@@ -44,12 +44,19 @@ Phase 1: Memory Foundation
 - MEMORY-02: 自动记忆压缩
 - MEMORY-03: 重要性权重摘要
 
+**Plans:** 3 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Core memory_manager.py module (data structures, add/compress/build/migrate/detect)
+- [ ] 01-02-PLAN.md — Integration with state_manager.py & tools.py (actor_speak, mark_memory, load migration)
+- [ ] 01-03-PLAN.md — Async LLM compression & edge cases (pending merge, LiteLlm fallback, serialization)
+
 **Success Criteria:**
-1. `app/memory_manager.py` 模块存在，实现 `update_memory_tiers()` 和 `build_actor_context()` 函数
-2. 运行 20+ 场戏后，每个演员的 `working_memory` ≤ 3 条、`recent_summary` 逐步增长、`arc_summary` 在阈值触发后被填充
+1. `app/memory_manager.py` 模块存在，实现 `add_working_memory()`、`build_actor_context()`、`check_and_compress()` 等函数
+2. 运行 20+ 场戏后，每个演员的 `working_memory` ≤ 5 条、`scene_summaries` 逐步增长、`arc_summary` 在阈值触发后被填充
 3. 旧版 `memory` 字段在 `load_progress()` 时自动迁移为 `working_memory`，不丢失数据
 4. `critical_memories` 机制可用：标记为关键的记忆不会被压缩，始终保留在上下文中
-5. `actor_speak()` 使用 `build_actor_context()` 替代原有扁平 `memory_str`，且无 LLM 调用（预压缩设计）
+5. `actor_speak()` 使用 `build_actor_context()` 替代原有扁平 `memory_str`，异步 LLM 压缩不阻塞主流程
 
 **Depends on:** None（基础设施，一切依赖于此）
 
