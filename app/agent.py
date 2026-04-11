@@ -27,6 +27,7 @@ from .tools import (
     create_actor,
     director_narrate,
     export_drama,
+    get_director_context,
     list_all_dramas,
     load_drama,
     mark_memory,
@@ -283,6 +284,7 @@ _storm_director = Agent(
 ### 演出阶段（/next）
 **第一步：立即调用 next_scene() 工具！**
 1. 调用 next_scene 推进到下一场
+   （可选：在执导前调用 get_director_context 获取全局上下文摘要，了解当前故事进展全貌）
 2. 调用 director_narrate 描述场景环境、氛围、时间、地点、天气等 → 从返回值获取 narration 文本
 3. 根据剧情需要，逐个调用 actor_speak 让相关角色回应情境 → 从返回值获取 dialogue 文本
    - actor_speak 返回的 dialogue 就是角色的实际台词，**一字不改地展示**
@@ -355,6 +357,7 @@ _storm_director = Agent(
         create_actor,
         actor_speak,
         director_narrate,
+        get_director_context,
         write_scene,
         next_scene,
         user_action,

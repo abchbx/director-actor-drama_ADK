@@ -50,9 +50,9 @@ from .actor_service import (
     stop_all_actor_services,
     list_running_actors,
 )
+from .context_builder import build_actor_context, build_director_context
 from .memory_manager import (
     add_working_memory,
-    build_actor_context,
     detect_importance,
     mark_critical_memory,
 )
@@ -272,7 +272,7 @@ async def actor_speak(
     formatted_lines.append(f"🎭 {actor_name}（{role_label} · {emotion_cn}）：")
 
     # Check if dialogue starts with [error] - format differently
-    if actor_dialogue.startswith("[") and "失败" in actor_dialogue or "超时" in actor_dialogue:
+    if actor_dialogue.startswith("[") and ("失败" in actor_dialogue or "超时" in actor_dialogue):
         formatted_lines.append(f"  ⚠️ {actor_dialogue}")
     else:
         # Split by newlines and indent each line as dialogue
@@ -411,6 +411,9 @@ def director_narrate(narration: str, tool_context: ToolContext) -> dict:
     """
     result = add_narration(narration, tool_context)
     
+    # Auto-include director context for scene awareness
+    director_ctx = build_director_context(tool_context)
+    
     # Auto-log the narration to conversation record
     add_conversation(
         speaker="导演",
@@ -435,6 +438,7 @@ def director_narrate(narration: str, tool_context: ToolContext) -> dict:
         "status": "success",
         "narration": narration,
         "formatted_narration": formatted_narration,
+        "director_context": director_ctx,
         "message": f"\n{separator}\n{formatted_narration}\n{separator}",
     }
 
@@ -498,6 +502,9 @@ def next_scene(tool_context: ToolContext) -> dict:
     state = tool_context.state.get("drama", {})
     scene_num = state.get("current_scene", 1)
 
+    # Auto-include director context for scene continuity
+    director_ctx = build_director_context(tool_context)
+
     # Get current actors for context
     actors_data = state.get("actors", {})
     actor_names = list(actors_data.keys())
@@ -507,6 +514,7 @@ def next_scene(tool_context: ToolContext) -> dict:
         "status": "success",
         "current_scene": scene_num,
         "actors_available": actor_names,
+        "director_context": director_ctx,
         "message": (
             f"▶️ 已推进至第 {scene_num} 场。\n\n"
             f"当前可用演员: {actor_list}\n\n"
@@ -822,6 +830,25 @@ def show_status(tool_context: ToolContext) -> dict:
         )
     
     return state
+
+
+def get_director_context(tool_context: ToolContext) -> dict:
+    """Get the current director context summary. Use when you need to review the overall story state, all actors' arcs, recent scenes, and active conflicts.
+
+    Returns a formatted context string containing: global story arc, current status, recent scenes, actor emotions, STORM perspectives, and any active conflicts or established facts.
+
+    Args:
+        tool_context: The tool context.
+
+    Returns:
+        dict with the director context summary.
+    """
+    context = build_director_context(tool_context)
+    return {
+        "status": "success",
+        "context": context,
+        "message": f"📋 导演上下文摘要:\n{context[:500]}..." if len(context) > 500 else f"📋 导演上下文摘要:\n{context}",
+    }
 
 
 def update_emotion(actor_name: str, emotion: str, tool_context: ToolContext) -> dict:

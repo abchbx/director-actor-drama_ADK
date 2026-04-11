@@ -332,6 +332,10 @@ def save_state_clean(tool_context: ToolContext) -> None:
 
     Call this before _set_state() to strip non-serializable objects.
     This is a no-op if no pending compression exists.
+
+    NOTE: Mutates actor_data dicts in-place within the state dict.
+    Call this BEFORE _set_state() — the mutations are visible through
+    the state dict reference.
     """
     state = _get_state(tool_context)
     for actor_name, actor_data in state.get("actors", {}).items():
@@ -545,12 +549,14 @@ def check_and_compress(actor_name: str, tool_context: ToolContext) -> dict:
                     compress_working_to_scene(actor_name, overflow, tool_context)
                 )
                 actor_data["scene_summaries"].append(result)
+                overflow_ids = set(id(e) for e in overflow)
                 pending["pending_entries"] = [
                     e for e in pending.get("pending_entries", [])
-                    if e not in overflow
+                    if id(e) not in overflow_ids
                 ]
             except RuntimeError:
                 # No event loop at all: keep entries in pending, compress later
+                logger.warning(f"Cannot compress memory for {actor_name}: no event loop available. Entries retained in pending.")
                 pass
 
         compressed.append(f"working→scene: {len(overflow)} 条")
@@ -575,6 +581,7 @@ def check_and_compress(actor_name: str, tool_context: ToolContext) -> dict:
                 )
                 actor_data["arc_summary"] = result
             except RuntimeError:
+                logger.warning(f"Cannot compress scene→arc for {actor_name}: no event loop available. Entries retained in pending.")
                 pass
 
         compressed.append(f"scene→arc: {len(overflow_summaries)} 条")
@@ -592,92 +599,6 @@ def check_and_compress(actor_name: str, tool_context: ToolContext) -> dict:
         "compressed": compressed,
         "message": f"压缩检查完成: {', '.join(compressed)}" if compressed else "无需压缩",
     }
-
-
-def build_actor_context(actor_name: str, tool_context: ToolContext) -> str:
-    """Build the complete memory context string for an actor_speak() call.
-
-    替换 tools.py:201-213 中的扁平 memory_str 构建。
-    按优先级组装：角色锚点 → 关键记忆 → 全局摘要 → 场景摘要 → 工作记忆 → 待压缩记忆。
-
-    Args:
-        actor_name: The actor whose context to build.
-        tool_context: Tool context for state access.
-
-    Returns:
-        Formatted context string for the actor prompt.
-    """
-    state = _get_state(tool_context)
-    actor_data = state.get("actors", {}).get(actor_name, {})
-
-    if not actor_data:
-        return "暂无记忆"
-
-    # Merge any completed async compression results
-    _merge_pending_compression(actor_name, actor_data, tool_context)
-
-    parts = []
-
-    # Tier 0: Character anchor (prevents backstory forgetting — PITFALLS #3)
-    role = actor_data.get("role", "")
-    personality = actor_data.get("personality", "")
-    parts.append(f"【角色锚点】你是{actor_name}，{role}。{personality}")
-
-    # Current emotion
-    emotion = actor_data.get("emotions", "neutral")
-    emotion_cn = {
-        "neutral": "平静", "angry": "愤怒", "sad": "悲伤", "happy": "喜悦",
-        "fearful": "恐惧", "confused": "困惑", "determined": "决绝",
-        "anxious": "焦虑", "hopeful": "充满希望",
-    }.get(emotion, emotion)
-    parts.append(f"【当前情绪】{emotion_cn}")
-
-    # Critical memories (D-07: always included, never compressed)
-    critical = actor_data.get("critical_memories", [])
-    if critical:
-        lines = [f"- [第{m['scene']}场] {m['entry']} [{m['reason']}]" for m in critical]
-        parts.append("【关键记忆（永久保留）】\n" + "\n".join(lines))
-
-    # Tier 3: Arc summary (always included — small)
-    arc = actor_data.get("arc_summary", {})
-    if arc.get("narrative"):
-        structured = arc.get("structured", {})
-        theme = structured.get("theme", "")
-        unresolved = "；".join(structured.get("unresolved", []))
-        resolved = "；".join(structured.get("resolved", []))
-        header = f"主题：{theme}" if theme else ""
-        if unresolved:
-            header += f" | 未决：{unresolved}"
-        if resolved:
-            header += f" | 已解决：{resolved}"
-        arc_text = arc["narrative"]
-        if header:
-            parts.append(f"【你的故事弧线】\n{header}\n{arc_text}")
-        else:
-            parts.append(f"【你的故事弧线】\n{arc_text}")
-
-    # Tier 2: Scene summaries
-    summaries = actor_data.get("scene_summaries", [])
-    if summaries:
-        lines = [f"- 第{s['scenes_covered']}场：{s['summary']}" for s in summaries[-10:]]
-        parts.append("【近期场景摘要】\n" + "\n".join(lines))
-
-    # Tier 1: Working memory (full detail, last 5)
-    working = actor_data.get("working_memory", [])
-    if working:
-        lines = [f"  第{e.get('scene', '?')}场: {e['entry']}" for e in working[-5:]]
-        parts.append("【最近的经历（详细）】\n" + "\n".join(lines))
-
-    # Fallback: pending entries not yet compressed (D-09: ensure no info loss)
-    pending = actor_data.get("_pending_compression", {})
-    if pending.get("pending_entries"):
-        pending_lines = [
-            f"  第{e.get('scene', '?')}场（待压缩）: {e['entry']}"
-            for e in pending["pending_entries"]
-        ]
-        parts.append("【待压缩记忆】\n" + "\n".join(pending_lines))
-
-    return "\n\n".join(parts) if parts else "暂无记忆"
 
 
 def mark_critical_memory(
@@ -712,8 +633,8 @@ def mark_critical_memory(
     actor_data = actors[actor_name]
     working = actor_data.get("working_memory", [])
 
-    if memory_index < 0 or memory_index >= len(working):
-        return {"status": "error", "message": f"索引 {memory_index} 超出范围（0-{len(working)-1}）。"}
+    if not working or memory_index < 0 or memory_index >= len(working):
+        return {"status": "error", "message": f"索引 {memory_index} 超出范围。工作记忆为空或索引无效。"}
 
     entry = working.pop(memory_index)
 
@@ -807,6 +728,10 @@ def detect_importance(entry_text: str, situation: str = "") -> tuple[bool, Optio
 
     使用关键词模式检测 6 类关键事件。用于自动识别重要记忆。
 
+    WARNING: Uses substring matching which can produce false positives.
+    For example, "兴奋" in 情感高峰 patterns matches normal text like "兴奋地跑来".
+    Critical detections should be confirmed by the director before marking.
+
     Args:
         entry_text: The memory entry text to analyze.
         situation: The situation context (may contain additional clues).
@@ -852,3 +777,13 @@ def ensure_actor_memory_fields(actor_data: dict) -> dict:
     })
     actor_data.setdefault("critical_memories", [])
     return actor_data
+
+
+# Phase 2: Re-export for backward compatibility
+# build_actor_context has been migrated to context_builder.py
+# Using lazy import to avoid circular import (context_builder imports _merge_pending_compression from us)
+def __getattr__(name):
+    if name == "build_actor_context":
+        from .context_builder import build_actor_context
+        return build_actor_context
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
