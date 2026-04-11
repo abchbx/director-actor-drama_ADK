@@ -47,8 +47,8 @@ Phase 1: Memory Foundation
 **Plans:** 3 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Core memory_manager.py module (data structures, add/compress/build/migrate/detect)
-- [ ] 01-02-PLAN.md — Integration with state_manager.py & tools.py (actor_speak, mark_memory, load migration)
+- [x] 01-01-PLAN.md — Core memory_manager.py module (data structures, add/compress/build/migrate/detect)
+- [x] 01-02-PLAN.md — Integration with state_manager.py & tools.py (actor_speak, mark_memory, load migration)
 - [ ] 01-03-PLAN.md — Async LLM compression & edge cases (pending merge, LiteLlm fallback, serialization)
 
 **Success Criteria:**
