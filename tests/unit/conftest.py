@@ -1,0 +1,70 @@
+"""Shared test fixtures for memory_manager unit tests."""
+
+import pytest
+from unittest.mock import MagicMock
+
+
+@pytest.fixture
+def mock_tool_context():
+    """Create a mock ToolContext with drama state containing a test actor."""
+    tc = MagicMock()
+    tc.state = {
+        "drama": {
+            "theme": "测试戏剧",
+            "current_scene": 3,
+            "status": "acting",
+            "actors": {
+                "朱棣": {
+                    "role": "燕王",
+                    "personality": "沉稳冷静，说话简短有力",
+                    "background": "明太祖第四子，封燕王，镇守北平",
+                    "knowledge_scope": "熟悉军事和朝堂",
+                    "memory": [],  # old field
+                    "working_memory": [],
+                    "scene_summaries": [],
+                    "arc_summary": {
+                        "structured": {
+                            "theme": "",
+                            "key_characters": [],
+                            "unresolved": [],
+                            "resolved": [],
+                        },
+                        "narrative": "",
+                    },
+                    "critical_memories": [],
+                    "emotions": "neutral",
+                    "created_at": "2026-04-11T10:00:00",
+                }
+            },
+        }
+    }
+    return tc
+
+
+@pytest.fixture
+def mock_tool_context_old_format():
+    """Create a mock ToolContext with OLD format actor (no new fields)."""
+    tc = MagicMock()
+    tc.state = {
+        "drama": {
+            "theme": "旧格式戏剧",
+            "current_scene": 5,
+            "status": "acting",
+            "actors": {
+                "朱元璋": {
+                    "role": "皇帝",
+                    "personality": "威严果断",
+                    "background": "大明开国皇帝",
+                    "knowledge_scope": "天下大事",
+                    "memory": [
+                        {"entry": "面对情境: 第一场描述", "timestamp": "2026-04-10T10:00:00"},
+                        {"entry": "面对情境: 第二场描述", "timestamp": "2026-04-10T11:00:00"},
+                        {"entry": "面对情境: 第三场描述", "timestamp": "2026-04-10T12:00:00"},
+                    ],
+                    "emotions": "angry",
+                    "created_at": "2026-04-10T09:00:00",
+                }
+            },
+        }
+    }
+    return tc
