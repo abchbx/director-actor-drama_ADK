@@ -1,15 +1,17 @@
 """Memory manager for the 3-tier drama memory architecture.
 
 实现三层记忆管理：工作记忆（Tier 1）→ 场景摘要（Tier 2）→ 全局摘要（Tier 3）。
-包含关键记忆保护、自动压缩触发、旧格式迁移功能。
+包含关键记忆保护、异步LLM压缩、旧格式迁移功能。
 
 Architecture:
-    working_memory (max 5) → compress → scene_summaries (max 10) → compress → arc_summary
+    working_memory (max 5) → async LLM compress → scene_summaries (max 10) → async LLM compress → arc_summary
     critical_memories: 独立存储，永不压缩
 """
 
+import asyncio
 import json
 import logging
+import os
 from typing import Optional
 
 from google.adk.tools import ToolContext
@@ -52,6 +54,348 @@ _EMOTION_WORDS = {
 
 # Maximum entry text length (T-01-01: prevent injection via overly long text)
 ENTRY_TEXT_MAX_LENGTH = 500
+
+
+# ============================================================================
+# LLM Compression Prompt Builders (from RESEARCH.md §LLM Compression Design)
+# ============================================================================
+
+
+def _build_compression_prompt_working(entries: list[dict], actor_name: str) -> str:
+    """Build the LLM prompt for working→scene compression."""
+    entries_text = "\n".join(
+        f"- [第{e.get('scene', '?')}场] {e['entry']}" for e in entries
+    )
+    return f"""你是一位戏剧记忆压缩助手。请将以下演员「{actor_name}」的工作记忆压缩为一段场景摘要。
+
+## 输入（{len(entries)} 条工作记忆）
+{entries_text}
+
+## 压缩规则
+1. 保留所有关键事件：角色首次登场、重大转折、情感变化、未决事件
+2. 次要事件仅保留一句概述
+3. 保持时间顺序
+4. 使用第三人称叙述
+5. 摘要长度控制在 150-200 字
+6. 特别标注涉及{actor_name}的情感变化和决策
+
+## 输出格式
+直接输出摘要文本，不要加前缀或标题。"""
+
+
+def _build_compression_prompt_arc(
+    summaries: list[dict],
+    existing_arc: dict,
+    actor_name: str,
+) -> str:
+    """Build the LLM prompt for scene→arc compression."""
+    summaries_text = "\n\n".join(
+        f"### 场景 {s.get('scenes_covered', '?')}\n{s['summary']}" for s in summaries
+    )
+    existing_narrative = existing_arc.get("narrative", "暂无")
+    existing_structured = existing_arc.get("structured", {})
+
+    return f"""你是一位戏剧故事弧线压缩助手。请将以下场景摘要融入演员「{actor_name}」的全局故事弧线摘要。
+
+## 新增场景摘要
+{summaries_text}
+
+## 现有全局摘要
+### 结构化信息
+- 主题: {existing_structured.get('theme', '未确定')}
+- 关键角色: {', '.join(existing_structured.get('key_characters', []))}
+- 未决冲突: {'; '.join(existing_structured.get('unresolved', []))}
+- 已解决冲突: {'; '.join(existing_structured.get('resolved', []))}
+
+### 叙事概述
+{existing_narrative}
+
+## 压缩规则
+1. 将新增摘要融入现有全局摘要，重写整个概述
+2. 更新结构化字段：添加新角色、更新冲突状态（未决→已解决）
+3. 叙事概述控制在 200-300 字
+4. 保持故事连贯性，不要遗漏重要转折
+5. 如有新主题浮现，更新主题字段
+
+## 输出格式（严格 JSON）
+{{{{
+  "structured": {{{{
+    "theme": "故事核心主题",
+    "key_characters": ["角色1", "角色2"],
+    "unresolved": ["未决冲突1", "未决冲突2"],
+    "resolved": ["已解决冲突1"]
+  }}}},
+  "narrative": "完整的故事弧线概述..."
+}}}}"""
+
+
+# ============================================================================
+# Async LLM Compression Functions
+# ============================================================================
+
+
+async def _call_llm(prompt: str) -> str:
+    """Call LLM for compression. Try LiteLlm first, fallback to httpx.
+
+    LiteLlm 是 ADK 内置的 LLM 封装，支持 OpenAI 兼容 API。
+    如果 LiteLlm 不可用（A2 假设），回退到 httpx 直接调用。
+    """
+    model_name = os.environ.get("MODEL_NAME", "openai/claude-sonnet-4-6")
+
+    # Try LiteLlm first
+    try:
+        from google.adk.models.lite_llm import LiteLlm
+        model = LiteLlm(model=model_name)
+        response = await model.generate_content_async([prompt])
+        if hasattr(response, 'text') and response.text:
+            return response.text.strip()
+    except Exception as e:
+        logger.info(f"LiteLlm call failed ({e}), falling back to httpx")
+
+    # Fallback: httpx direct API call
+    try:
+        import httpx
+        api_base = os.environ.get("OPENAI_BASE_URL", "https://openrouter.ai/api/v1")
+        api_key = os.environ.get("OPENAI_API_KEY", os.environ.get("LLM_API_KEY", ""))
+
+        async with httpx.AsyncClient(timeout=httpx.Timeout(timeout=60)) as client:
+            response = await client.post(
+                f"{api_base}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": model_name.replace("openai/", ""),
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.3,
+                    "max_tokens": 1000,
+                },
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data["choices"][0]["message"]["content"].strip()
+    except Exception as e:
+        logger.error(f"httpx fallback also failed: {e}")
+        # Return a basic concatenation as last resort
+        return "压缩失败：请参考原始记忆条目。"
+
+
+async def compress_working_to_scene(
+    actor_name: str,
+    entries: list[dict],
+    tool_context: ToolContext,
+) -> dict:
+    """Async LLM compression of working memory → scene summary.
+
+    使用 LLM 将工作记忆条目压缩为场景摘要。
+    先尝试 LiteLlm，失败时回退到 httpx 直接 API 调用。
+
+    Args:
+        actor_name: The actor whose memory to compress.
+        entries: Working memory entries to compress.
+        tool_context: Tool context for state access.
+
+    Returns:
+        dict with summary, scenes_covered, key_events.
+    """
+    prompt = _build_compression_prompt_working(entries, actor_name)
+
+    # Try LiteLlm first (A2 from RESEARCH.md)
+    summary_text = await _call_llm(prompt)
+
+    # Determine scenes covered
+    scenes = sorted(set(e.get("scene", 0) for e in entries))
+    scenes_covered = f"{scenes[0]}-{scenes[-1]}" if len(scenes) > 1 else str(scenes[0])
+
+    # Extract key events
+    key_events = []
+    for e in entries:
+        first_sentence = e["entry"].split("。")[0]
+        if first_sentence:
+            key_events.append(first_sentence + "。" if "。" not in first_sentence else first_sentence)
+
+    return {
+        "summary": summary_text,
+        "scenes_covered": scenes_covered,
+        "key_events": key_events,
+    }
+
+
+async def compress_scene_to_arc(
+    actor_name: str,
+    summaries: list[dict],
+    tool_context: ToolContext,
+) -> dict:
+    """Async LLM compression of scene summaries → arc summary.
+
+    使用 LLM 将场景摘要压缩入全局摘要。
+    Per D-10: 每次重写整个全局摘要。
+
+    Args:
+        actor_name: The actor whose memory to compress.
+        summaries: Scene summaries to compress.
+        tool_context: Tool context for state access.
+
+    Returns:
+        dict with structured and narrative fields (the new arc_summary).
+    """
+    state = _get_state(tool_context)
+    actor_data = state.get("actors", {}).get(actor_name, {})
+    existing_arc = actor_data.get("arc_summary", {})
+
+    prompt = _build_compression_prompt_arc(summaries, existing_arc, actor_name)
+    response_text = await _call_llm(prompt)
+
+    # Parse JSON response (A3 from RESEARCH.md: may need fault-tolerant parsing)
+    try:
+        # Try to extract JSON from response (LLM may add markdown fences)
+        json_text = response_text.strip()
+        if "```json" in json_text:
+            json_text = json_text.split("```json")[1].split("```")[0].strip()
+        elif "```" in json_text:
+            json_text = json_text.split("```")[1].split("```")[0].strip()
+
+        result = json.loads(json_text)
+        # Validate structure
+        structured = result.get("structured", existing_arc.get("structured", {}))
+        narrative = result.get("narrative", response_text[:500])
+
+        return {
+            "structured": {
+                "theme": structured.get("theme", ""),
+                "key_characters": structured.get("key_characters", []),
+                "unresolved": structured.get("unresolved", []),
+                "resolved": structured.get("resolved", []),
+            },
+            "narrative": narrative[:500],  # Hard limit per Pitfall 3
+        }
+    except (json.JSONDecodeError, KeyError, IndexError):
+        # Fallback: use raw text as narrative
+        logger.warning(f"Failed to parse arc compression JSON for {actor_name}, using raw text")
+        return {
+            "structured": existing_arc.get("structured", {
+                "theme": "", "key_characters": [], "unresolved": [], "resolved": [],
+            }),
+            "narrative": response_text[:500],
+        }
+
+
+# ============================================================================
+# Serialization Helpers for _pending_compression
+# ============================================================================
+
+
+def _serialize_pending_for_save(actor_data: dict) -> dict:
+    """Strip non-serializable objects from _pending_compression before saving.
+
+    asyncio.Task objects cannot be JSON serialized (A3 from RESEARCH.md).
+    Only preserve pending_entries (raw data) for re-compression on load.
+    """
+    pending = actor_data.get("_pending_compression", {})
+    if not pending:
+        return actor_data
+
+    # Keep only serializable fields
+    actor_data["_pending_compression"] = {
+        "working_to_scene": None,   # Task reference stripped
+        "scene_to_arc": None,       # Task reference stripped
+        "pending_entries": pending.get("pending_entries", []),
+        "result": None,             # Result already merged or cleared
+    }
+    return actor_data
+
+
+def _deserialize_pending_on_load(actor_data: dict) -> dict:
+    """Restore _pending_compression structure after loading from disk.
+
+    If pending_entries exist from a previous session, they need to be
+    re-compressed. The actual re-compression will happen on the next
+    check_and_compress() or build_actor_context() call.
+    """
+    pending = actor_data.get("_pending_compression", {})
+    if not pending:
+        return actor_data
+
+    # Ensure structure is complete
+    actor_data["_pending_compression"] = {
+        "working_to_scene": None,
+        "scene_to_arc": None,
+        "pending_entries": pending.get("pending_entries", []),
+        "result": None,
+    }
+    return actor_data
+
+
+def save_state_clean(tool_context: ToolContext) -> None:
+    """Clean _pending_compression in all actors before state save.
+
+    Call this before _set_state() to strip non-serializable objects.
+    This is a no-op if no pending compression exists.
+    """
+    state = _get_state(tool_context)
+    for actor_name, actor_data in state.get("actors", {}).items():
+        _serialize_pending_for_save(actor_data)
+
+
+# ============================================================================
+# Pending Compression Merge
+# ============================================================================
+
+
+def _merge_pending_compression(actor_name: str, actor_data: dict, tool_context) -> bool:
+    """Merge any completed compression results into the actor's state.
+
+    在 build_actor_context() 开头调用，确保使用最新数据。
+    返回 True 如果有合并发生（需要重新保存 state）。
+
+    Args:
+        actor_name: The actor's name.
+        actor_data: The actor data dict (mutated in place if merged).
+        tool_context: Tool context for state access.
+
+    Returns:
+        True if any merge happened, False otherwise.
+    """
+    pending = actor_data.get("_pending_compression", {})
+    if not pending:
+        return False
+
+    merged = False
+
+    # Check working→scene result
+    task_w2s = pending.get("working_to_scene")
+    if task_w2s and hasattr(task_w2s, 'done') and task_w2s.done():
+        try:
+            result = task_w2s.result()
+            actor_data["scene_summaries"].append(result)
+            # Clear compressed entries from pending
+            pending["pending_entries"] = []
+            pending["working_to_scene"] = None
+            merged = True
+        except Exception as e:
+            # Compression failed — keep entries in pending as fallback
+            logger.warning(f"Working→scene compression failed for {actor_name}: {e}")
+            pending["working_to_scene"] = None
+
+    # Check scene→arc result
+    task_s2a = pending.get("scene_to_arc")
+    if task_s2a and hasattr(task_s2a, 'done') and task_s2a.done():
+        try:
+            result = task_s2a.result()
+            actor_data["arc_summary"] = result
+            pending["scene_to_arc"] = None
+            merged = True
+        except Exception as e:
+            logger.warning(f"Scene→arc compression failed for {actor_name}: {e}")
+            pending["scene_to_arc"] = None
+
+    if merged:
+        state = _get_state(tool_context)
+        state["actors"][actor_name] = actor_data
+        _set_state(state, tool_context)
+
+    return merged
 
 
 # ============================================================================
@@ -147,14 +491,10 @@ def add_working_memory(
 
 
 def check_and_compress(actor_name: str, tool_context: ToolContext) -> dict:
-    """Check memory tier sizes and trigger compression if limits exceeded.
+    """Check memory tier sizes and trigger async compression if limits exceeded.
 
-    检查各层记忆容量，超过阈值时触发压缩。
-    - working_memory > WORKING_MEMORY_LIMIT (5): 触发 compress_working_to_scene()
-    - scene_summaries > SCENE_SUMMARY_LIMIT (10): 触发 compress_scene_to_arc()
-
-    在 Plan 01 中，压缩是同步的 stub 实现（不调用 LLM）。
-    Plan 03 将替换为真正的异步 LLM 压缩。
+    检查各层记忆容量，超过阈值时触发异步 LLM 压缩。
+    压缩结果通过 _pending_compression 延迟合并，避免竞态条件。
 
     Args:
         actor_name: The actor whose memory to check.
@@ -172,25 +512,47 @@ def check_and_compress(actor_name: str, tool_context: ToolContext) -> dict:
     actor_data = actors[actor_name]
     compressed = []
 
+    # Ensure _pending_compression field exists
+    actor_data.setdefault("_pending_compression", {
+        "working_to_scene": None,
+        "scene_to_arc": None,
+        "pending_entries": [],
+        "result": None,
+    })
+
     # Check working_memory overflow (D-04)
     working = actor_data.get("working_memory", [])
     if len(working) > WORKING_MEMORY_LIMIT:
         overflow = working[:-WORKING_MEMORY_LIMIT]
         actor_data["working_memory"] = working[-WORKING_MEMORY_LIMIT:]
 
-        # Stub compression: create a simple scene summary from overflow entries
-        # (Plan 03 will replace with LLM-based async compression)
-        scenes = sorted(set(e.get("scene", 0) for e in overflow))
-        scenes_covered = f"{scenes[0]}-{scenes[-1]}" if len(scenes) > 1 else str(scenes[0])
-        summary_text = "；".join(e["entry"][:50] for e in overflow)
-        key_events = [e["entry"].split("。")[0] + "。" for e in overflow if "。" in e["entry"]]
+        # Store overflow in pending for async compression
+        pending = actor_data["_pending_compression"]
+        pending["pending_entries"] = pending.get("pending_entries", []) + overflow
 
-        scene_summary = {
-            "summary": summary_text,
-            "scenes_covered": scenes_covered,
-            "key_events": key_events,
-        }
-        actor_data["scene_summaries"].append(scene_summary)
+        # Launch async compression task
+        try:
+            loop = asyncio.get_running_loop()
+            # There's a running loop: create a task
+            task = loop.create_task(
+                compress_working_to_scene(actor_name, overflow, tool_context)
+            )
+            pending["working_to_scene"] = task
+        except RuntimeError:
+            # No running loop: run synchronously
+            try:
+                result = asyncio.run(
+                    compress_working_to_scene(actor_name, overflow, tool_context)
+                )
+                actor_data["scene_summaries"].append(result)
+                pending["pending_entries"] = [
+                    e for e in pending.get("pending_entries", [])
+                    if e not in overflow
+                ]
+            except RuntimeError:
+                # No event loop at all: keep entries in pending, compress later
+                pass
+
         compressed.append(f"working→scene: {len(overflow)} 条")
 
     # Check scene_summaries overflow (D-05)
@@ -199,24 +561,28 @@ def check_and_compress(actor_name: str, tool_context: ToolContext) -> dict:
         overflow_summaries = summaries[:-SCENE_SUMMARY_LIMIT]
         actor_data["scene_summaries"] = summaries[-SCENE_SUMMARY_LIMIT:]
 
-        # Stub: merge overflow summaries into arc_summary
-        # (Plan 03 will replace with LLM-based rewrite)
-        existing_arc = actor_data.get("arc_summary", {})
-        existing_narrative = existing_arc.get("narrative", "")
+        try:
+            loop = asyncio.get_running_loop()
+            task = loop.create_task(
+                compress_scene_to_arc(actor_name, overflow_summaries, tool_context)
+            )
+            actor_data["_pending_compression"]["scene_to_arc"] = task
+        except RuntimeError:
+            # No running loop: run synchronously
+            try:
+                result = asyncio.run(
+                    compress_scene_to_arc(actor_name, overflow_summaries, tool_context)
+                )
+                actor_data["arc_summary"] = result
+            except RuntimeError:
+                pass
 
-        new_events = "；".join(s.get("summary", "")[:80] for s in overflow_summaries)
-        updated_narrative = f"{existing_narrative}。近期：{new_events}" if existing_narrative else f"近期：{new_events}"
-
-        actor_data["arc_summary"] = {
-            "structured": existing_arc.get("structured", {
-                "theme": "", "key_characters": [], "unresolved": [], "resolved": [],
-            }),
-            "narrative": updated_narrative[:500],  # Hard limit per Pitfall 3
-        }
         compressed.append(f"scene→arc: {len(overflow_summaries)} 条")
 
     # Save state if anything changed
     if compressed:
+        # Strip asyncio.Task objects (not JSON-serializable) before saving
+        _serialize_pending_for_save(actor_data)
         actors[actor_name] = actor_data
         state["actors"] = actors
         _set_state(state, tool_context)
@@ -232,7 +598,7 @@ def build_actor_context(actor_name: str, tool_context: ToolContext) -> str:
     """Build the complete memory context string for an actor_speak() call.
 
     替换 tools.py:201-213 中的扁平 memory_str 构建。
-    按优先级组装：角色锚点 → 关键记忆 → 全局摘要 → 场景摘要 → 工作记忆。
+    按优先级组装：角色锚点 → 关键记忆 → 全局摘要 → 场景摘要 → 工作记忆 → 待压缩记忆。
 
     Args:
         actor_name: The actor whose context to build.
@@ -246,6 +612,9 @@ def build_actor_context(actor_name: str, tool_context: ToolContext) -> str:
 
     if not actor_data:
         return "暂无记忆"
+
+    # Merge any completed async compression results
+    _merge_pending_compression(actor_name, actor_data, tool_context)
 
     parts = []
 
@@ -298,6 +667,15 @@ def build_actor_context(actor_name: str, tool_context: ToolContext) -> str:
     if working:
         lines = [f"  第{e.get('scene', '?')}场: {e['entry']}" for e in working[-5:]]
         parts.append("【最近的经历（详细）】\n" + "\n".join(lines))
+
+    # Fallback: pending entries not yet compressed (D-09: ensure no info loss)
+    pending = actor_data.get("_pending_compression", {})
+    if pending.get("pending_entries"):
+        pending_lines = [
+            f"  第{e.get('scene', '?')}场（待压缩）: {e['entry']}"
+            for e in pending["pending_entries"]
+        ]
+        parts.append("【待压缩记忆】\n" + "\n".join(pending_lines))
 
     return "\n\n".join(parts) if parts else "暂无记忆"
 

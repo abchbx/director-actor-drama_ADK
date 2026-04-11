@@ -8,6 +8,7 @@ Tests the 3-tier memory architecture:
 - Legacy memory migration
 """
 
+from unittest.mock import patch, AsyncMock
 from app.memory_manager import (
     add_working_memory,
     check_and_compress,
@@ -263,7 +264,10 @@ class TestCheckAndCompress:
             for i in range(7)
         ]
 
-        result = check_and_compress("朱棣", mock_tool_context)
+        with patch("app.memory_manager._call_llm", new_callable=AsyncMock) as mock_llm:
+            mock_llm.return_value = "压缩摘要：第0-1场事件概述。"
+            result = check_and_compress("朱棣", mock_tool_context)
+
         assert result["status"] == "success"
         assert len(result["compressed"]) > 0
 
@@ -284,7 +288,10 @@ class TestCheckAndCompress:
             for i in range(12)
         ]
 
-        result = check_and_compress("朱棣", mock_tool_context)
+        with patch("app.memory_manager._call_llm", new_callable=AsyncMock) as mock_llm:
+            mock_llm.return_value = '{"structured": {"theme": "测试", "key_characters": ["朱棣"], "unresolved": [], "resolved": []}, "narrative": "故事弧线概述。"}'
+            result = check_and_compress("朱棣", mock_tool_context)
+
         assert result["status"] == "success"
         assert len(result["compressed"]) > 0
 
