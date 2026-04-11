@@ -49,7 +49,7 @@ Phase 1: Memory Foundation
 Plans:
 - [x] 01-01-PLAN.md — Core memory_manager.py module (data structures, add/compress/build/migrate/detect)
 - [x] 01-02-PLAN.md — Integration with state_manager.py & tools.py (actor_speak, mark_memory, load migration)
-- [ ] 01-03-PLAN.md — Async LLM compression & edge cases (pending merge, LiteLlm fallback, serialization)
+- [x] 01-03-PLAN.md — Async LLM compression & edge cases (pending merge, LiteLlm fallback, serialization)
 
 **Success Criteria:**
 1. `app/memory_manager.py` 模块存在，实现 `add_working_memory()`、`build_actor_context()`、`check_and_compress()` 等函数
