@@ -290,6 +290,8 @@ class TestAgentIncludesMarkMemory:
     def test_agent_includes_mark_memory(self):
         """agent.py director tools list includes mark_memory."""
         from app.agent import _storm_director
+        from app.tools import mark_memory as mark_memory_tool
 
-        tool_names = [t.name for t in _storm_director.tools]
+        # In ADK, tools in the tools list are Python functions
+        tool_names = [t.__name__ if hasattr(t, '__name__') else getattr(t, 'name', str(t)) for t in _storm_director.tools]
         assert "mark_memory" in tool_names
