@@ -1,0 +1,26 @@
+{
+  "name": "actor_纪年",
+  "description": "演员 纪年，角色：主角",
+  "url": "http://localhost:9049/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_纪年",
+      "name": "扮演纪年",
+      "description": "以纪年的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

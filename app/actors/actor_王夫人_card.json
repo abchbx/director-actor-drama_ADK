@@ -1,0 +1,26 @@
+{
+  "name": "actor_王夫人",
+  "description": "演员 王夫人，角色：对立面",
+  "url": "http://localhost:9097/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_王夫人",
+      "name": "扮演王夫人",
+      "description": "以王夫人的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

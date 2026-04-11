@@ -1,0 +1,61 @@
+{
+  "theme": "同步回退测试",
+  "actors": {
+    "同步演员": {
+      "working_memory": [
+        {
+          "entry": "条目3",
+          "importance": "normal",
+          "scene": 3
+        },
+        {
+          "entry": "条目4",
+          "importance": "normal",
+          "scene": 4
+        },
+        {
+          "entry": "条目5",
+          "importance": "normal",
+          "scene": 5
+        },
+        {
+          "entry": "条目6",
+          "importance": "normal",
+          "scene": 6
+        },
+        {
+          "entry": "条目7",
+          "importance": "normal",
+          "scene": 7
+        }
+      ],
+      "scene_summaries": [
+        {
+          "summary": "同步压缩摘要",
+          "scenes_covered": "0-2",
+          "key_events": [
+            "条目0。",
+            "条目1。",
+            "条目2。"
+          ]
+        }
+      ],
+      "arc_summary": {
+        "structured": {
+          "theme": "",
+          "key_characters": [],
+          "unresolved": [],
+          "resolved": []
+        },
+        "narrative": ""
+      },
+      "critical_memories": [],
+      "_pending_compression": {
+        "working_to_scene": null,
+        "scene_to_arc": null,
+        "pending_entries": [],
+        "result": null
+      }
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "theme": "新格式戏剧",
+  "current_scene": 1,
+  "status": "acting",
+  "actors": {
+    "新角色": {
+      "role": "测试",
+      "personality": "普通",
+      "background": "测试背景",
+      "knowledge_scope": "测试知识",
+      "memory": [],
+      "working_memory": [
+        {
+          "entry": "已有记忆",
+          "importance": "normal",
+          "scene": 1
+        }
+      ],
+      "scene_summaries": [],
+      "arc_summary": {
+        "structured": {
+          "theme": "",
+          "key_characters": [],
+          "unresolved": [],
+          "resolved": []
+        },
+        "narrative": ""
+      },
+      "critical_memories": [],
+      "emotions": "neutral",
+      "created_at": "2026-04-11T09:00:00"
+    }
+  },
+  "scenes": [],
+  "narration_log": [],
+  "created_at": "2026-04-11T09:00:00",
+  "updated_at": "2026-04-11T05:35:38.481896"
+}

@@ -1,0 +1,26 @@
+{
+  "name": "actor_蒙恬",
+  "description": "演员 蒙恬，角色：重要配角/导师",
+  "url": "http://localhost:9039/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_蒙恬",
+      "name": "扮演蒙恬",
+      "description": "以蒙恬的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

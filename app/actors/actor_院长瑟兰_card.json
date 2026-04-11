@@ -1,0 +1,26 @@
+{
+  "name": "actor_院长瑟兰",
+  "description": "演员 院长瑟兰，角色：反派/对立面",
+  "url": "http://localhost:9051/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_院长瑟兰",
+      "name": "扮演院长瑟兰",
+      "description": "以院长瑟兰的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

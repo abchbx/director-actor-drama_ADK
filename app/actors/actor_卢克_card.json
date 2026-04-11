@@ -1,0 +1,26 @@
+{
+  "name": "actor_卢克",
+  "description": "演员 卢克，角色：旁观者/朋友",
+  "url": "http://localhost:9022/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_卢克",
+      "name": "扮演卢克",
+      "description": "以卢克的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

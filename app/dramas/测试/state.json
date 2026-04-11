@@ -1,0 +1,65 @@
+{
+  "actors": {
+    "快演员": {
+      "working_memory": [
+        {
+          "entry": "条目7",
+          "importance": "normal",
+          "scene": 7
+        },
+        {
+          "entry": "条目8",
+          "importance": "normal",
+          "scene": 8
+        },
+        {
+          "entry": "条目9",
+          "importance": "normal",
+          "scene": 9
+        },
+        {
+          "entry": "条目10",
+          "importance": "normal",
+          "scene": 10
+        },
+        {
+          "entry": "条目11",
+          "importance": "normal",
+          "scene": 11
+        }
+      ],
+      "scene_summaries": [
+        {
+          "summary": "您提供的输入数据似乎只有占位符格式（条目0-6），并未包含具体的工作记忆内容。\n\n请您提供「快演员」的实际工作记忆条目（例如具体的场景描述、事件、台词等），这样我才能为您进行压缩。",
+          "scenes_covered": "0-6",
+          "key_events": [
+            "条目0。",
+            "条目1。",
+            "条目2。",
+            "条目3。",
+            "条目4。",
+            "条目5。",
+            "条目6。"
+          ]
+        }
+      ],
+      "arc_summary": {
+        "structured": {
+          "theme": "",
+          "key_characters": [],
+          "unresolved": [],
+          "resolved": []
+        },
+        "narrative": ""
+      },
+      "critical_memories": [],
+      "_pending_compression": {
+        "working_to_scene": null,
+        "scene_to_arc": null,
+        "pending_entries": [],
+        "result": null
+      }
+    }
+  },
+  "theme": "测试"
+}

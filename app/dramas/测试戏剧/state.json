@@ -1,0 +1,40 @@
+{
+  "theme": "测试戏剧",
+  "current_scene": 3,
+  "status": "acting",
+  "actors": {
+    "朱棣": {
+      "role": "燕王",
+      "personality": "沉稳冷静，说话简短有力",
+      "background": "明太祖第四子，封燕王，镇守北平",
+      "knowledge_scope": "熟悉军事和朝堂",
+      "memory": [],
+      "working_memory": [
+        {
+          "entry": "重要发现",
+          "importance": "normal",
+          "scene": 2
+        }
+      ],
+      "scene_summaries": [],
+      "arc_summary": {
+        "structured": {
+          "theme": "",
+          "key_characters": [],
+          "unresolved": [],
+          "resolved": []
+        },
+        "narrative": ""
+      },
+      "critical_memories": [
+        {
+          "entry": "普通记忆",
+          "reason": "用户标记",
+          "scene": 1
+        }
+      ],
+      "emotions": "neutral",
+      "created_at": "2026-04-11T10:00:00"
+    }
+  }
+}

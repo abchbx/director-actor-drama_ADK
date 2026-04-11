@@ -1,0 +1,26 @@
+{
+  "name": "actor_贾宝玉",
+  "description": "演员 贾宝玉，角色：主角",
+  "url": "http://localhost:9065/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_贾宝玉",
+      "name": "扮演贾宝玉",
+      "description": "以贾宝玉的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

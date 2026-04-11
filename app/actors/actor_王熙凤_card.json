@@ -1,0 +1,26 @@
+{
+  "name": "actor_王熙凤",
+  "description": "演员 王熙凤，角色：反派/对立面",
+  "url": "http://localhost:9086/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_王熙凤",
+      "name": "扮演王熙凤",
+      "description": "以王熙凤的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

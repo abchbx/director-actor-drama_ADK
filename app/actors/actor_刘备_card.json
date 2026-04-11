@@ -1,0 +1,26 @@
+{
+  "name": "actor_刘备",
+  "description": "演员 刘备，角色：仁君",
+  "url": "http://localhost:9019/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_刘备",
+      "name": "扮演刘备",
+      "description": "以刘备的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

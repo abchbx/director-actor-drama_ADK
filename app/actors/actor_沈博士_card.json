@@ -1,0 +1,26 @@
+{
+  "name": "actor_沈博士",
+  "description": "演员 沈博士，角色：对立力量",
+  "url": "http://localhost:9034/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_沈博士",
+      "name": "扮演沈博士",
+      "description": "以沈博士的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

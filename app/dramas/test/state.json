@@ -1,0 +1,98 @@
+{
+  "theme": "test",
+  "actors": {
+    "朱棣": {
+      "working_memory": [],
+      "scene_summaries": [
+        {
+          "summary": "第2摘要",
+          "scenes_covered": "2",
+          "key_events": [
+            "事件2"
+          ]
+        },
+        {
+          "summary": "第3摘要",
+          "scenes_covered": "3",
+          "key_events": [
+            "事件3"
+          ]
+        },
+        {
+          "summary": "第4摘要",
+          "scenes_covered": "4",
+          "key_events": [
+            "事件4"
+          ]
+        },
+        {
+          "summary": "第5摘要",
+          "scenes_covered": "5",
+          "key_events": [
+            "事件5"
+          ]
+        },
+        {
+          "summary": "第6摘要",
+          "scenes_covered": "6",
+          "key_events": [
+            "事件6"
+          ]
+        },
+        {
+          "summary": "第7摘要",
+          "scenes_covered": "7",
+          "key_events": [
+            "事件7"
+          ]
+        },
+        {
+          "summary": "第8摘要",
+          "scenes_covered": "8",
+          "key_events": [
+            "事件8"
+          ]
+        },
+        {
+          "summary": "第9摘要",
+          "scenes_covered": "9",
+          "key_events": [
+            "事件9"
+          ]
+        },
+        {
+          "summary": "第10摘要",
+          "scenes_covered": "10",
+          "key_events": [
+            "事件10"
+          ]
+        },
+        {
+          "summary": "第11摘要",
+          "scenes_covered": "11",
+          "key_events": [
+            "事件11"
+          ]
+        }
+      ],
+      "arc_summary": {
+        "structured": {
+          "theme": "测试",
+          "key_characters": [
+            "朱棣"
+          ],
+          "unresolved": [],
+          "resolved": []
+        },
+        "narrative": "故事弧线概述。"
+      },
+      "critical_memories": [],
+      "_pending_compression": {
+        "working_to_scene": null,
+        "scene_to_arc": null,
+        "pending_entries": [],
+        "result": null
+      }
+    }
+  }
+}
