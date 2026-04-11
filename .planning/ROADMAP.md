@@ -92,6 +92,12 @@ Plans:
 **Requirements:**
 - MEMORY-05: 语义检索
 
+**Plans:** 2 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — semantic_retriever.py 核心模块（加权标签匹配、三层搜索、去重排序、标签解析、回填工具）+ memory_manager.py 压缩 prompt 标签生成
+- [ ] 03-02-PLAN.md — 集成层（tools.py 导演 Tool 注册 + context_builder.py 相关回忆段落 + agent.py instruction 更新）
+
 **Success Criteria:**
 1. `retrieve_relevant_scenes(tags, current_scene, tool_context)` 函数可用，返回 top-K 相关场景摘要
 2. 每个场景压缩时自动生成标签集（角色名、地点、情感关键词、冲突类型）
