@@ -64,29 +64,29 @@
 
 | REQ-ID | Phase | Status |
 |--------|-------|--------|
-| MEMORY-01 | — | — |
-| MEMORY-02 | — | — |
-| MEMORY-03 | — | — |
-| MEMORY-04 | — | — |
-| MEMORY-05 | — | — |
-| LOOP-01 | — | — |
-| LOOP-02 | — | — |
-| LOOP-03 | — | — |
-| LOOP-04 | — | — |
-| CONFLICT-01 | — | — |
-| CONFLICT-02 | — | — |
-| CONFLICT-03 | — | — |
-| CONFLICT-04 | — | — |
-| CONFLICT-05 | — | — |
-| DSTORM-01 | — | — |
-| DSTORM-02 | — | — |
-| DSTORM-03 | — | — |
-| DSTORM-04 | — | — |
-| DSTORM-05 | — | — |
-| COHERENCE-01 | — | — |
-| COHERENCE-02 | — | — |
-| COHERENCE-03 | — | — |
-| COHERENCE-04 | — | — |
-| COHERENCE-05 | — | — |
+| MEMORY-01 | Phase 1 | planned |
+| MEMORY-02 | Phase 1 | planned |
+| MEMORY-03 | Phase 1 | planned |
+| MEMORY-04 | Phase 2 | planned |
+| MEMORY-05 | Phase 3 | planned |
+| LOOP-01 | Phase 4 | planned |
+| LOOP-02 | Phase 5 | planned |
+| LOOP-03 | Phase 4 | planned |
+| LOOP-04 | Phase 5 | planned |
+| CONFLICT-01 | Phase 6 | planned |
+| CONFLICT-02 | Phase 6 | planned |
+| CONFLICT-03 | Phase 6 | planned |
+| CONFLICT-04 | Phase 6 | planned |
+| CONFLICT-05 | Phase 7 | planned |
+| DSTORM-01 | Phase 8 | planned |
+| DSTORM-02 | Phase 8 | planned |
+| DSTORM-03 | Phase 8 | planned |
+| DSTORM-04 | Phase 9 | planned |
+| DSTORM-05 | Phase 9 | planned |
+| COHERENCE-01 | Phase 10 | planned |
+| COHERENCE-02 | Phase 10 | planned |
+| COHERENCE-03 | Phase 10 | planned |
+| COHERENCE-04 | Phase 10 | planned |
+| COHERENCE-05 | Phase 11 | planned |
 
-*Traceability will be filled when roadmap is created.*
+*Traceability filled from ROADMAP.md on 2026-04-11.*
