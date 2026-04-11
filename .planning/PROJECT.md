@@ -22,6 +22,9 @@
 - ✓ 状态持久化 — 双层存储（内存 ADK state + 文件系统 JSON），支持保存/加载
 - ✓ 用户事件注入 — `/action` 命令允许用户注入事件
 - ✓ 剧本导出 — Markdown 格式导出完整剧本和对话记录
+- ✓ 3 层记忆架构 — 工作记忆/场景摘要/全局摘要，逐级压缩（Validated in Phase 1: Memory Foundation）
+- ✓ 自动记忆压缩 — 异步 LLM 压缩，不阻塞主流程（Validated in Phase 1: Memory Foundation）
+- ✓ 重要性权重摘要 — 关键记忆标记与保留，6 类关键事件检测（Validated in Phase 1: Memory Foundation）
 
 ### Active
 
@@ -30,7 +33,6 @@
 - [ ] 无限畅写引擎 — 剧情不再受预设大纲约束，可以无限延续，每场戏自然衔接
 - [ ] 混合推进模式 — AI 自主推进剧情 + 用户随时可注入事件/转向，两者无缝切换
 - [ ] 动态 STORM 机制 — 每 N 场自动重新发现新视角、注入新冲突、扩展世界观
-- [ ] 分层记忆系统 — 近期记忆详尽、远期记忆压缩为摘要，保障长程逻辑连贯性
 - [ ] 冲突引擎 — 自动检测剧情平淡时注入转折事件（新角色、意外、矛盾升级）
 - [ ] 上下文窗口管理 — 控制每场戏传入 LLM 的上下文大小，防止质量退化
 
@@ -84,7 +86,7 @@
 
 ---
 
-*Last updated: 2026-04-11 after initialization*
+*Last updated: 2026-04-11 after Phase 1 completion*
 
 ## Evolution
 
