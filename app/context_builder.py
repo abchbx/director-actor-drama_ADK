@@ -20,6 +20,7 @@ from google.adk.tools import ToolContext
 
 from .memory_manager import _merge_pending_compression
 from .state_manager import _get_state, _set_state
+from .semantic_retriever import retrieve_relevant_scenes, _extract_auto_tags, _normalize_scene_range
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +50,7 @@ _ACTOR_SECTION_PRIORITIES = {
     "critical_memories": 4,
     "emotion": 5,
     "anchor": 6,
+    "semantic_recall": 0,
 }
 
 # Section priorities for director context (higher = less likely to truncate)
@@ -60,6 +62,7 @@ _DIRECTOR_SECTION_PRIORITIES = {
     "global_arc": 5,
     "facts": 5,
     "actor_emotions": 6,
+    "last_scene_transition": 7,
     "current_status": 10,
 }
 
@@ -304,6 +307,53 @@ def _assemble_actor_sections(
             "priority": _ACTOR_SECTION_PRIORITIES["pending_memory"],
             "truncatable": True,
         })
+
+    # Semantic recall section (priority 0, lowest — D-14/D-16)
+    auto_tags = _extract_auto_tags(actor_data, tool_context)
+    if auto_tags:
+        state_ref = _get_state(tool_context)
+        current_scene_num = state_ref.get("current_scene", 0)
+
+        # Collect scene ranges already in sections to avoid duplication (Pitfall 2)
+        existing_scene_ranges = set()
+        for sec in sections:
+            if sec.get("key") == "scene_summaries":
+                # Parse scene ranges from the section text (e.g., "第3-5场")
+                for match in re.finditer(r'第(\d+)(?:-(\d+))?场', sec.get("text", "")):
+                    start = int(match.group(1))
+                    end = int(match.group(2) or match.group(1))
+                    existing_scene_ranges.update(range(start, end + 1))
+
+        recall_results = retrieve_relevant_scenes(
+            tags=auto_tags,
+            current_scene=current_scene_num,
+            tool_context=tool_context,
+            actor_name=actor_name,  # D-07: actor limited to own memories
+            top_k=5,  # Over-fetch to allow dedup filtering
+        )
+
+        # Filter out results whose scenes overlap with existing scene_summaries (Pitfall 2)
+        filtered_results = []
+        for r in recall_results:
+            result_scenes = _normalize_scene_range(r.get("scenes_covered", ""))
+            if not result_scenes.intersection(existing_scene_ranges):
+                filtered_results.append(r)
+            if len(filtered_results) >= 3:  # D-14: actor side top-3 after filtering
+                break
+
+        if filtered_results:
+            recall_lines = []
+            for r in filtered_results:
+                recall_lines.append(
+                    f"- 第{r['scenes_covered']}场：{r['text'][:100]} "
+                    f"[匹配: {', '.join(r.get('matched_tags', []))}]"
+                )
+            sections.append({
+                "key": "semantic_recall",
+                "text": "【相关回忆】\n" + "\n".join(recall_lines),
+                "priority": _ACTOR_SECTION_PRIORITIES["semantic_recall"],
+                "truncatable": True,
+            })
 
     return sections
 
@@ -577,13 +627,132 @@ def _build_facts_section(state: dict) -> dict:
     return {"key": "facts", "text": text, "priority": _DIRECTOR_SECTION_PRIORITIES["facts"], "truncatable": True}
 
 
+def _extract_scene_transition(state: dict) -> dict:
+    """Extract scene transition info from state (D-08/D-09/D-10).
+
+    三要素：①上一场结局 ②角色情绪状态 ③未决事件/悬念
+    纯函数，不调用 LLM。与 next_scene() 返回的衔接信息不重复（D-10）：
+    next_scene() 返回即时衔接要点，此处返回更完整的上下文视野。
+
+    Args:
+        state: The drama state dict.
+
+    Returns:
+        dict with is_first_scene, last_ending, actor_emotions, unresolved fields.
+    """
+    scenes = state.get("scenes", [])
+    actors = state.get("actors", {})
+    current_scene = state.get("current_scene", 0)
+
+    if not scenes:
+        return {
+            "is_first_scene": True,
+            "last_ending": "",
+            "actor_emotions": {},
+            "unresolved": [],
+        }
+
+    last_scene = scenes[-1]
+
+    # ① Last scene ending: from description + content tail
+    last_ending = last_scene.get("description", "")
+    content = last_scene.get("content", "")
+    if content and len(content) > 50:
+        last_ending += ("..." + content[-150:]) if len(content) > 150 else content
+    if len(last_ending) > 300:
+        last_ending = last_ending[-300:]
+
+    # ② Actor emotions
+    actor_emotions = {}
+    for name, data in actors.items():
+        emotion = data.get("emotions", "neutral")
+        actor_emotions[name] = _EMOTION_CN.get(emotion, emotion)
+
+    # ③ Unresolved events: from critical_memories + arc_summary.unresolved
+    unresolved = []
+    seen = set()
+    for name, data in actors.items():
+        for m in data.get("critical_memories", []):
+            if m.get("reason") == "未决事件":
+                entry = f"{name}: {m['entry'][:80]}"
+                if entry not in seen:
+                    unresolved.append(entry)
+                    seen.add(entry)
+        arc = data.get("arc_summary", {}).get("structured", {})
+        for u in arc.get("unresolved", []):
+            if u not in seen:
+                unresolved.append(f"- {u}")
+                seen.add(u)
+
+    return {
+        "is_first_scene": current_scene == 0,
+        "last_ending": last_ending,
+        "actor_emotions": actor_emotions,
+        "unresolved": unresolved[:5],  # Max 5 items to save tokens
+    }
+
+
+def _build_last_scene_transition_section(state: dict) -> dict:
+    """Build the last scene transition section for director context (D-08/D-09).
+
+    与 next_scene() 返回的衔接信息不重复（D-10）：
+    next_scene() 返回即时衔接要点（精简），此处返回更完整的上下文视野。
+    Priority 7: higher than recent_scenes but lower than current_status.
+    Not truncatable: transition info must always be shown.
+    """
+    scenes = state.get("scenes", [])
+    if not scenes:
+        return {
+            "key": "last_scene_transition",
+            "text": "",
+            "priority": _DIRECTOR_SECTION_PRIORITIES["last_scene_transition"],
+            "truncatable": False,
+        }
+
+    transition = _extract_scene_transition(state)
+
+    if transition["is_first_scene"]:
+        return {
+            "key": "last_scene_transition",
+            "text": "",
+            "priority": _DIRECTOR_SECTION_PRIORITIES["last_scene_transition"],
+            "truncatable": False,
+        }
+
+    last_scene = scenes[-1]
+    parts = []
+
+    # Last scene ending
+    parts.append(f"【上一场衔接】\n上一场「{last_scene.get('title', '未命名')}」：{transition['last_ending']}")
+
+    # Actor emotions
+    if transition["actor_emotions"]:
+        emotion_lines = []
+        for name, emo in transition["actor_emotions"].items():
+            role = state.get("actors", {}).get(name, {}).get("role", "")
+            emotion_lines.append(f"- {name}（{role}）：{emo}")
+        parts.append("当前角色情绪：\n" + "\n".join(emotion_lines))
+
+    # Unresolved events
+    if transition["unresolved"]:
+        parts.append("未决事件：\n" + "\n".join(f"- {u}" if not u.startswith("-") else u for u in transition["unresolved"]))
+
+    text = "\n".join(parts)
+    return {
+        "key": "last_scene_transition",
+        "text": text,
+        "priority": _DIRECTOR_SECTION_PRIORITIES["last_scene_transition"],
+        "truncatable": False,
+    }
+
+
 def build_director_context(
     tool_context: ToolContext,
     token_budget: int = DEFAULT_DIRECTOR_TOKEN_BUDGET,
 ) -> str:
     """Build context for the Director agent with all available state info + D-04 forward compat.
 
-    组装导演上下文：全局弧线 + 当前状态 + 近期场景 + 演员情绪 + STORM视角 +
+    组装导演上下文：全局弧线 + 当前状态 + 上一场衔接 + 近期场景 + 演员情绪 + STORM视角 +
     D-04 占位（conflict_engine/dynamic_storm/established_facts）。
     通过字段存在性检查实现向前兼容。
 
@@ -602,14 +771,15 @@ def build_director_context(
 
     # Assemble all sections
     sections = [
-        _build_current_status_section(state),
-        _build_actor_emotions_section(state),
-        _build_global_arc_section(state),
-        _build_facts_section(state),
-        _build_recent_scenes_section(state),
-        _build_conflict_section(state),
-        _build_storm_section(state),
-        _build_dynamic_storm_section(state),
+        _build_current_status_section(state),           # priority 10
+        _build_last_scene_transition_section(state),    # priority 7 — LOOP-03
+        _build_actor_emotions_section(state),           # priority 6
+        _build_global_arc_section(state),               # priority 5
+        _build_facts_section(state),                    # priority 5
+        _build_recent_scenes_section(state),            # priority 4
+        _build_conflict_section(state),                 # priority 4
+        _build_storm_section(state),                    # priority 3
+        _build_dynamic_storm_section(state),            # priority 3
     ]
 
     # Filter out empty sections before truncation
