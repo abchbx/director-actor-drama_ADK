@@ -376,12 +376,16 @@ class TestCalculateTension:
             current_scene=5,
             actors={
                 "朱棣": {
-                    "emotions": "angry", "working_memory": [],
+                    "emotions": "angry", "working_memory": [
+                        {"entry": "今日朝堂之上议论纷纷", "scene": 3},
+                    ],
                     "critical_memories": [{"reason": "未决事件", "entry": "test"}],
                     "arc_summary": {"structured": {"unresolved": ["item1"]}},
                 },
                 "道衍": {
-                    "emotions": "fearful", "working_memory": [],
+                    "emotions": "neutral", "working_memory": [
+                        {"entry": "劝谏燕王谨慎行事", "scene": 4},
+                    ],
                     "critical_memories": [],
                     "arc_summary": {"structured": {"unresolved": []}},
                 },
@@ -425,12 +429,16 @@ class TestCalculateTension:
             current_scene=15,
             actors={
                 "朱棣": {
-                    "emotions": "angry", "working_memory": [],
+                    "emotions": "angry", "working_memory": [
+                        {"entry": "今日朝堂之上议论纷纷", "scene": 13},
+                    ],
                     "critical_memories": [{"reason": "未决事件", "entry": "test"}],
                     "arc_summary": {"structured": {"unresolved": ["item1"]}},
                 },
                 "道衍": {
-                    "emotions": "fearful", "working_memory": [],
+                    "emotions": "neutral", "working_memory": [
+                        {"entry": "劝谏燕王谨慎行事", "scene": 14},
+                    ],
                     "critical_memories": [],
                     "arc_summary": {"structured": {"unresolved": []}},
                 },
