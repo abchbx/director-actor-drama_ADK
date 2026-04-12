@@ -142,6 +142,13 @@ Plans:
 - LOOP-02: 混合推进模式
 - LOOP-04: 用户终止机制
 
+**Plans:** 3 plans
+
+Plans:
+- [x] 05-01-PLAN.md — Tool Functions: auto_advance, steer_drama, end_drama, trigger_storm + next_scene() counter decrement
+- [x] 05-02-PLAN.md — Context Builder & State: steer/epilogue/auto-advance sections + state field init + load migration
+- [x] 05-03-PLAN.md — Director Prompt Restructure + Router + CLI: 7-section prompt + routing + auto-interrupt + CLI updates
+
 **Success Criteria:**
 1. 用户可通过 `/action` 注入事件、`/steer <direction>` 轻量引导、`/storm` 手动触发视角发现，与 AI 自主推进无缝切换
 2. `/end` 命令触发终幕旁白和完整剧本导出，戏剧优雅结束
