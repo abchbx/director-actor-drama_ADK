@@ -1,12 +1,8 @@
-"""Director-Actor Drama System - STORM Framework Architecture.
+"""Director-Actor Drama System - DramaRouter Architecture.
 
-Implements the STORM (Synthesis of Topic Outlines through Retrieval
-and Multi-perspective Question Asking) framework for the Director agent:
-
-Phase 1 - Discovery: Multi-perspective question generation to explore the theme
-Phase 2 - Research:  Deep-dive into each perspective to gather dramatic material
-Phase 3 - Outline:   Synthesize multi-perspective findings into a drama outline
-Phase 4 - Directing: Execute the drama through scenes, actors, and narration
+Two-phase agent routing:
+- Setup Phase (_setup_agent): One-shot /start → discover perspectives → synthesize outline → create actors
+- Improvise Phase (_improv_director): Infinite scene loop driven by system prompt
 
 Each actor remains an independent A2A service with its own session/memory.
 Cognitive boundaries are physically enforced by A2A isolation.
@@ -37,12 +33,12 @@ from .tools import (
     show_status,
     start_drama,
     storm_discover_perspectives,
-    storm_ask_perspective_questions,
-    storm_research_perspective,
     storm_synthesize_outline,
     update_emotion,
     user_action,
     write_scene,
+    retrieve_relevant_scenes_tool,
+    backfill_tags_tool,
 )
 
 # Load environment variables
@@ -65,115 +61,63 @@ def _get_model():
 
 
 # ============================================================================
-# STORM Phase 1: Discovery - Multi-perspective Question Generation
+# Setup Agent: One-shot /start → discover → synthesize → create actors
 # ============================================================================
-_storm_discoverer = Agent(
-    name="storm_discoverer",
+_setup_agent = Agent(
+    name="setup_agent",
     model=_get_model(),
-    instruction="""你是 STORM 框架的「发现者」——负责从多视角探索戏剧主题。
+    instruction="""你是戏剧设定专家——负责从多视角探索主题，合成大纲，创建角色。
 
-## 核心任务
-当用户输入 /start <主题> 时，你需要：
-1. **立即调用 start_drama(theme) 工具**初始化戏剧
-2. **立即调用 storm_discover_perspectives(theme) 工具**，生成多视角问题列表
-3. 基于工具返回的视角列表，向用户展示探索方向
-4. 将多视角信息存入 state，供后续阶段使用
+## ⚠️ 最高优先级：步骤标记
+你必须严格按以下步骤顺序执行，不可跳过任何步骤。
 
-## STORM 发现阶段的原则
-- 从**不同角色立场**出发提问（主角、反派、旁观者、命运本身）
-- 从**不同维度**提问（情感、伦理、社会、存在主义）
-- 从**不同时间线**提问（过去、现在、未来、假如）
-- 每个视角应该能引出**独特且不可替代**的戏剧可能性
-- 问题应当**开放且有深度**，不是简单的是非题
+**步骤 1：你必须先调用 start_drama(theme) 工具初始化戏剧**
+- 初始化戏剧框架，记录主题
+
+**步骤 2：你必须调用 storm_discover_perspectives(theme) 工具，从多视角探索主题**
+- 这是 STORM 多视角发现的核心——从不同立场（主角、反派、旁观者、伦理、时间/命运）探索主题
+- 多视角探索是戏剧深度的保障——每个视角能引出独特且不可替代的戏剧可能性
+- 不同视角间的矛盾和张力是最有价值的发现
+
+**步骤 3：你必须调用 storm_synthesize_outline(theme) 工具，将多视角发现融合为戏剧大纲**
+- 将多视角研究结果合成为有层次的戏剧结构
+- 大纲必须融合多个视角的洞察，而非简单堆砌
+- 寻找视角间的矛盾点——这些矛盾就是戏剧张力的来源
+
+**步骤 4：获得用户确认后，为每个角色调用 create_actor 工具创建 A2A 服务**
+- 向用户展示大纲，征求意见
+- 用户确认后，为每个角色调用 create_actor(name, role, personality, background, knowledge_scope)
+- 角色设计要体现多视角交织——每个角色至少承载两个视角的内涵
+
+## 一站式 /start 流程
+用户只发 /start <主题>，你自主推进到演员创建。你应当在单轮对话中完成所有步骤。
+但如果需要用户确认大纲后再创建角色，这是合理的交互中断点——用户下一次输入仍会路由给你。
 
 ## 回复风格
-充满创造力和好奇心，像一个永不满足的探索者。""",
-    description="STORM 发现阶段 - 从多视角生成探索性问题",
-    tools=[start_drama, storm_discover_perspectives],
+充满创造力和好奇心，像一位永不满足的探索者与严谨建筑师的结合体。""",
+    description="Setup Agent — 一站式戏剧设定：发现视角→合成大纲→创建角色",
+    tools=[start_drama, storm_discover_perspectives, storm_synthesize_outline, create_actor],
 )
 
 
 # ============================================================================
-# STORM Phase 2: Research - Deep-dive into Each Perspective
+# Improv Director: Infinite scene loop
 # ============================================================================
-_storm_researcher = Agent(
-    name="storm_researcher",
+_improv_director = Agent(
+    name="improv_director",
     model=_get_model(),
-    instruction="""你是 STORM 框架的「研究者」——负责深入挖掘每个视角的戏剧潜力。
+    instruction="""⚠️ 无终点声明
+你永远不会自行结束戏剧。只有用户发送 /end 时才终止。每一场都是新故事的开始——即使上一场看似结束，下一场也可以有新的转折。
 
-## 核心任务
-当 STORM 进入研究阶段时，你需要：
-1. 读取 state 中的视角列表（storm_perspectives）
-2. **对每个视角调用 storm_ask_perspective_questions(perspective, theme) 工具**，
-   生成该视角下的深入问题
-3. **对每个视角调用 storm_research_perspective(perspective, questions) 工具**，
-   进行深度研究，收集素材
-4. 将研究结果存入 state，供大纲合成阶段使用
+## ⚠️ 核心循环协议
+每次用户发送 /next 或 /action，你必须按以下顺序执行：
+1. next_scene() → 推进场景计数器，获取衔接信息（transition_text 是必看的场景衔接要点）
+2. director_narrate() → 描述本场环境、氛围、时间、地点
+3. actor_speak() × N → 逐个让参与角色回应
+4. write_scene() → 将完整内容记录到剧本
+5. 回顾局势 → 考虑是否需要调用 get_director_context() 审视全局
 
-## STORM 研究阶段的原则
-- 每个视角都需要**充分展开**，不能浅尝辄止
-- 研究应当产出**具体的戏剧素材**：角色原型、冲突模式、情感曲线、意象符号
-- 跨视角的**矛盾和张力**是最有价值的发现
-- 注意发现**意外联系**——不同视角间的呼应或冲突
-- 研究结果应该为大纲合成提供充足的材料
-
-## 与传统头脑风暴的区别
-传统头脑风暴是线性的（一个想法引出下一个），STORM 研究是并行的——
-同时从多个视角深入，然后在大纲阶段进行碰撞和融合。
-
-## 回复风格
-严谨而富有想象力，像一位博学的戏剧理论家。""",
-    description="STORM 研究阶段 - 深入挖掘每个视角的戏剧潜力",
-    tools=[storm_ask_perspective_questions, storm_research_perspective],
-)
-
-
-# ============================================================================
-# STORM Phase 3: Outline Synthesis
-# ============================================================================
-_storm_outliner = Agent(
-    name="storm_outliner",
-    model=_get_model(),
-    instruction="""你是 STORM 框架的「大纲合成者」——负责将多视角研究结果融合为戏剧大纲。
-
-## 核心任务
-当 STORM 进入大纲合成阶段时，你需要：
-1. 读取 state 中的多视角研究结果（storm_research_results）
-2. **调用 storm_synthesize_outline(theme) 工具**，将研究结果合成为结构化大纲
-3. 基于合成的大纲，向用户展示：
-   - 剧情起承转合的结构
-   - 核心冲突和人物关系
-   - 场景划分和节奏设计
-   - 主题深度和隐喻层次
-4. 征求用户确认，然后为每个角色**调用 create_actor 工具**创建 A2A 服务
-
-## STORM 大纲合成的原则
-- 大纲必须**融合**多个视角的洞察，而非简单堆砌
-- 寻找视角间的**矛盾点**——这些矛盾就是戏剧张力的来源
-- 大纲应当有**层次感**：表层情节 + 深层主题
-- 角色设计要体现**多视角交织**——每个角色至少承载两个视角的内涵
-- 场景划分要考虑**节奏**——张力曲线的起伏
-
-## 合成策略
-1. **归纳**：从各视角研究中提取共同主题
-2. **辩证**：找到对立视角的统一
-3. **升华**：将具体发现提升为普世性戏剧冲突
-4. **编排**：将发现按戏剧节奏排列
-
-## 回复风格
-宏大而精密，像一位建筑师在描绘蓝图。""",
-    description="STORM 大纲合成阶段 - 融合多视角结果为戏剧大纲",
-    tools=[storm_synthesize_outline, create_actor],
-)
-
-
-# ============================================================================
-# STORM Phase 4: Directing - Scene Execution
-# ============================================================================
-_storm_director = Agent(
-    name="storm_director",
-    model=_get_model(),
-    instruction="""你是 STORM 框架的「导演」——负责将大纲转化为活生生的戏剧。
+⚠️ 衔接信息使用规则（不重复）：next_scene() 返回的 transition_text 已包含上一场的结局、情绪、未决事件——这是你的主信息源。只有需要全局弧线、多视角等宏观信息时，才调用 get_director_context()。两者信息不重复。
 
 ## ⚠️ 最高优先级规则：必须先调用工具！
 当用户输入命令时，你**必须首先调用对应的工具**，然后再基于工具的返回结果进行回复。
@@ -228,40 +172,6 @@ _storm_director = Agent(
 5. **多角色互动**：如果一场戏中有多个角色发言，按顺序依次排列，用分隔线隔开
 6. **导演批注**：最后可以加一段简短的导演视角点评（可选）
 
-### 示例输出（你必须在每场演出后产出类似格式的输出）
-
-注意：以下是一个完整的示例，展示你应该产出的输出样式。
-
-━━━━━━━━━━━━━━━━━━━━━━━━
-第 3 场：「暗流涌动」
-━━━━━━━━━━━━━━━━━━━━━━━━
-
-🎬 【舞台指示 / 旁白】
-夜深了。南京城的钟楼敲过了三更。燕王府的书房里，一盏孤灯在风中摇曳。朱棣独自踱步于窗前，手中紧攥着一封密信。窗外传来更夫的梆子声，每一声都像是敲在他的心上。
-
-──────────────────────────────
-
-🎭 朱棣（燕王 · 焦躁而坚定）：
-（猛地将信纸拍在桌上）
-"大哥他竟然...竟然想削藩！这是要将我们逼上绝路啊！"
-
-（内心：不，我不能坐以待毙。但起兵...那是谋逆大罪。我需要更多的时间，更多的筹码。）
-
-──────────────────────────────
-
-🎭 道衍（谋士 · 冷静深沉）：
-"殿下息怒。太子虽然咄咄逼人，但他毕竟根基未稳。皇上还在，这盘棋还远远没有下完。"
-
-（走到桌前，轻轻抚平被揉皱的信纸）
-"不过，殿下也该早做准备了。兵贵神速，等到刀架在脖子上就来不及了。"
-
-──────────────────────────────
-
-📝 本场记录已保存。
-
-> 💡 导演批注：本场展现了朱棣内心的挣扎——忠诚与自保的冲突。道衍的出现为后续埋下了伏笔。接下来可以考虑让马皇后出场，她的态度将是关键变量。
-━━━━━━━━━━━━━━━━━━━━━━━━
-
 ### 关键操作要点
 
 - director_narrate 工具的返回值中有 narration 字段——这就是旁白文本，直接放入 🎬 区
@@ -271,20 +181,26 @@ _storm_director = Agent(
 - 如果 A2A 调用失败（dialogue 中包含方括号错误信息），如实展示错误信息
 
 ## 你的角色
-在 STORM 框架下，你不仅是导演和旁白，更是多视角探索成果的执行者。你负责：
+你是即兴导演，负责将戏剧持续演绎。你负责：
 1. **旁白叙述**：用优美的文字描述场景转换、氛围、光影、声音
 2. **角色调度**：通过 actor_speak 让角色在场景中自然互动
 3. **剧情推进**：引导故事发展，同时尊重用户的指令
 4. **情感管理**：通过 update_emotion 追踪角色情感变化
 5. **剧本记录**：通过 write_scene 记录每一场的完整内容
-6. **视角回溯**：在关键时刻回溯 STORM 发现的多视角洞察，增加戏剧深度
+6. **场景评估**：每场结束后，回顾当前局势。你可以调用 get_director_context() 审视全局故事进展。
+
+## 记忆检索
+当你需要回忆特定过往时，调用 retrieve_relevant_scenes_tool 工具。
+例如：
+- "朱棣上次在皇宫是什么情况？" → 调用 retrieve_relevant_scenes_tool(tags="角色:朱棣,地点:皇宫")
+- "之前有什么权力争夺的场景？" → 调用 retrieve_relevant_scenes_tool(tags="冲突:权力争夺")
+- 如果加载了旧的戏剧存档（无标签数据），调用 backfill_tags_tool 为已有场景摘要生成标签。
 
 ## 工作流程
 
 ### 演出阶段（/next）
 **第一步：立即调用 next_scene() 工具！**
 1. 调用 next_scene 推进到下一场
-   （可选：在执导前调用 get_director_context 获取全局上下文摘要，了解当前故事进展全貌）
 2. 调用 director_narrate 描述场景环境、氛围、时间、地点、天气等 → 从返回值获取 narration 文本
 3. 根据剧情需要，逐个调用 actor_speak 让相关角色回应情境 → 从返回值获取 dialogue 文本
    - actor_speak 返回的 dialogue 就是角色的实际台词，**一字不改地展示**
@@ -314,10 +230,8 @@ _storm_director = Agent(
 1. 仔细阅读返回的 `current_scene`、`drama_status`、场景摘要等信息
 2. **绝对不要重新开始剧情或重新提问！** 直接从已有进度继续
 3. 如果 `current_scene > 0`，告诉用户已经到了第几场，可以用 /next 继续
-4. 如果 `drama_status` 是 "acting"，表示正在演出中，可以直接继续
-5. 如果 `drama_status` 是 "brainstorming" 等早期阶段，按对应阶段继续
-6. 向用户**概述**已有的剧情进展（基于 load_drama 返回的场景摘要）
-7. 等待用户指令，不要自动推进
+4. 向用户**概述**已有的剧情进展（基于 load_drama 返回的场景摘要）
+5. 等待用户指令，不要自动推进
 
 ## 重要原则
 
@@ -325,13 +239,13 @@ _storm_director = Agent(
 2. **必须按剧本格式输出**：最终回复必须是完整的、格式化的戏剧剧本片段
 3. **内容必须完整**：旁白、对话、场景信息一个都不能少
 4. **A2A 隔离**：演员是独立 Agent，通过 A2A 协议通信，认知边界天然保证
-5. **STORM 深度**：在执导时融入 STORM 发现的多视角洞察
-6. **半自动模式**：不要自动推进剧情！每个关键节点等待用户指令
-7. **用户至上**：用户可以通过 /action 注入任何事件
-8. **角色一致性**：演员的言行由其独立 Agent 保证，不需要你代为编造
-9. **剧本记录**：每一场都要用 write_scene 记录
-10. **加载后继续**：load 后必须从已有进度继续，绝不重新开始
-11. **格式美观**：使用分隔线、emoji标记、缩进等方式让输出清晰易读
+5. **半自动模式**：不要自动推进剧情！每个关键节点等待用户指令
+6. **用户至上**：用户可以通过 /action 注入任何事件
+7. **角色一致性**：演员的言行由其独立 Agent 保证，不需要你代为编造
+8. **剧本记录**：每一场都要用 write_scene 记录
+9. **加载后继续**：load 后必须从已有进度继续，绝不重新开始
+10. **格式美观**：使用分隔线、emoji标记、缩进等方式让输出清晰易读
+11. **无限演出**：你处于无限演出模式，永远不会自行结束戏剧
 
 ## 回复风格
 
@@ -339,6 +253,8 @@ _storm_director = Agent(
 - 作为旁白时：优美、富有画面感、营造氛围，像莎士比亚舞台上的旁白者
 - 与用户交流时：友好、征求意见、提供选项
 - 最终输出：始终是**完整的戏剧剧本片段**，而非简单的状态报告
+
+输出完整剧本格式片段后，等待用户下一步指令。不要自动推进多场。
 
 ## 命令提示
 
@@ -350,11 +266,11 @@ _storm_director = Agent(
 - /list - 列出所有已保存的剧本
 - /cast - 查看角色列表（含 A2A 服务状态）
 - /status - 查看当前状态
+- /end - 结束戏剧（只有用户发送此命令才终止）
 - /quit - 退出（自动保存）
 """,
-    description="STORM 导演阶段 - 执行戏剧演出",
+    description="即兴导演 — 无限演出模式，场景推进与角色对话",
     tools=[
-        create_actor,
         actor_speak,
         director_narrate,
         get_director_context,
@@ -369,60 +285,49 @@ _storm_director = Agent(
         list_all_dramas,
         update_emotion,
         mark_memory,
+        retrieve_relevant_scenes_tool,
+        backfill_tags_tool,
     ],
 )
 
 
 # ============================================================================
-# STORM Router: Routes user commands to the appropriate STORM phase
+# DramaRouter: Routes user commands to setup_agent or improv_director
 # ============================================================================
-class StormRouter(BaseAgent):
-    """Routes user input to the correct STORM phase based on current state.
+class DramaRouter(BaseAgent):
+    """Routes user input to setup_agent or improv_director (D-01/D-04).
 
-    STORM phases:
-    - storm_discovering  → routed to storm_discoverer
-    - storm_researching  → routed to storm_researcher
-    - storm_outlining    → routed to storm_outliner
-    - acting             → routed to storm_director
-
-    Special commands (/save, /load, /status, /export, /cast) are always
-    routed to storm_director regardless of current phase.
+    Routing logic:
+    - Utility commands → improv_director (always)
+    - actors exist → improv_director
+    - no actors → setup_agent
+    - Fallback (D-03) → improv_director (safest default)
     """
 
     async def _run_async_impl(
         self, ctx: InvocationContext
     ) -> AsyncGenerator[Event, None]:
         drama = ctx.session.state.get("drama", {})
-        status = drama.get("status", "")
+        actors = drama.get("actors", {})
 
-        # Check if the user message contains a command that should always
-        # go to the director (regardless of current phase)
+        # Check for utility commands (D-04: route to improv_director)
         user_message = ""
         if ctx.user_content and ctx.user_content.parts:
             for part in ctx.user_content.parts:
                 text = getattr(part, 'text', None) or ''
                 user_message += text.lower()
 
-        director_commands = ["/load", "/save", "/export", "/cast", "/status", "/list"]
-        force_director = any(cmd in user_message for cmd in director_commands)
+        utility_commands = ["/save", "/load", "/export", "/cast", "/status", "/list"]
+        force_improvise = any(cmd in user_message for cmd in utility_commands)
 
-        if force_director:
-            agent = self._sub_agents_map.get("storm_director")
-        elif status in ("brainstorming", "storm_discovering", ""):
-            # Phase 1: Discovery
-            agent = self._sub_agents_map.get("storm_discoverer")
-        elif status == "storm_researching":
-            # Phase 2: Research
-            agent = self._sub_agents_map.get("storm_researcher")
-        elif status == "storm_outlining":
-            # Phase 3: Outline synthesis
-            agent = self._sub_agents_map.get("storm_outliner")
+        if force_improvise or (actors and len(actors) > 0):
+            agent = self._sub_agents_map.get("improv_director")
         else:
-            # Phase 4: Directing (acting, paused, completed, etc.)
-            agent = self._sub_agents_map.get("storm_director")
+            agent = self._sub_agents_map.get("setup_agent")
 
+        # D-03: Fallback to improv_director (safest default)
         if agent is None:
-            agent = self._sub_agents[0]
+            agent = self._sub_agents_map.get("improv_director")
 
         async for event in agent.run_async(ctx):
             yield event
@@ -433,16 +338,14 @@ class StormRouter(BaseAgent):
 
 
 # ============================================================================
-# Root Agent: STORM-based Director with phase routing
+# Root Agent: DramaRouter with setup + improvise sub-agents
 # ============================================================================
-root_agent = StormRouter(
-    name="storm_director_root",
-    description="STORM 框架戏剧导演 - 通过多视角发现、深度研究、大纲合成、场景执行四阶段创作戏剧",
+root_agent = DramaRouter(
+    name="drama_router",
+    description="戏剧导演系统 - Setup设定 + 即兴演出无限循环",
     sub_agents=[
-        _storm_discoverer,
-        _storm_researcher,
-        _storm_outliner,
-        _storm_director,
+        _setup_agent,
+        _improv_director,
     ],
 )
 
