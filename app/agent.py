@@ -25,8 +25,10 @@ from .tools import (
     create_actor,
     director_narrate,
     end_drama,
+    evaluate_tension,
     export_drama,
     get_director_context,
+    inject_conflict,
     list_all_dramas,
     load_drama,
     mark_memory,
@@ -233,6 +235,15 @@ _improv_director = Agent(
 - 如果某个角色没有说话（比如只做了动作），也在对应位置标注
 - 如果 A2A 调用失败（dialogue 中包含方括号错误信息），如实展示错误信息
 
+## §8 张力评估与冲突注入
+每场 write_scene 之后，调用 evaluate_tension() 检查张力水平。
+- 如果 is_boring=True：立即调用 inject_conflict(conflict_type=None) 获取冲突建议，在下一场中自然融入
+- 如果张力正常（30-70）：继续当前节奏
+- 如果张力过高（>70）：可适当缓和节奏
+冲突建议为"导演建议"——你自由决定如何融入剧情，不必照搬提示。
+活跃冲突上限 4 条，超出时优先解决已有冲突。
+同类型冲突 8 场内不会重复推荐。
+
 ## 🎭 A2A 多 Agent 架构
 本系统采用 A2A（Agent-to-Agent）协议实现真正的多 Agent 架构：
 - 每个演员是一个**独立的 A2A Agent 服务**，运行在独立端口上
@@ -354,6 +365,8 @@ _improv_director = Agent(
         steer_drama,
         end_drama,
         trigger_storm,
+        evaluate_tension,
+        inject_conflict,
     ],
 )
 

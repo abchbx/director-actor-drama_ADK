@@ -21,6 +21,7 @@ from google.adk.tools import ToolContext
 from .memory_manager import _merge_pending_compression
 from .state_manager import _get_state, _set_state
 from .semantic_retriever import retrieve_relevant_scenes, _extract_auto_tags, _normalize_scene_range
+from .conflict_engine import CONFLICT_TEMPLATES
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +62,7 @@ _DIRECTOR_SECTION_PRIORITIES = {
     "conflicts": 4,
     "global_arc": 5,
     "facts": 5,
+    "tension": 5,
     "actor_emotions": 6,
     "last_scene_transition": 7,
     "steer": 8,
@@ -573,9 +575,10 @@ def _build_storm_section(state: dict) -> dict:
 
 
 def _build_conflict_section(state: dict) -> dict:
-    """Build the active conflicts section (D-04 forward-compatible).
+    """Build the active conflicts section (D-04 forward-compatible, expanded in Phase 6 D-15).
 
-    仅当 state 中存在 conflict_engine 且有 active_conflicts 时才生成内容。
+    展开每条冲突的详细信息（类型、描述、涉及角色）。
+    张力状态摘要由 _build_tension_section 负责，此处不重复（Pitfall 7 mitigation）。
 
     Args:
         state: The drama state dict.
@@ -591,9 +594,51 @@ def _build_conflict_section(state: dict) -> dict:
     if not active:
         return {"key": "conflicts", "text": "", "priority": _DIRECTOR_SECTION_PRIORITIES["conflicts"], "truncatable": True}
 
-    lines = [f"- {c}" if isinstance(c, str) else f"- {c.get('description', str(c))}" for c in active]
+    lines = []
+    for c in active:
+        if isinstance(c, str):
+            lines.append(f"- {c}")
+        else:
+            type_cn = CONFLICT_TEMPLATES.get(c.get("type", ""), {}).get("name", c.get("type", ""))
+            desc = c.get("description", "")
+            actors = "、".join(c.get("involved_actors", []))
+            lines.append(f"- [{type_cn}] {desc}（涉及：{actors}）")
+
     text = "【活跃冲突】\n" + "\n".join(lines)
     return {"key": "conflicts", "text": text, "priority": _DIRECTOR_SECTION_PRIORITIES["conflicts"], "truncatable": True}
+
+
+def _build_tension_section(state: dict) -> dict:
+    """Build the tension status section for director context (D-14).
+
+    显示张力评分摘要（不展开冲突详情——详情由 _build_conflict_section 负责），
+    避免信息重复（Pitfall 7 mitigation）。
+
+    Args:
+        state: The drama state dict.
+
+    Returns:
+        Section dict for tension status.
+    """
+    conflict_engine = state.get("conflict_engine")
+    if not conflict_engine:
+        return {"key": "tension", "text": "", "priority": _DIRECTOR_SECTION_PRIORITIES["tension"], "truncatable": False}
+
+    score = conflict_engine.get("tension_score", 0)
+    is_boring = conflict_engine.get("is_boring", False)
+    active_count = len(conflict_engine.get("active_conflicts", []))
+    consecutive_low = conflict_engine.get("consecutive_low_tension", 0)
+
+    if is_boring:
+        label = "低张力⚠️"
+    elif score > 70:
+        label = "高张力🔥"
+    else:
+        label = "正常✅"
+
+    text = f"【张力状态】\n当前张力：{score}/100（{label}） | 活跃冲突：{active_count} 条 | 连续低张力：{consecutive_low} 场"
+
+    return {"key": "tension", "text": text, "priority": _DIRECTOR_SECTION_PRIORITIES["tension"], "truncatable": False}
 
 
 def _build_dynamic_storm_section(state: dict) -> dict:
@@ -869,6 +914,7 @@ def build_director_context(
         _build_actor_emotions_section(state),           # priority 6
         _build_global_arc_section(state),               # priority 5
         _build_facts_section(state),                    # priority 5
+        _build_tension_section(state),                  # priority 5 — Phase 6
         _build_recent_scenes_section(state),            # priority 4
         _build_conflict_section(state),                 # priority 4
         _build_storm_section(state),                    # priority 3
