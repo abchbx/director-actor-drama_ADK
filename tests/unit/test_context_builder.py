@@ -11,6 +11,10 @@ from app.context_builder import (
     build_director_context,
     _extract_scene_transition,
     _build_last_scene_transition_section,
+    _build_steer_section,
+    _build_epilogue_section,
+    _build_auto_advance_section,
+    _DIRECTOR_SECTION_PRIORITIES,
     DEFAULT_ACTOR_TOKEN_BUDGET,
     DEFAULT_DIRECTOR_TOKEN_BUDGET,
 )
@@ -611,3 +615,84 @@ class TestDirectorContextTransitionIntegration:
         mock_tool_context.state["drama"]["current_scene"] = 0
         result = build_director_context(mock_tool_context)
         assert "上一场衔接" not in result
+
+
+# ============================================================================
+# Phase 5 — Mixed Autonomy Mode Section Tests
+# ============================================================================
+
+
+class TestPhase5Sections:
+    """Test Phase 5 context builder sections: steer, epilogue, auto-advance."""
+
+    # --- _build_steer_section tests ---
+
+    def test_steer_section_with_direction(self):
+        """_build_steer_section with steer_direction returns text with 【用户引导】."""
+        state = {"steer_direction": "让朱棣更偏执"}
+        result = _build_steer_section(state)
+        assert "【用户引导】" in result["text"]
+        assert "让朱棣更偏执" in result["text"]
+        assert result["key"] == "steer"
+        assert result["priority"] == _DIRECTOR_SECTION_PRIORITIES["steer"]
+        assert result["truncatable"] is False
+
+    def test_steer_section_without_direction(self):
+        """_build_steer_section with steer_direction=None returns empty text."""
+        state = {"steer_direction": None}
+        result = _build_steer_section(state)
+        assert result["text"] == ""
+        assert result["key"] == "steer"
+
+    # --- _build_epilogue_section tests ---
+
+    def test_epilogue_section_ended(self):
+        """_build_epilogue_section with status='ended' returns text with 【番外篇模式】."""
+        state = {"status": "ended"}
+        result = _build_epilogue_section(state)
+        assert "【番外篇模式】" in result["text"]
+        assert "番外篇/后日谈" in result["text"]
+        assert result["key"] == "epilogue"
+        assert result["priority"] == _DIRECTOR_SECTION_PRIORITIES["epilogue"]
+        assert result["truncatable"] is False
+
+    def test_epilogue_section_acting(self):
+        """_build_epilogue_section with status='acting' returns empty text."""
+        state = {"status": "acting"}
+        result = _build_epilogue_section(state)
+        assert result["text"] == ""
+        assert result["key"] == "epilogue"
+
+    # --- _build_auto_advance_section tests ---
+
+    def test_auto_advance_section_active(self):
+        """_build_auto_advance_section with remaining_auto_scenes=3 returns text with 【自动推进模式】."""
+        state = {"remaining_auto_scenes": 3}
+        result = _build_auto_advance_section(state)
+        assert "【自动推进模式】" in result["text"]
+        assert "3 场" in result["text"]
+        assert result["key"] == "auto_advance"
+        assert result["priority"] == _DIRECTOR_SECTION_PRIORITIES["auto_advance"]
+        assert result["truncatable"] is False
+
+    def test_auto_advance_section_inactive(self):
+        """_build_auto_advance_section with remaining_auto_scenes=0 returns empty text."""
+        state = {"remaining_auto_scenes": 0}
+        result = _build_auto_advance_section(state)
+        assert result["text"] == ""
+        assert result["key"] == "auto_advance"
+
+    # --- Integration: build_director_context includes new sections ---
+
+    def test_build_director_context_includes_steer(self, mock_tool_context):
+        """build_director_context with steer_direction set includes 【用户引导】 in output."""
+        mock_tool_context.state["drama"]["steer_direction"] = "加强冲突"
+        result = build_director_context(mock_tool_context)
+        assert "【用户引导】" in result
+        assert "加强冲突" in result
+
+    def test_build_director_context_includes_epilogue(self, mock_tool_context):
+        """build_director_context with status='ended' includes 【番外篇模式】 in output."""
+        mock_tool_context.state["drama"]["status"] = "ended"
+        result = build_director_context(mock_tool_context)
+        assert "【番外篇模式】" in result
