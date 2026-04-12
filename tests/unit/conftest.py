@@ -13,6 +13,9 @@ def mock_tool_context():
             "theme": "测试戏剧",
             "current_scene": 3,
             "status": "acting",
+            "remaining_auto_scenes": 0,
+            "steer_direction": None,
+            "storm": {"last_review": {}},
             "actors": {
                 "朱棣": {
                     "role": "燕王",
@@ -34,6 +37,36 @@ def mock_tool_context():
                     "critical_memories": [],
                     "emotions": "neutral",
                     "created_at": "2026-04-11T10:00:00",
+                }
+            },
+        }
+    }
+    return tc
+
+
+@pytest.fixture
+def mock_tool_context_no_storm():
+    """Create a mock ToolContext without the storm sub-dict, for testing trigger_storm initialization."""
+    tc = MagicMock()
+    tc.state = {
+        "drama": {
+            "theme": "测试戏剧",
+            "current_scene": 3,
+            "status": "acting",
+            "remaining_auto_scenes": 0,
+            "steer_direction": None,
+            # Note: no "storm" key
+            "actors": {
+                "朱棣": {
+                    "role": "燕王",
+                    "personality": "沉稳冷静",
+                    "background": "明太祖第四子",
+                    "knowledge_scope": "军事",
+                    "working_memory": [],
+                    "scene_summaries": [],
+                    "arc_summary": {"structured": {}, "narrative": ""},
+                    "critical_memories": [],
+                    "emotions": "neutral",
                 }
             },
         }
