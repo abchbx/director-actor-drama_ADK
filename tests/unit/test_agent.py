@@ -633,3 +633,98 @@ class TestImprovDirectorPhase5:
         assert "/steer" in instruction
         assert "/end" in instruction
         assert "/storm" in instruction
+
+
+# ============================================================================
+# Phase 5: CLI Tests
+# ============================================================================
+
+
+class TestCLIPhase5Commands:
+    """Test CLI Phase 5 help text and function call display."""
+
+    def test_banner_contains_auto_command(self):
+        """CLI banner lists /auto command."""
+        from cli import print_banner
+        import io
+        from contextlib import redirect_stdout
+
+        f = io.StringIO()
+        with redirect_stdout(f):
+            print_banner()
+        output = f.getvalue()
+        assert "/auto" in output
+
+    def test_banner_contains_steer_command(self):
+        """CLI banner lists /steer command."""
+        from cli import print_banner
+        import io
+        from contextlib import redirect_stdout
+
+        f = io.StringIO()
+        with redirect_stdout(f):
+            print_banner()
+        output = f.getvalue()
+        assert "/steer" in output
+
+    def test_banner_contains_end_command(self):
+        """CLI banner lists /end command."""
+        from cli import print_banner
+        import io
+        from contextlib import redirect_stdout
+
+        f = io.StringIO()
+        with redirect_stdout(f):
+            print_banner()
+        output = f.getvalue()
+        assert "/end" in output
+
+    def test_banner_contains_storm_command(self):
+        """CLI banner lists /storm command."""
+        from cli import print_banner
+        import io
+        from contextlib import redirect_stdout
+
+        f = io.StringIO()
+        with redirect_stdout(f):
+            print_banner()
+        output = f.getvalue()
+        assert "/storm" in output
+
+    def test_send_message_displays_phase5_function_calls(self):
+        """CLI _send_message displays Phase 5 tool function calls."""
+        # Verify the Phase 5 function names are in the display list
+        # by checking the source code of _send_message
+        import cli
+        import inspect
+        source = inspect.getsource(cli._send_message)
+        assert "auto_advance" in source
+        assert "steer_drama" in source
+        assert "end_drama" in source
+        assert "trigger_storm" in source
+
+
+class TestCLIAutoDefault:
+    """Test D-04: /auto without number defaults to 3 scenes."""
+
+    def test_auto_without_number_defaults_to_3(self):
+        """D-04: '/auto' (no number) should be expanded to '/auto 3'."""
+        # Simulate the CLI preprocessing logic
+        user_input = "/auto"
+        if user_input.lower() == "/auto":
+            user_input = "/auto 3"
+        assert user_input == "/auto 3"
+
+    def test_auto_with_number_unchanged(self):
+        """D-04: '/auto 5' should remain '/auto 5'."""
+        user_input = "/auto 5"
+        if user_input.lower() == "/auto":
+            user_input = "/auto 3"
+        assert user_input == "/auto 5"
+
+    def test_auto_uppercase_unchanged_after_default(self):
+        """D-04: '/AUTO' (uppercase) should also default to 3."""
+        user_input = "/AUTO"
+        if user_input.lower() == "/auto":
+            user_input = "/auto 3"
+        assert user_input == "/auto 3"

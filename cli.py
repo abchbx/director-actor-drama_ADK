@@ -44,7 +44,11 @@ def print_banner():
     print("  命令列表:")
     print("  /start <主题>   - 开始新剧作")
     print("  /next           - 推进下一场")
-    print("  /action <描述>  - 注入事件")
+    print("  /action <描述>  - 注入具体事件")
+    print("  /steer <方向>   - 设置下一场方向引导")
+    print("  /auto [N]       - 自动推进 N 场（默认3场）")
+    print("  /end            - 终幕：生成终幕旁白 + 导出剧本")
+    print("  /storm [焦点]   - 触发视角审视")
     print("  /save [名称]    - 保存进度（含对话记录）")
     print("  /load <名称>    - 加载进度")
     print("  /export         - 导出剧本为 Markdown")
@@ -83,6 +87,10 @@ async def run_interactive():
 
         if not user_input:
             continue
+
+        # D-04: /auto without number defaults to 3 scenes
+        if user_input.lower() == "/auto":
+            user_input = "/auto 3"
 
         # Handle local commands
         if user_input == "/quit":
@@ -145,6 +153,10 @@ async def _send_message(runner: Runner, message: str) -> str:
                             "save_drama",
                             "load_drama",
                             "export_drama",
+                            "auto_advance",    # Phase 5
+                            "steer_drama",     # Phase 5
+                            "end_drama",       # Phase 5
+                            "trigger_storm",   # Phase 5
                         ]:
                             args_str = str(fn_args)
                             if len(args_str) > 80:
