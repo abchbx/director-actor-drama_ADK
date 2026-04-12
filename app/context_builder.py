@@ -63,6 +63,9 @@ _DIRECTOR_SECTION_PRIORITIES = {
     "facts": 5,
     "actor_emotions": 6,
     "last_scene_transition": 7,
+    "steer": 8,
+    "epilogue": 9,
+    "auto_advance": 9,
     "current_status": 10,
 }
 
@@ -641,6 +644,79 @@ def _build_facts_section(state: dict) -> dict:
     return {"key": "facts", "text": text, "priority": _DIRECTOR_SECTION_PRIORITIES["facts"], "truncatable": True}
 
 
+def _build_steer_section(state: dict) -> dict:
+    """Build the user steer guidance section (D-08/D-09).
+
+    当用户使用 /steer 设置方向引导时，此段落注入导演上下文。
+    效力仅下一场，之后 next_scene() 自动清除 steer_direction。
+
+    Args:
+        state: The drama state dict.
+
+    Returns:
+        Section dict for the steer guidance.
+    """
+    steer = state.get("steer_direction")
+    if not steer:
+        return {"key": "steer", "text": "", "priority": _DIRECTOR_SECTION_PRIORITIES["steer"], "truncatable": False}
+    return {
+        "key": "steer",
+        "text": f"【用户引导】\n用户建议方向：{steer}\n请在此方向上发挥创意，但不必拘泥。此引导仅本场生效。",
+        "priority": _DIRECTOR_SECTION_PRIORITIES["steer"],
+        "truncatable": False,
+    }
+
+
+def _build_epilogue_section(state: dict) -> dict:
+    """Build the epilogue mode section (D-24).
+
+    当 drama_status == "ended" 时，标注番外篇模式，
+    导演以更轻松、回顾性的风格叙事。
+
+    Args:
+        state: The drama state dict.
+
+    Returns:
+        Section dict for the epilogue mode.
+    """
+    if state.get("status") != "ended":
+        return {"key": "epilogue", "text": "", "priority": _DIRECTOR_SECTION_PRIORITIES["epilogue"], "truncatable": False}
+    return {
+        "key": "epilogue",
+        "text": "【番外篇模式】\n本剧已正式结束，当前为番外篇/后日谈。请以更轻松、回顾性的风格叙事。场景编号继续递增，但标注「番外第 X 场」。",
+        "priority": _DIRECTOR_SECTION_PRIORITIES["epilogue"],
+        "truncatable": False,
+    }
+
+
+def _build_auto_advance_section(state: dict) -> dict:
+    """Build the auto-advance status section (D-01/D-03).
+
+    当 remaining_auto_scenes > 0 时，提示导演当前处于自动推进模式，
+    以及计数器递减和中断规则。
+
+    Args:
+        state: The drama state dict.
+
+    Returns:
+        Section dict for the auto-advance status.
+    """
+    remaining = state.get("remaining_auto_scenes", 0)
+    if remaining <= 0:
+        return {"key": "auto_advance", "text": "", "priority": _DIRECTOR_SECTION_PRIORITIES["auto_advance"], "truncatable": False}
+    return {
+        "key": "auto_advance",
+        "text": (
+            f"【自动推进模式】\n"
+            f"当前正在自动推进，剩余 {remaining} 场。"
+            f"每场 write_scene 后递减计数器，归零时回到手动模式。"
+            f"输出后插入提示：[自动推进中... 剩余 N 场，输入任意内容中断]"
+        ),
+        "priority": _DIRECTOR_SECTION_PRIORITIES["auto_advance"],
+        "truncatable": False,
+    }
+
+
 def _extract_scene_transition(state: dict) -> dict:
     """Extract scene transition info from state (D-08/D-09/D-10).
 
@@ -786,6 +862,9 @@ def build_director_context(
     # Assemble all sections
     sections = [
         _build_current_status_section(state),           # priority 10
+        _build_epilogue_section(state),                 # priority 9 — Phase 5
+        _build_auto_advance_section(state),             # priority 9 — Phase 5
+        _build_steer_section(state),                    # priority 8 — Phase 5
         _build_last_scene_transition_section(state),    # priority 7 — LOOP-03
         _build_actor_emotions_section(state),           # priority 6
         _build_global_arc_section(state),               # priority 5
