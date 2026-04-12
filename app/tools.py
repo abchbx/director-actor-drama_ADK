@@ -617,15 +617,25 @@ def auto_advance(scenes: int, tool_context: ToolContext) -> dict:
     设置自动推进模式，AI 将自主推进指定场数的戏剧。用户可随时输入任何内容中断。
 
     Args:
-        scenes: Number of scenes to auto-advance. Default 3, soft cap at 10.
+        scenes: Number of scenes to auto-advance. Must be >= 1. Default 3, soft cap at 10.
 
     Returns:
         dict with auto-advance status and guidance.
     """
+    # Validate scenes > 0
+    if scenes < 1:
+        return {
+            "status": "error",
+            "message": f"❌ 自动推进场数必须 ≥ 1，当前值: {scenes}",
+        }
+
     state = _get_state(tool_context)
 
-    # D-05: Soft cap at 10 with warning
-    if scenes > 10:
+    # D-05: Soft cap at 10 — warn once, then allow on repeated request
+    confirmed = state.get("_auto_advance_confirmed", False)
+    if scenes > 10 and not confirmed:
+        state["_auto_advance_confirmed"] = True
+        _set_state(state, tool_context)
         current = state.get("remaining_auto_scenes", 0)
         return {
             "status": "info",
@@ -636,6 +646,8 @@ def auto_advance(scenes: int, tool_context: ToolContext) -> dict:
             ),
             "remaining_auto_scenes": current,
         }
+    # Clear confirmation flag regardless
+    state.pop("_auto_advance_confirmed", None)
 
     # D-04: Default 3 handled by caller (router/CLI passes 3 if no arg)
     state["remaining_auto_scenes"] = scenes
@@ -665,6 +677,14 @@ def steer_drama(direction: str, tool_context: ToolContext) -> dict:
         dict with confirmation that the steer is set.
     """
     state = _get_state(tool_context)
+
+    # Validate non-empty direction
+    if not direction or not direction.strip():
+        return {
+            "status": "error",
+            "message": "❌ 方向不能为空。请提供方向引导，例如 /steer 让朱棣更偏执",
+        }
+
     state["steer_direction"] = direction
     _set_state(state, tool_context)
 

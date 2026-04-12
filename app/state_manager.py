@@ -826,7 +826,9 @@ def advance_scene(tool_context=None) -> dict:
     """
     state = _get_state(tool_context)
     state["current_scene"] = state.get("current_scene", 0) + 1
-    state["status"] = "acting"
+    # Preserve "ended" status (epilogue mode) — only set "acting" if not ended
+    if state.get("status") != "ended":
+        state["status"] = "acting"
     state["updated_at"] = datetime.now().isoformat()
     _set_state(state, tool_context)
     return {
