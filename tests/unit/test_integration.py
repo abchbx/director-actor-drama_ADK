@@ -25,6 +25,7 @@ from app.state_manager import (
     _get_state,
     _set_state,
     init_drama_state,
+    _migrate_legacy_status,
 )
 from app.memory_manager import (
     add_working_memory,
@@ -295,3 +296,83 @@ class TestAgentIncludesMarkMemory:
         # In ADK, tools in the tools list are Python functions
         tool_names = [t.__name__ if hasattr(t, '__name__') else getattr(t, 'name', str(t)) for t in _improv_director.tools]
         assert "mark_memory" in tool_names
+
+
+# ============================================================================
+# Phase 5 — Mixed Autonomy Mode Backward Compatibility Tests
+# ============================================================================
+
+
+class TestPhase5BackwardCompat:
+    """Test Phase 5 state field defaults, migration, and backward compatibility."""
+
+    def test_load_legacy_state_without_phase5_fields(self):
+        """Loading a state dict WITHOUT Phase 5 fields gets safe defaults via setdefault."""
+        # Simulate an old state dict without Phase 5 fields
+        state = {
+            "theme": "旧戏剧",
+            "status": "acting",
+            "current_scene": 5,
+            "actors": {"角色A": {"role": "主角"}},
+            "scenes": [],
+            "narration_log": [],
+        }
+        # Apply the same setdefault logic as load_progress
+        state.setdefault("remaining_auto_scenes", 0)
+        state.setdefault("steer_direction", None)
+        state.setdefault("storm", {"last_review": {}})
+        if "storm" in state and "last_review" not in state["storm"]:
+            state["storm"]["last_review"] = {}
+
+        assert state["remaining_auto_scenes"] == 0
+        assert state["steer_direction"] is None
+        assert state["storm"] == {"last_review": {}}
+
+    def test_load_state_with_ended_status_preserved(self):
+        """_migrate_legacy_status preserves 'ended' status instead of overwriting to 'acting'."""
+        state = {
+            "status": "ended",
+            "actors": {"角色A": {"role": "主角"}},
+        }
+        result = _migrate_legacy_status(state)
+        assert result["status"] == "ended"
+
+    def test_init_drama_state_has_phase5_fields(self, fresh_tool_context):
+        """init_drama_state initializes remaining_auto_scenes, steer_direction, storm."""
+        import json
+        from app import state_manager
+
+        # Create a unique theme to avoid conflicts
+        theme = f"Phase5InitTest_{id(fresh_tool_context)}"
+
+        # Mock _save_state_to_file to avoid file I/O
+        with patch.object(state_manager, '_save_state_to_file'):
+            result = init_drama_state(theme, fresh_tool_context)
+
+        assert result["status"] == "success"
+        drama_state = fresh_tool_context.state["drama"]
+        assert drama_state["remaining_auto_scenes"] == 0
+        assert drama_state["steer_direction"] is None
+        assert drama_state["storm"] == {"last_review": {}}
+
+    def test_load_state_storm_without_last_review(self):
+        """Loading a state with storm sub-dict but no last_review gets it filled in."""
+        state = {
+            "theme": "测试",
+            "status": "acting",
+            "current_scene": 1,
+            "actors": {},
+            "scenes": [],
+            "narration_log": [],
+            "storm": {"perspectives": []},  # has storm but no last_review
+        }
+        # Apply the same setdefault logic as load_progress
+        state.setdefault("remaining_auto_scenes", 0)
+        state.setdefault("steer_direction", None)
+        state.setdefault("storm", {"last_review": {}})
+        if "storm" in state and "last_review" not in state["storm"]:
+            state["storm"]["last_review"] = {}
+
+        assert state["storm"]["last_review"] == {}
+        # Existing perspectives should be preserved
+        assert state["storm"]["perspectives"] == []

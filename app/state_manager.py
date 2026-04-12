@@ -336,11 +336,15 @@ def init_drama_state(theme: str, tool_context=None) -> dict:
     
     state = _get_state(tool_context)
     state["theme"] = theme
-    state["status"] = "brainstorming"
+    state["status"] = "setup"
     state["current_scene"] = 0
     state["scenes"] = []
     state["actors"] = {}
     state["narration_log"] = []
+    # Phase 5: Mixed Autonomy Mode fields (D-21/D-22/D-23)
+    state["remaining_auto_scenes"] = 0
+    state["steer_direction"] = None
+    state["storm"] = {"last_review": {}}
     state["created_at"] = datetime.now().isoformat()
     state["updated_at"] = datetime.now().isoformat()
     
@@ -415,6 +419,10 @@ def _migrate_legacy_status(state: dict) -> dict:
     Returns:
         The same state dict with migrated status.
     """
+    # Preserve "ended" status from Phase 5+ saves
+    if state.get("status") == "ended":
+        return state
+
     actors = state.get("actors", {})
     if actors and len(actors) > 0:
         state["status"] = "acting"
@@ -474,6 +482,14 @@ def load_progress(save_name: str, tool_context=None) -> dict:
 
     # D-14: Auto-migrate old STORM status to DramaRouter status
     _migrate_legacy_status(state)
+
+    # Phase 5: Ensure new fields exist for backward compatibility (D-28)
+    state.setdefault("remaining_auto_scenes", 0)
+    state.setdefault("steer_direction", None)
+    state.setdefault("storm", {"last_review": {}})
+    # Also ensure storm sub-dict has last_review key (D-22)
+    if "storm" in state and "last_review" not in state["storm"]:
+        state["storm"]["last_review"] = {}
 
     _set_state(state, tool_context)
     
@@ -824,7 +840,7 @@ def set_drama_status(new_status: str, tool_context=None) -> dict:
     """Update the drama's overall status.
 
     Args:
-        new_status: New status (brainstorming, writing, acting, completed, paused).
+        new_status: New status (setup, acting, completed, paused).
 
     Returns:
         dict with status.
