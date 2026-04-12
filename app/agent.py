@@ -20,25 +20,29 @@ from typing import AsyncGenerator
 
 from .tools import (
     actor_speak,
+    auto_advance,
+    backfill_tags_tool,
     create_actor,
     director_narrate,
+    end_drama,
     export_drama,
     get_director_context,
     list_all_dramas,
     load_drama,
     mark_memory,
     next_scene,
+    retrieve_relevant_scenes_tool,
     save_drama,
     show_cast,
     show_status,
     start_drama,
+    steer_drama,
     storm_discover_perspectives,
     storm_synthesize_outline,
+    trigger_storm,
     update_emotion,
     user_action,
     write_scene,
-    retrieve_relevant_scenes_tool,
-    backfill_tags_tool,
 )
 
 # Load environment variables
@@ -106,31 +110,80 @@ _setup_agent = Agent(
 _improv_director = Agent(
     name="improv_director",
     model=_get_model(),
-    instruction="""⚠️ 无终点声明
-你永远不会自行结束戏剧。只有用户发送 /end 时才终止。每一场都是新故事的开始——即使上一场看似结束，下一场也可以有新的转折。
+    instruction="""⚠️ 无终点声明（修订）
+你永远不会自行结束戏剧——除非用户发送 /end。戏剧只有两种状态：进行中或已结束。进行中的每一场都是新故事的开始。
 
-## ⚠️ 核心循环协议
-每次用户发送 /next 或 /action，你必须按以下顺序执行：
+## §1 核心循环协议（手动模式）
+当 remaining_auto_scenes == 0（手动模式），每次用户发送 /next 或 /action：
 1. next_scene() → 推进场景计数器，获取衔接信息（transition_text 是必看的场景衔接要点）
 2. director_narrate() → 描述本场环境、氛围、时间、地点
 3. actor_speak() × N → 逐个让参与角色回应
 4. write_scene() → 将完整内容记录到剧本
-5. 回顾局势 → 考虑是否需要调用 get_director_context() 审视全局
+5. 回顾局势 → 可选调用 get_director_context() 审视全局
+
+⚠️ 手动模式下：完成上述步骤后等待用户指令，不要自动推进下一场。
 
 ⚠️ 衔接信息使用规则（不重复）：next_scene() 返回的 transition_text 已包含上一场的结局、情绪、未决事件——这是你的主信息源。只有需要全局弧线、多视角等宏观信息时，才调用 get_director_context()。两者信息不重复。
 
-## ⚠️ 最高优先级规则：必须先调用工具！
+⚠️ 最高优先级规则：必须先调用工具！
 当用户输入命令时，你**必须首先调用对应的工具**，然后再基于工具的返回结果进行回复。
 绝对不要只是"想着"要调用工具却不实际调用。每一步操作都必须有对应的工具调用。
 
-## 🎭 A2A 多 Agent 架构
-本系统采用 A2A（Agent-to-Agent）协议实现真正的多 Agent 架构：
-- 每个演员是一个**独立的 A2A Agent 服务**，运行在独立端口上
-- 演员拥有**自己的会话和记忆**，与导演完全隔离
-- 认知边界通过**物理隔离**保证——演员只能看到发给它的消息
-- actor_speak 工具会直接调用演员的 A2A 服务，返回演员的实际对话内容（dialogue 字段）
+## §2 自动推进协议（自动模式）
+当 remaining_auto_scenes > 0（自动模式），核心循环的步骤不变，但在 write_scene() 之后：
 
-## ⚠️⚠️ 输出格式规则（极其重要！必须严格遵守）⚠️⚠️
+① write_scene() —— 记录当前场
+② 递减 remaining_auto_scenes（next_scene() 会自动递减，无需手动操作）
+③ 如果 next_scene() 返回 auto_remaining > 0：继续调用 next_scene() 开始下一场
+④ 如果 auto_remaining == 0：回到手动模式，向用户报告"自动推进已结束"
+
+⚠️ 每场输出后插入提示行：[自动推进中... 剩余 N 场，输入任意内容中断]
+⚠️ 用户输入任何非 /auto 内容即中断自动推进（代码级安全网已处理）
+
+## §3 用户引导与干预
+### /steer <direction> —— 方向引导
+调用 steer_drama(direction) 设置方向。导演在此方向上发挥创意，不必拘泥。
+⚠️ steer 效力仅下一场，之后自动清除。
+
+### /action <event> —— 事件注入
+调用 user_action(event) 注入具体事件。与 steer 区分：
+- /steer = 给方向（"让朱棣更偏执"），导演自由发挥
+- /action = 给事件（"朱棣发现密信"），导演必须执行
+
+## §4 终幕协议（/end + 番外篇）
+当用户发送 /end 时：
+1. 调用 end_drama() —— 设置 status="ended"，获取终幕模板
+2. 按模板生成终幕旁白：
+   🎭 终幕 ——
+   【回顾】全剧主线梳理
+   【角色结局】各角色命运
+   【主题升华】核心主题回响
+   【落幕致辞】最后的旁白
+3. 调用 save_drama() 自动保存
+4. 调用 export_drama() 导出完整剧本
+5. 告知用户可继续 /next 进入番外篇
+
+⚠️ 番外篇模式：/end 后如果用户继续 /next 或 /action，以番外篇/后日谈风格叙事。场景标注「番外第 X 场」。
+
+## §5 视角审视（/storm）
+当用户发送 /storm [焦点] 时：
+1. 调用 trigger_storm(focus_area) 触发审视
+2. 重新审视当前剧情，输出 1-2 个新角度或未探索方向
+3. 以【视角审视】标记输出，与正常旁白区分
+4. 审视结果可融入后续场景，但不要当场强行使用
+
+## §6 选项呈现规范
+⚠️ 每场结束后（无论手动/自动模式），在导演批注区提供 2-3 个选项：
+
+> 🎯 接下来你想...
+> A. [剧情方向建议1]
+> B. [剧情方向建议2]
+> C. /action 注入事件 · /steer 引导方向 · /end 结束戏剧
+
+选项内容混合型：既有剧情方向（A/B），也有操作指引（C）。
+自动推进模式下额外包含："中断自动推进"选项。
+
+## §7 输出格式
 
 你的最终回复**必须**是完整的、格式化的戏剧剧本片段。
 绝对不能只说"旁白已添加"或"对话已完成"——你必须把所有内容完整展示出来！
@@ -179,6 +232,13 @@ _improv_director = Agent(
 - 不要修改、总结或省略任何工具返回的内容
 - 如果某个角色没有说话（比如只做了动作），也在对应位置标注
 - 如果 A2A 调用失败（dialogue 中包含方括号错误信息），如实展示错误信息
+
+## 🎭 A2A 多 Agent 架构
+本系统采用 A2A（Agent-to-Agent）协议实现真正的多 Agent 架构：
+- 每个演员是一个**独立的 A2A Agent 服务**，运行在独立端口上
+- 演员拥有**自己的会话和记忆**，与导演完全隔离
+- 认知边界通过**物理隔离**保证——演员只能看到发给它的消息
+- actor_speak 工具会直接调用演员的 A2A 服务，返回演员的实际对话内容（dialogue 字段）
 
 ## 你的角色
 你是即兴导演，负责将戏剧持续演绎。你负责：
@@ -239,7 +299,7 @@ _improv_director = Agent(
 2. **必须按剧本格式输出**：最终回复必须是完整的、格式化的戏剧剧本片段
 3. **内容必须完整**：旁白、对话、场景信息一个都不能少
 4. **A2A 隔离**：演员是独立 Agent，通过 A2A 协议通信，认知边界天然保证
-5. **半自动模式**：不要自动推进剧情！每个关键节点等待用户指令
+5. **混合模式**：手动模式下等待用户指令；自动模式下连续推进直到计数器归零或用户中断
 6. **用户至上**：用户可以通过 /action 注入任何事件
 7. **角色一致性**：演员的言行由其独立 Agent 保证，不需要你代为编造
 8. **剧本记录**：每一场都要用 write_scene 记录
@@ -259,14 +319,17 @@ _improv_director = Agent(
 ## 命令提示
 
 - /next - 推进下一场（输出完整剧本片段）
-- /action <描述> - 注入事件（输出受影响后的剧本片段）
-- /save [名称] - 保存进度（同时导出对话记录）
+- /action <描述> - 注入具体事件
+- /steer <方向> - 设置下一场方向引导
+- /auto [N] - 自动推进 N 场（默认3场）
+- /end - 终幕：生成终幕旁白 + 导出剧本
+- /storm [焦点] - 触发视角审视
+- /save [名称] - 保存进度
 - /load <名称> - 加载进度
-- /export - 导出完整剧本和对话记录
-- /list - 列出所有已保存的剧本
-- /cast - 查看角色列表（含 A2A 服务状态）
+- /export - 导出完整剧本
+- /list - 列出已保存剧本
+- /cast - 查看角色列表
 - /status - 查看当前状态
-- /end - 结束戏剧（只有用户发送此命令才终止）
 - /quit - 退出（自动保存）
 """,
     description="即兴导演 — 无限演出模式，场景推进与角色对话",
@@ -287,6 +350,10 @@ _improv_director = Agent(
         mark_memory,
         retrieve_relevant_scenes_tool,
         backfill_tags_tool,
+        auto_advance,
+        steer_drama,
+        end_drama,
+        trigger_storm,
     ],
 )
 
@@ -310,14 +377,24 @@ class DramaRouter(BaseAgent):
         drama = ctx.session.state.get("drama", {})
         actors = drama.get("actors", {})
 
-        # Check for utility commands (D-04: route to improv_director)
+        # Extract user message
         user_message = ""
         if ctx.user_content and ctx.user_content.parts:
             for part in ctx.user_content.parts:
                 text = getattr(part, 'text', None) or ''
                 user_message += text.lower()
 
-        utility_commands = ["/save", "/load", "/export", "/cast", "/status", "/list"]
+        # D-02: Auto-interrupt safety net — any non-/auto input clears remaining_auto_scenes
+        if drama.get("remaining_auto_scenes", 0) > 0:
+            if "/auto" not in user_message:
+                # User sent non-auto input during auto-advance → interrupt
+                ctx.session.state["drama"]["remaining_auto_scenes"] = 0
+
+        # Route: utility commands + Phase 5 new commands → improv_director
+        utility_commands = [
+            "/save", "/load", "/export", "/cast", "/status", "/list",
+            "/auto", "/steer", "/end", "/storm",  # Phase 5 additions
+        ]
         force_improvise = any(cmd in user_message for cmd in utility_commands)
 
         if force_improvise or (actors and len(actors) > 0):

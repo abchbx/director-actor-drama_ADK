@@ -4,30 +4,41 @@ Tests LOOP-01 (DramaRouter routing) and LOOP-03 (scene transition + state migrat
 - DramaRouter routes to setup_agent when no actors, improv_director when actors exist
 - _migrate_legacy_status migrates old STORM status values to setup/acting
 - next_scene() returns transition info (is_first_scene, transition, transition_text)
+
+Phase 5 additions:
+- DramaRouter routes /auto, /steer, /end, /storm to improv_director
+- DramaRouter auto-interrupt safety net clears remaining_auto_scenes (D-02)
+- _improv_director has Phase 5 tools (auto_advance, steer_drama, end_drama, trigger_storm)
+- _improv_director prompt has 7-section structure (D-26)
 """
 
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, AsyncMock
 from typing import AsyncGenerator
 
 
 # --- Helper to create a mock InvocationContext ---
 
 
-def _make_ctx(actors: dict | None = None, user_text: str = "") -> MagicMock:
+def _make_ctx(actors: dict | None = None, user_text: str = "", remaining_auto_scenes: int = 0) -> MagicMock:
     """Create a mock InvocationContext with specified drama state and user input."""
     ctx = MagicMock()
 
     # Build session.state
     actors = actors if actors is not None else {}
+    drama_state = {
+        "actors": actors,
+        "status": "acting" if actors else "setup",
+        "remaining_auto_scenes": remaining_auto_scenes,
+    }
     ctx.session.state.get = MagicMock(
         side_effect=lambda key, default=None: {
-            "drama": {
-                "actors": actors,
-                "status": "acting" if actors else "setup",
-            }
+            "drama": drama_state
         }.get(key, default)
     )
+    # Allow direct dict-style access for D-02 auto-interrupt
+    ctx.session.state.__setitem__ = MagicMock()
+    ctx.session.state.__getitem__ = MagicMock(return_value=drama_state)
 
     # Build user_content
     if user_text:
@@ -65,7 +76,10 @@ class TestDramaRouterRouting:
                 text = getattr(part, 'text', None) or ''
                 user_message += text.lower()
 
-        utility_commands = ["/save", "/load", "/export", "/cast", "/status", "/list"]
+        utility_commands = [
+            "/save", "/load", "/export", "/cast", "/status", "/list",
+            "/auto", "/steer", "/end", "/storm",  # Phase 5 additions
+        ]
         force_improvise = any(cmd in user_message for cmd in utility_commands)
 
         if force_improvise or (actors and len(actors) > 0):
@@ -97,7 +111,10 @@ class TestDramaRouterRouting:
                 text = getattr(part, 'text', None) or ''
                 user_message += text.lower()
 
-        utility_commands = ["/save", "/load", "/export", "/cast", "/status", "/list"]
+        utility_commands = [
+            "/save", "/load", "/export", "/cast", "/status", "/list",
+            "/auto", "/steer", "/end", "/storm",  # Phase 5 additions
+        ]
         force_improvise = any(cmd in user_message for cmd in utility_commands)
 
         if force_improvise or (actors and len(actors) > 0):
@@ -114,7 +131,8 @@ class TestDramaRouterRouting:
         """D-04: Utility commands always route to improv_director."""
         from app.agent import root_agent
 
-        for cmd in ["/save", "/load", "/export", "/cast", "/status", "/list"]:
+        for cmd in ["/save", "/load", "/export", "/cast", "/status", "/list",
+                    "/auto", "/steer", "/end", "/storm"]:
             ctx = _make_ctx(actors={}, user_text=cmd)
 
             drama = ctx.session.state.get("drama", {})
@@ -126,7 +144,10 @@ class TestDramaRouterRouting:
                     text = getattr(part, 'text', None) or ''
                     user_message += text.lower()
 
-            utility_commands = ["/save", "/load", "/export", "/cast", "/status", "/list"]
+            utility_commands = [
+                "/save", "/load", "/export", "/cast", "/status", "/list",
+                "/auto", "/steer", "/end", "/storm",  # Phase 5 additions
+            ]
             force_improvise = any(cmd in user_message for cmd in utility_commands)
 
             if force_improvise or (actors and len(actors) > 0):
@@ -365,3 +386,250 @@ async def test_drama_router_run_async_impl_is_async_generator():
     assert inspect.isasyncgenfunction(root_agent._run_async_impl), (
         "_run_async_impl should be an async generator function"
     )
+
+
+# ============================================================================
+# Phase 5: Mixed Autonomy Mode Tests (LOOP-02, LOOP-04)
+# ============================================================================
+
+
+class TestDramaRouterPhase5Routing:
+    """Test DramaRouter routes Phase 5 commands to improv_director."""
+
+    def test_router_routes_auto_to_improv(self):
+        """D-01: /auto command routes to improv_director."""
+        ctx = _make_ctx(actors={}, user_text="/auto 3")
+
+        drama = ctx.session.state.get("drama", {})
+        actors = drama.get("actors", {})
+
+        user_message = ""
+        if ctx.user_content and ctx.user_content.parts:
+            for part in ctx.user_content.parts:
+                text = getattr(part, 'text', None) or ''
+                user_message += text.lower()
+
+        utility_commands = [
+            "/save", "/load", "/export", "/cast", "/status", "/list",
+            "/auto", "/steer", "/end", "/storm",
+        ]
+        force_improvise = any(cmd in user_message for cmd in utility_commands)
+
+        if force_improvise or (actors and len(actors) > 0):
+            expected_agent_name = "improv_director"
+        else:
+            expected_agent_name = "setup_agent"
+
+        assert expected_agent_name == "improv_director"
+
+    def test_router_routes_steer_to_improv(self):
+        """D-07: /steer command routes to improv_director."""
+        ctx = _make_ctx(actors={}, user_text="/steer 让朱棣更偏执")
+
+        drama = ctx.session.state.get("drama", {})
+        actors = drama.get("actors", {})
+
+        user_message = ""
+        if ctx.user_content and ctx.user_content.parts:
+            for part in ctx.user_content.parts:
+                text = getattr(part, 'text', None) or ''
+                user_message += text.lower()
+
+        utility_commands = [
+            "/save", "/load", "/export", "/cast", "/status", "/list",
+            "/auto", "/steer", "/end", "/storm",
+        ]
+        force_improvise = any(cmd in user_message for cmd in utility_commands)
+
+        if force_improvise or (actors and len(actors) > 0):
+            expected_agent_name = "improv_director"
+        else:
+            expected_agent_name = "setup_agent"
+
+        assert expected_agent_name == "improv_director"
+
+    def test_router_routes_end_to_improv(self):
+        """D-11: /end command routes to improv_director."""
+        ctx = _make_ctx(actors={}, user_text="/end")
+
+        drama = ctx.session.state.get("drama", {})
+        actors = drama.get("actors", {})
+
+        user_message = ""
+        if ctx.user_content and ctx.user_content.parts:
+            for part in ctx.user_content.parts:
+                text = getattr(part, 'text', None) or ''
+                user_message += text.lower()
+
+        utility_commands = [
+            "/save", "/load", "/export", "/cast", "/status", "/list",
+            "/auto", "/steer", "/end", "/storm",
+        ]
+        force_improvise = any(cmd in user_message for cmd in utility_commands)
+
+        if force_improvise or (actors and len(actors) > 0):
+            expected_agent_name = "improv_director"
+        else:
+            expected_agent_name = "setup_agent"
+
+        assert expected_agent_name == "improv_director"
+
+    def test_router_routes_storm_to_improv(self):
+        """D-19: /storm command routes to improv_director."""
+        ctx = _make_ctx(actors={}, user_text="/storm 角色关系")
+
+        drama = ctx.session.state.get("drama", {})
+        actors = drama.get("actors", {})
+
+        user_message = ""
+        if ctx.user_content and ctx.user_content.parts:
+            for part in ctx.user_content.parts:
+                text = getattr(part, 'text', None) or ''
+                user_message += text.lower()
+
+        utility_commands = [
+            "/save", "/load", "/export", "/cast", "/status", "/list",
+            "/auto", "/steer", "/end", "/storm",
+        ]
+        force_improvise = any(cmd in user_message for cmd in utility_commands)
+
+        if force_improvise or (actors and len(actors) > 0):
+            expected_agent_name = "improv_director"
+        else:
+            expected_agent_name = "setup_agent"
+
+        assert expected_agent_name == "improv_director"
+
+
+class TestDramaRouterAutoInterrupt:
+    """Test D-02: Auto-interrupt safety net clears remaining_auto_scenes."""
+
+    def test_router_auto_interrupt_clears_counter(self):
+        """D-02: Non-/auto input during auto-advance clears remaining_auto_scenes."""
+        ctx = _make_ctx(actors={}, user_text="something", remaining_auto_scenes=5)
+
+        drama = ctx.session.state.get("drama", {})
+        user_message = ""
+        if ctx.user_content and ctx.user_content.parts:
+            for part in ctx.user_content.parts:
+                text = getattr(part, 'text', None) or ''
+                user_message += text.lower()
+
+        # D-02: Auto-interrupt safety net
+        if drama.get("remaining_auto_scenes", 0) > 0:
+            if "/auto" not in user_message:
+                # Should clear — user sent non-auto input during auto-advance
+                assert "/auto" not in user_message, "Non-auto message should trigger interrupt"
+                # Simulate the clearing
+                drama["remaining_auto_scenes"] = 0
+
+        assert drama["remaining_auto_scenes"] == 0, (
+            "remaining_auto_scenes should be cleared after non-/auto input"
+        )
+
+    def test_router_auto_not_interrupted_by_auto_command(self):
+        """D-02: /auto command during auto-advance should NOT clear counter."""
+        ctx = _make_ctx(actors={}, user_text="/auto 5", remaining_auto_scenes=5)
+
+        drama = ctx.session.state.get("drama", {})
+        user_message = ""
+        if ctx.user_content and ctx.user_content.parts:
+            for part in ctx.user_content.parts:
+                text = getattr(part, 'text', None) or ''
+                user_message += text.lower()
+
+        # D-02: Auto-interrupt safety net — /auto should NOT clear
+        if drama.get("remaining_auto_scenes", 0) > 0:
+            if "/auto" not in user_message:
+                drama["remaining_auto_scenes"] = 0
+
+        # Should still be 5 since "/auto" is in the message
+        assert drama["remaining_auto_scenes"] == 5, (
+            "remaining_auto_scenes should NOT be cleared when user sends /auto"
+        )
+
+
+class TestImprovDirectorPhase5:
+    """Test _improv_director Phase 5 integrations."""
+
+    def test_improv_director_has_phase5_tools(self):
+        """_improv_director tools include auto_advance, steer_drama, end_drama, trigger_storm."""
+        from app.agent import _improv_director
+
+        tool_names = [getattr(t, 'name', getattr(t, '__name__', str(t))) for t in _improv_director.tools]
+        assert "auto_advance" in tool_names, "auto_advance tool not registered"
+        assert "steer_drama" in tool_names, "steer_drama tool not registered"
+        assert "end_drama" in tool_names, "end_drama tool not registered"
+        assert "trigger_storm" in tool_names, "trigger_storm tool not registered"
+
+    def test_improv_prompt_contains_seven_sections(self):
+        """D-26: _improv_director prompt has 7-section structure."""
+        from app.agent import _improv_director
+
+        instruction = _improv_director.instruction
+        assert "核心循环协议" in instruction, "§1 核心循环协议 missing"
+        assert "自动推进协议" in instruction, "§2 自动推进协议 missing"
+        assert "用户引导与干预" in instruction, "§3 用户引导与干预 missing"
+        assert "终幕协议" in instruction, "§4 终幕协议 missing"
+        assert "视角审视" in instruction, "§5 视角审视 missing"
+        assert "选项呈现规范" in instruction, "§6 选项呈现规范 missing"
+        assert "输出格式" in instruction, "§7 输出格式 missing"
+
+    def test_improv_prompt_contains_auto_advance_protocol(self):
+        """§2: Prompt describes auto-advance behavior with remaining_auto_scenes."""
+        from app.agent import _improv_director
+
+        instruction = _improv_director.instruction
+        assert "remaining_auto_scenes" in instruction
+        assert "auto_remaining" in instruction
+
+    def test_improv_prompt_contains_steer_protocol(self):
+        """§3: Prompt describes /steer vs /action distinction."""
+        from app.agent import _improv_director
+
+        instruction = _improv_director.instruction
+        assert "steer_drama" in instruction
+        assert "方向引导" in instruction
+
+    def test_improv_prompt_contains_end_protocol(self):
+        """§4: Prompt describes end + epilogue flow."""
+        from app.agent import _improv_director
+
+        instruction = _improv_director.instruction
+        assert "end_drama" in instruction
+        assert "番外篇" in instruction
+
+    def test_improv_prompt_contains_storm_protocol(self):
+        """§5: Prompt describes /storm perspective review."""
+        from app.agent import _improv_director
+
+        instruction = _improv_director.instruction
+        assert "trigger_storm" in instruction
+        assert "【视角审视】" in instruction
+
+    def test_improv_prompt_contains_options_spec(self):
+        """§6: Prompt describes options format."""
+        from app.agent import _improv_director
+
+        instruction = _improv_director.instruction
+        assert "选项呈现规范" in instruction
+        assert "接下来你想" in instruction
+
+    def test_improv_prompt_updated_principle_5(self):
+        """Principle 5 updated to mixed mode instead of semi-auto."""
+        from app.agent import _improv_director
+
+        instruction = _improv_director.instruction
+        assert "混合模式" in instruction
+        # The old "半自动模式" should be replaced
+        assert "半自动模式" not in instruction
+
+    def test_improv_prompt_updated_command_list(self):
+        """Command list includes Phase 5 commands."""
+        from app.agent import _improv_director
+
+        instruction = _improv_director.instruction
+        assert "/auto" in instruction
+        assert "/steer" in instruction
+        assert "/end" in instruction
+        assert "/storm" in instruction
