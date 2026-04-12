@@ -59,6 +59,13 @@ from .memory_manager import (
     mark_critical_memory,
 )
 from .semantic_retriever import retrieve_relevant_scenes, backfill_tags
+from .conflict_engine import (
+    calculate_tension,
+    generate_conflict_suggestion,
+    select_conflict_type,
+    update_conflict_engine_state,
+    CONFLICT_TEMPLATES,
+)
 
 
 def start_drama(theme: str, tool_context: ToolContext) -> dict:
@@ -773,6 +780,110 @@ def trigger_storm(focus_area: str, tool_context: ToolContext) -> dict:
             f"格式：以【视角审视】标记输出。"
         ),
         "focus_area": focus_area,
+    }
+
+
+def evaluate_tension(tool_context: ToolContext) -> dict:
+    """Evaluate current drama tension level based on heuristic signals.
+
+    基于启发式规则评估当前剧情张力（0-100），无需 LLM 调用。
+    每场 write_scene 后应调用此工具检查张力水平。
+
+    Returns:
+        dict with tension_score (0-100), is_boring, suggested_action, signals.
+    """
+    state = _get_state(tool_context)
+
+    # Ensure conflict_engine exists (defensive)
+    state.setdefault("conflict_engine", {
+        "tension_score": 0, "is_boring": False,
+        "tension_history": [], "active_conflicts": [],
+        "used_conflict_types": [], "last_inject_scene": 0,
+        "consecutive_low_tension": 0,
+    })
+
+    # Calculate tension (pure heuristic, no LLM)
+    result = calculate_tension(state)
+
+    # Update state
+    updated_ce = update_conflict_engine_state(state, result)
+    state["conflict_engine"] = updated_ce
+    _set_state(state, tool_context)
+
+    # Format display
+    score = result["tension_score"]
+    label = "低张力⚠️" if result["is_boring"] else ("高张力🔥" if score > 70 else "正常✅")
+    return {
+        "status": "success",
+        "tension_score": score,
+        "is_boring": result["is_boring"],
+        "suggested_action": result["suggested_action"],
+        "signals": result["signals"],
+        "message": (
+            f"📊 张力评分：{score}/100（{label}）\n"
+            f"{'⚠️ 剧情平淡，建议调用 inject_conflict 注入冲突' if result['is_boring'] else '✅ 张力水平正常'}"
+        ),
+    }
+
+
+def inject_conflict(conflict_type: str | None, tool_context: ToolContext) -> dict:
+    """Generate a conflict suggestion to inject when tension is low.
+
+    当张力过低时，生成结构化冲突建议供导演融入下一场。
+    冲突注入为"导演建议"模式——导演自由决定如何融入。
+
+    Args:
+        conflict_type: Optional specific conflict type to inject. Must be one of:
+            new_character, secret_revealed, escalation, betrayal, accident,
+            external_threat, dilemma. If None, auto-selects an available type.
+
+    Returns:
+        dict with conflict suggestion or status message.
+    """
+    state = _get_state(tool_context)
+
+    # Ensure conflict_engine exists
+    state.setdefault("conflict_engine", {
+        "tension_score": 0, "is_boring": False,
+        "tension_history": [], "active_conflicts": [],
+        "used_conflict_types": [], "last_inject_scene": 0,
+        "consecutive_low_tension": 0,
+    })
+
+    # Validate conflict_type if provided
+    if conflict_type is not None and conflict_type not in CONFLICT_TEMPLATES:
+        valid_types = ", ".join(CONFLICT_TEMPLATES.keys())
+        return {
+            "status": "error",
+            "message": f"❌ 无效的冲突类型 '{conflict_type}'。可用类型：{valid_types}",
+        }
+
+    # Generate suggestion
+    suggestion = generate_conflict_suggestion(state, conflict_type=conflict_type)
+
+    # If successful, update state
+    if suggestion.get("status") == "success":
+        updated_ce = update_conflict_engine_state(state, calculate_tension(state), suggestion)
+        state["conflict_engine"] = updated_ce
+        _set_state(state, tool_context)
+        return {
+            "status": "success",
+            **suggestion,
+            "message": (
+                f"🎭 冲突建议：{suggestion['type_cn']}\n"
+                f"描述：{suggestion['description']}\n"
+                f"提示：{suggestion['prompt_hint']}\n"
+                f"涉及角色：{'、'.join(suggestion['involved_actors'])}\n"
+                f"紧迫度：{suggestion['urgency']}"
+            ),
+        }
+
+    # Non-success status (all_exhausted, limit_reached)
+    return {
+        "status": suggestion.get("status", "info"),
+        "message": suggestion.get("message", "无法生成冲突建议"),
+        "urgency": suggestion.get("urgency", "normal"),
+        **suggestion,
     }
 
 

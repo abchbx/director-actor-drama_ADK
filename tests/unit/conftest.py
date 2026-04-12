@@ -16,6 +16,15 @@ def mock_tool_context():
             "remaining_auto_scenes": 0,
             "steer_direction": None,
             "storm": {"last_review": {}},
+            "conflict_engine": {
+                "tension_score": 0,
+                "is_boring": False,
+                "tension_history": [],
+                "active_conflicts": [],
+                "used_conflict_types": [],
+                "last_inject_scene": 0,
+                "consecutive_low_tension": 0,
+            },
             "actors": {
                 "朱棣": {
                     "role": "燕王",

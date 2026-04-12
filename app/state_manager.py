@@ -345,6 +345,16 @@ def init_drama_state(theme: str, tool_context=None) -> dict:
     state["remaining_auto_scenes"] = 0
     state["steer_direction"] = None
     state["storm"] = {"last_review": {}}
+    # Phase 6: Tension & Conflict Engine fields (D-16/D-17)
+    state["conflict_engine"] = {
+        "tension_score": 0,
+        "is_boring": False,
+        "tension_history": [],
+        "active_conflicts": [],
+        "used_conflict_types": [],
+        "last_inject_scene": 0,
+        "consecutive_low_tension": 0,
+    }
     state["created_at"] = datetime.now().isoformat()
     state["updated_at"] = datetime.now().isoformat()
     
@@ -490,6 +500,17 @@ def load_progress(save_name: str, tool_context=None) -> dict:
     # Also ensure storm sub-dict has last_review key (D-22)
     if "storm" in state and "last_review" not in state["storm"]:
         state["storm"]["last_review"] = {}
+
+    # Phase 6: Ensure conflict_engine exists for backward compatibility (D-18)
+    state.setdefault("conflict_engine", {
+        "tension_score": 0,
+        "is_boring": False,
+        "tension_history": [],
+        "active_conflicts": [],
+        "used_conflict_types": [],
+        "last_inject_scene": 0,
+        "consecutive_low_tension": 0,
+    })
 
     _set_state(state, tool_context)
     
