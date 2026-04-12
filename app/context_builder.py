@@ -499,6 +499,20 @@ def _build_current_status_section(state: dict) -> dict:
     lines = [f"戏剧主题：{theme}" if theme else "",
              f"当前场景：第{current_scene}场",
              f"状态：{status}"]
+
+    # Phase 5: Auto-advance status
+    auto_remaining = state.get("remaining_auto_scenes", 0)
+    if auto_remaining > 0:
+        lines.append(f"自动推进: 剩余 {auto_remaining} 场")
+        lines.append("⚠️ 每场 write_scene 后递减计数器，归零时回到手动模式")
+        lines.append("输出后插入提示: [自动推进中... 剩余 N 场，输入任意内容中断]")
+
+    # Phase 5: User steer direction
+    steer = state.get("steer_direction")
+    if steer:
+        lines.append(f"用户引导: {steer}")
+        lines.append("此引导仅本场生效，之后自动清除")
+
     text = "【当前状态】\n" + "\n".join(line for line in lines if line)
     return {"key": "current_status", "text": text, "priority": _DIRECTOR_SECTION_PRIORITIES["current_status"], "truncatable": False}
 

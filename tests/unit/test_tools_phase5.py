@@ -1,7 +1,7 @@
 """Unit tests for Phase 5 tool functions: auto_advance, steer_drama, end_drama, trigger_storm."""
 
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from app.tools import auto_advance, steer_drama, end_drama, trigger_storm, next_scene
 
@@ -98,3 +98,99 @@ class TestTriggerStorm:
         assert result["status"] == "success"
         # Should have created the storm sub-dict
         assert "storm" in mock_tool_context_no_storm.state["drama"]
+
+
+class TestNextSceneEnhancements:
+    """Tests for next_scene() Phase 5 enhancements."""
+
+    def test_next_scene_decrement_auto(self, mock_tool_context):
+        """next_scene() decrements remaining_auto_scenes when > 0."""
+        mock_tool_context.state["drama"]["remaining_auto_scenes"] = 3
+
+        with patch("app.tools.advance_scene") as mock_advance, \
+             patch("app.tools._extract_scene_transition") as mock_transition, \
+             patch("app.tools.build_director_context") as mock_ctx:
+            mock_advance.return_value = {"status": "success"}
+            mock_transition.return_value = {
+                "is_first_scene": False,
+                "last_ending": "",
+                "actor_emotions": {},
+                "unresolved": [],
+            }
+            mock_ctx.return_value = ""
+
+            result = next_scene(mock_tool_context)
+
+        assert mock_tool_context.state["drama"]["remaining_auto_scenes"] == 2
+        assert result["auto_remaining"] == 2
+        assert "自动推进中" in result["message"]
+        assert "剩余 2 场" in result["message"]
+
+    def test_next_scene_decrement_to_zero(self, mock_tool_context):
+        """next_scene() decrements to 0 and shows 'manual mode' message."""
+        mock_tool_context.state["drama"]["remaining_auto_scenes"] = 1
+
+        with patch("app.tools.advance_scene") as mock_advance, \
+             patch("app.tools._extract_scene_transition") as mock_transition, \
+             patch("app.tools.build_director_context") as mock_ctx:
+            mock_advance.return_value = {"status": "success"}
+            mock_transition.return_value = {
+                "is_first_scene": False,
+                "last_ending": "",
+                "actor_emotions": {},
+                "unresolved": [],
+            }
+            mock_ctx.return_value = ""
+
+            result = next_scene(mock_tool_context)
+
+        assert mock_tool_context.state["drama"]["remaining_auto_scenes"] == 0
+        assert result["auto_remaining"] == 0
+        assert "回到手动模式" in result["message"]
+
+    def test_next_scene_clears_steer(self, mock_tool_context):
+        """next_scene() clears steer_direction after reading it (D-09)."""
+        mock_tool_context.state["drama"]["steer_direction"] = "让朱棣更偏执"
+        mock_tool_context.state["drama"]["remaining_auto_scenes"] = 0
+
+        with patch("app.tools.advance_scene") as mock_advance, \
+             patch("app.tools._extract_scene_transition") as mock_transition, \
+             patch("app.tools.build_director_context") as mock_ctx:
+            mock_advance.return_value = {"status": "success"}
+            mock_transition.return_value = {
+                "is_first_scene": False,
+                "last_ending": "",
+                "actor_emotions": {},
+                "unresolved": [],
+            }
+            mock_ctx.return_value = ""
+
+            result = next_scene(mock_tool_context)
+
+        assert mock_tool_context.state["drama"]["steer_direction"] is None
+        # Return dict should still have the steer value that was read
+        assert result["steer_direction"] == "让朱棣更偏执"
+
+    def test_next_scene_no_auto_no_steer(self, mock_tool_context):
+        """next_scene() with no auto or steer returns clean result."""
+        mock_tool_context.state["drama"]["remaining_auto_scenes"] = 0
+        mock_tool_context.state["drama"]["steer_direction"] = None
+
+        with patch("app.tools.advance_scene") as mock_advance, \
+             patch("app.tools._extract_scene_transition") as mock_transition, \
+             patch("app.tools.build_director_context") as mock_ctx:
+            mock_advance.return_value = {"status": "success"}
+            mock_transition.return_value = {
+                "is_first_scene": False,
+                "last_ending": "",
+                "actor_emotions": {},
+                "unresolved": [],
+            }
+            mock_ctx.return_value = ""
+
+            result = next_scene(mock_tool_context)
+
+        assert result["auto_remaining"] == 0
+        assert result["steer_direction"] is None
+        # No auto/steer info in message
+        assert "自动推进" not in result["message"]

@@ -530,6 +530,27 @@ def next_scene(tool_context: ToolContext) -> dict:
             parts.append(f"未决事件：{'；'.join(transition['unresolved'][:3])}")
         transition_text = "【上一场衔接】\n" + "\n".join(parts)
 
+    # Phase 5: Auto-advance counter decrement (A4 mitigation)
+    # When remaining_auto_scenes > 0, decrement on each new scene start.
+    # This is a code-level safety net — the prompt also instructs LLM to decrement.
+    auto_remaining = state.get("remaining_auto_scenes", 0)
+    auto_status = ""
+    if auto_remaining > 0:
+        state["remaining_auto_scenes"] = max(0, auto_remaining - 1)
+        auto_remaining = state["remaining_auto_scenes"]
+        if auto_remaining == 0:
+            auto_status = "\n\n🔄 自动推进已结束，回到手动模式。"
+        else:
+            auto_status = f"\n\n[自动推进中... 剩余 {auto_remaining} 场，输入任意内容中断]"
+        # Persist the counter change
+        _set_state(state, tool_context)
+
+    # Phase 5: Clear steer_direction after it's been read for this scene (D-09)
+    steer_info = state.get("steer_direction")
+    if steer_info:
+        state["steer_direction"] = None
+        _set_state(state, tool_context)
+
     # Auto-include director context for scene continuity
     # D-10 compliance: next_scene() returns concise transition_text (must-read),
     # while director_context provides broader global view. The _improv_director
@@ -551,6 +572,8 @@ def next_scene(tool_context: ToolContext) -> dict:
         "transition_text": transition_text,
         "actors_available": actor_names,
         "director_context": director_ctx,
+        "auto_remaining": auto_remaining,
+        "steer_direction": steer_info,
         "message": (
             f"▶️ 已推进至第 {scene_num} 场。\n\n"
             f"{transition_text}\n\n"
@@ -560,6 +583,7 @@ def next_scene(tool_context: ToolContext) -> dict:
             f"  ② actor_speak —— 让角色对话\n"
             f"  ③ write_scene —— 记录本场\n\n"
             f"输出完整剧本格式片段后等待用户指令。"
+            f"{auto_status}"
         ),
     }
 
