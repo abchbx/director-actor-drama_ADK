@@ -1,0 +1,92 @@
+# Requirements — Director-Actor-Drama 无限畅写版
+
+**Version:** v1
+**Date:** 2026-04-11
+
+## v1 Requirements
+
+### 记忆管理 (MEMORY)
+
+- [ ] **MEMORY-01**: 3 层记忆架构 — 工作记忆（当前场景详情）、场景摘要（近期场景压缩）、全局摘要（远期整体浓缩），三层逐级压缩
+- [ ] **MEMORY-02**: 自动记忆压缩 — 场景数超过阈值时自动将最早的工作记忆压缩为场景摘要，场景摘要超过阈值时压缩为全局摘要
+- [ ] **MEMORY-03**: 重要性权重摘要 — 压缩时根据事件重要性保留关键细节（角色首次登场、重大转折、情感高峰），次要事件仅保留一句概述
+- [ ] **MEMORY-04**: 上下文构建器 — 为每场戏组装传入 LLM 的上下文，包含：全局摘要 + 近期场景摘要 + 当前场景工作记忆 + 导演指令，总 token 控制在预算内
+- [ ] **MEMORY-05**: 语义检索 — 按关键词/角色名/事件类型检索历史记忆，当演员或导演需要回忆特定过往时使用
+
+### 无限循环引擎 (LOOP)
+
+- [ ] **LOOP-01**: 无限叙事循环 — 场景→评估张力→注入冲突(如需)→下一场，无预设终点，直至用户发出终止命令
+- [ ] **LOOP-02**: 混合推进模式 — AI 自主推进剧情发展，用户可随时通过命令注入事件、改变方向、添加角色，两者无缝切换
+- [ ] **LOOP-03**: 场景自然衔接 — 每场戏的 prompt 自动包含上一场的关键信息（结局、情绪、未决事件），确保逻辑自然延续
+- [ ] **LOOP-04**: 用户终止机制 — 明确的 `/end` 命令结束戏剧，触发终幕旁白和完整剧本导出
+
+### 冲突引擎 (CONFLICT)
+
+- [ ] **CONFLICT-01**: 张力评分 — 每场结束后自动评估当前剧情张力水平（0-10），基于：角色冲突强度、未决事件数量、情绪对立程度
+- [ ] **CONFLICT-02**: 低张力自动注入 — 张力评分低于阈值时，自动生成转折事件并融入剧情（新角色登场、意外发生、矛盾升级）
+- [ ] **CONFLICT-03**: 冲突模板库 — 预置多种冲突类型模板：新角色登场、意外事件、矛盾升级、信任背叛、秘密发现、外部威胁、抉择困境
+- [ ] **CONFLICT-04**: 冲突去重 — 记录近期已使用的冲突类型，避免连续注入相同类型的冲突
+- [ ] **CONFLICT-05**: 弧线追踪 — 追踪每个角色弧线（成长/堕落/转变）和故事弧线（起承转合）的完成度，确保弧线不被遗忘
+
+### 动态 STORM (DSTORM)
+
+- [ ] **DSTORM-01**: 动态视角发现 — 每 N 场（可配置，默认 10 场）自动重新发现新视角，从当前剧情中挖掘未被探索的角度
+- [ ] **DSTORM-02**: 新冲突注入 — 基于新发现的视角生成新冲突并融入剧情，扩展戏剧张力维度
+- [ ] **DSTORM-03**: 世界观扩展 — 动态引入新角色、新地点、新规则，扩展故事世界而非重复已有内容
+- [ ] **DSTORM-04**: 用户触发的 STORM — 用户可主动请求新视角发现（`/storm` 命令），不受 N 场间隔限制
+- [ ] **DSTORM-05**: 渐进式 STORM — 每次动态 STORM 只注入 1-2 个新视角，避免一次性过载导致剧情失焦
+
+### 连贯性保障 (COHERENCE)
+
+- [ ] **COHERENCE-01**: 一致性检查 — 新场景生成前检查与已确立事实的矛盾，若发现矛盾则提示导演修正
+- [ ] **COHERENCE-02**: 关键事实追踪 — 维护"已确立事实"清单（谁是谁、在哪、发生了什么），防止后续场景产生矛盾
+- [ ] **COHERENCE-03**: 角色一致性 — 确保演员行为符合其性格定义和累积记忆，避免人设崩塌
+- [ ] **COHERENCE-04**: 矛盾修复 — 检测到逻辑矛盾时自动生成修复性旁白（"其实..."、"之前未曾提及的是..."），而非直接报错中断
+- [ ] **COHERENCE-05**: 时间线追踪 — 维护剧情时间线（事件发生顺序、时间跨度），防止时序矛盾和场景跳跃
+
+## v2 Requirements (Deferred)
+
+- MEMORY-06: 记忆遗忘模拟 — 演员自然遗忘远期细节，更拟人
+- LOOP-05: 场景节奏控制 — 快慢交替，避免单调
+- LOOP-06: 多线叙事切换 — 主线/支线并行推进
+- CONFLICT-06: 高张力冷却 — 持续高压后自动引入缓和场景
+- DSTORM-06: 用户自定义 STORM 主题 — 指定下次动态 STORM 的探索方向
+
+## Out of Scope
+
+- 多用户协作 — 当前架构为单用户设计，A2A 隔离不支持多用户会话共享
+- 语音/视频输出 — 仅文本交互，多模态需要额外基础设施
+- 自定义 LLM 模型选择 UI — 使用系统默认模型配置
+- Web UI — 当前仅 CLI 交互
+- 向量数据库集成 — v1 使用 3 层 JSON 记忆，ChromaDB/FAISS 作为未来升级路径
+
+## Traceability
+
+| REQ-ID | Phase | Status |
+|--------|-------|--------|
+| MEMORY-01 | Phase 1 | planned |
+| MEMORY-02 | Phase 1 | planned |
+| MEMORY-03 | Phase 1 | planned |
+| MEMORY-04 | Phase 2 | planned |
+| MEMORY-05 | Phase 3 | planned |
+| LOOP-01 | Phase 4 | planned |
+| LOOP-02 | Phase 5 | planned |
+| LOOP-03 | Phase 4 | planned |
+| LOOP-04 | Phase 5 | planned |
+| CONFLICT-01 | Phase 6 | planned |
+| CONFLICT-02 | Phase 6 | planned |
+| CONFLICT-03 | Phase 6 | planned |
+| CONFLICT-04 | Phase 6 | planned |
+| CONFLICT-05 | Phase 7 | planned |
+| DSTORM-01 | Phase 8 | planned |
+| DSTORM-02 | Phase 8 | planned |
+| DSTORM-03 | Phase 8 | planned |
+| DSTORM-04 | Phase 9 | planned |
+| DSTORM-05 | Phase 9 | planned |
+| COHERENCE-01 | Phase 10 | planned |
+| COHERENCE-02 | Phase 10 | planned |
+| COHERENCE-03 | Phase 10 | planned |
+| COHERENCE-04 | Phase 10 | planned |
+| COHERENCE-05 | Phase 11 | planned |
+
+*Traceability filled from ROADMAP.md on 2026-04-11.*

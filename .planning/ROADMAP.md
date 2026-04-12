@@ -119,9 +119,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 04-01-PLAN.md — DramaRouter 重构（_setup_agent + _improv_director + 路由逻辑）
-- [ ] 04-02-PLAN.md — 场景衔接信息增强（_extract_scene_transition + build_director_context 衔接段落）
-- [ ] 04-03-PLAN.md — next_scene 返回值增强 + 旧状态迁移 + 单元测试
+- [x] 04-01-PLAN.md — DramaRouter 重构（_setup_agent + _improv_director + 路由逻辑）
+- [x] 04-02-PLAN.md — 场景衔接信息增强（_extract_scene_transition + build_director_context 衔接段落）
+- [x] 04-03-PLAN.md — next_scene 返回值增强 + 旧状态迁移 + 单元测试
 
 **Success Criteria:**
 1. `app/agent.py` 中 `StormRouter` 演化为 `DramaRouter`，仅区分 setup 阶段和 improvise 阶段
