@@ -483,12 +483,12 @@ def load_progress(save_name: str, tool_context=None) -> dict:
     return {
         "status": "success",
         "message": f"Loaded drama: {save_data.get('theme', 'Unknown')}",
-        "theme": save_data.get("theme", ""),
-        "drama_status": save_data.get("status", ""),
-        "current_scene": save_data.get("current_scene", 0),
-        "num_actors": len(save_data.get("actors", {})),
-        "num_scenes": len(save_data.get("scenes", [])),
-        "actors_list": list(save_data.get("actors", {}).keys()),
+        "theme": state.get("theme", ""),
+        "drama_status": state.get("status", ""),
+        "current_scene": state.get("current_scene", 0),
+        "num_actors": len(state.get("actors", {})),
+        "num_scenes": len(state.get("scenes", [])),
+        "actors_list": list(state.get("actors", {}).keys()),
         "drama_folder": os.path.dirname(state_file),
     }
 
