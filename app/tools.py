@@ -50,12 +50,13 @@ from .actor_service import (
     stop_all_actor_services,
     list_running_actors,
 )
-from .context_builder import build_actor_context, build_director_context
+from .context_builder import build_actor_context, build_director_context, _extract_scene_transition
 from .memory_manager import (
     add_working_memory,
     detect_importance,
     mark_critical_memory,
 )
+from .semantic_retriever import retrieve_relevant_scenes, backfill_tags
 
 
 def start_drama(theme: str, tool_context: ToolContext) -> dict:
@@ -490,19 +491,51 @@ def write_scene(
 
 
 def next_scene(tool_context: ToolContext) -> dict:
-    """Advance to the next scene. Use when user provides /next command.
+    """Advance to the next scene with transition info. Use when user provides /next command.
+
+    Returns transition information (D-08/D-09/D-10/D-13) including:
+    - is_first_scene: True if this is the first scene (D-13)
+    - transition: {last_ending, actor_emotions, unresolved} (D-09)
+    - transition_text: Formatted paragraph for director prompt
 
     Args:
         tool_context: The tool context.
 
     Returns:
-        dict with the new scene info and format guidance.
+        dict with the new scene info, transition info, and format guidance.
     """
+    from .context_builder import _extract_scene_transition
+
     result = advance_scene(tool_context)
     state = tool_context.state.get("drama", {})
     scene_num = state.get("current_scene", 1)
 
+    # Extract transition info (D-08/D-09/D-10/D-13)
+    transition = _extract_scene_transition(state)
+
+    # Build transition paragraph for director prompt
+    transition_text = ""
+    if transition["is_first_scene"]:
+        transition_text = "🎬 这是本剧的第一场戏！请输出开场白，介绍故事背景和主要角色。"
+    else:
+        parts = []
+        if transition["last_ending"]:
+            parts.append(f"上一场结局：{transition['last_ending']}")
+        if transition["actor_emotions"]:
+            emotions_str = "、".join(
+                f"{name}（{emo}）" for name, emo in transition["actor_emotions"].items()
+            )
+            parts.append(f"角色情绪：{emotions_str}")
+        if transition["unresolved"]:
+            parts.append(f"未决事件：{'；'.join(transition['unresolved'][:3])}")
+        transition_text = "【上一场衔接】\n" + "\n".join(parts)
+
     # Auto-include director context for scene continuity
+    # D-10 compliance: next_scene() returns concise transition_text (must-read),
+    # while director_context provides broader global view. The _improv_director
+    # prompt must instruct: use transition_text for scene-to-scene continuity,
+    # use director_context only when you need global arc/storm overview.
+    # This prevents duplicate transition info in the LLM's working context.
     director_ctx = build_director_context(tool_context)
 
     # Get current actors for context
@@ -513,16 +546,20 @@ def next_scene(tool_context: ToolContext) -> dict:
     return {
         "status": "success",
         "current_scene": scene_num,
+        "is_first_scene": transition["is_first_scene"],
+        "transition": transition,
+        "transition_text": transition_text,
         "actors_available": actor_names,
         "director_context": director_ctx,
         "message": (
             f"▶️ 已推进至第 {scene_num} 场。\n\n"
+            f"{transition_text}\n\n"
             f"当前可用演员: {actor_list}\n\n"
-            f"请按以下顺序执行，并按剧本格式输出：\n"
-            f"  ① 调用 director_narrate —— 描述本场的时间、地点、环境、氛围、灯光、声音等舞台指示\n"
-            f"  ② 对每个参与本场的角色，调用 actor_speak —— 获取其对话内容\n"
-            f"  ③ 调用 write_scene —— 将本场完整内容记录到剧本中\n\n"
-            f"最终输出必须包含完整的剧本格式片段（旁白 + 角色对话）。"
+            f"请按以下顺序执行：\n"
+            f"  ① director_narrate —— 描述本场环境\n"
+            f"  ② actor_speak —— 让角色对话\n"
+            f"  ③ write_scene —— 记录本场\n\n"
+            f"输出完整剧本格式片段后等待用户指令。"
         ),
     }
 
@@ -686,7 +723,7 @@ def load_drama(save_name: str, tool_context: ToolContext) -> dict:
     if narration_log:
         narration_summary = f"\n已有旁白: {len(narration_log)} 条"
 
-    # Build next action guidance
+    # Build next action guidance using new DramaRouter statuses
     drama_status = result.get("drama_status", "")
     if drama_status == "acting" and current_scene > 0:
         next_action = (
@@ -695,12 +732,8 @@ def load_drama(save_name: str, tool_context: ToolContext) -> dict:
         )
     elif drama_status == "acting":
         next_action = "\n\n▶️ 请使用 /next 开始第一场戏。"
-    elif drama_status in ("brainstorming", "storm_discovering"):
-        next_action = "\n\n▶️ 请使用 /next 继续 STORM 发现阶段。"
-    elif drama_status == "storm_researching":
-        next_action = "\n\n▶️ 请使用 /next 继续 STORM 研究阶段。"
-    elif drama_status == "storm_outlining":
-        next_action = "\n\n▶️ 请使用 /next 继续大纲合成阶段。"
+    elif drama_status == "setup":
+        next_action = "\n\n▶️ 请使用 /start <主题> 继续设定。"
     else:
         next_action = "\n\n▶️ 请使用 /next 继续剧情。"
 
@@ -1244,3 +1277,73 @@ def storm_synthesize_outline(theme: str, tool_context: ToolContext) -> dict:
         "phase": "outline",
         "next_phase": "directing",
     }
+
+
+# ============================================================================
+# Semantic Retrieval Tools (Phase 3 — MEMORY-05)
+# ============================================================================
+
+
+def retrieve_relevant_scenes_tool(
+    tags: str,
+    tool_context: ToolContext,
+) -> dict:
+    """Retrieve relevant scene memories by tags. Use when you need to recall specific past events.
+
+    按标签检索相关历史记忆，导演全局搜索所有演员的记忆。
+
+    Args:
+        tags: Comma-separated tags, e.g. "角色:朱棣,情感:愤怒,冲突:权力争夺"
+
+    Returns:
+        dict with top-K relevant memories, sorted by relevance score.
+    """
+    tag_list = [t.strip() for t in tags.split(",") if t.strip()]
+    if not tag_list:
+        return {"status": "error", "message": "请提供至少一个标签用于检索。"}
+
+    # Validate tag length (T-03-01)
+    for t in tag_list:
+        if len(t) > 50:
+            return {"status": "error", "message": f"标签过长（{len(t)}字符），限制50字符以内。"}
+
+    state = tool_context.state.get("drama", {})
+    current_scene = state.get("current_scene", 0)
+
+    results = retrieve_relevant_scenes(
+        tags=tag_list,
+        current_scene=current_scene,
+        tool_context=tool_context,
+        actor_name=None,  # 导演全局搜索 (D-07)
+        top_k=5,  # 导演侧 top-5 (D-08)
+    )
+
+    # Format results for readability
+    formatted = []
+    for r in results:
+        matched = ", ".join(r.get("matched_tags", []))
+        formatted.append(
+            f"- 第{r['scenes_covered']}场[{r['source']}]: {r['text'][:150]} (匹配: {matched}, 相关度: {r['score']:.1f})"
+        )
+
+    return {
+        "status": "success",
+        "message": f"找到 {len(results)} 条相关记忆。\n" + "\n".join(formatted),
+        "results": results,
+    }
+
+
+async def backfill_tags_tool(tool_context: ToolContext) -> dict:
+    """Backfill tags for existing scene summaries that lack tags. Call once when loading an old drama.
+
+    对已有的 scene_summaries 批量生成标签（调用 LLM）。
+    执行后标记 tags_backfilled=True，避免重复执行。
+
+    Args:
+        tool_context: Tool context for state access.
+
+    Returns:
+        dict with backfill status and count of tagged summaries.
+    """
+    result = await backfill_tags(tool_context)
+    return result

@@ -400,6 +400,29 @@ def save_progress(save_name: str = "", tool_context=None) -> dict:
     }
 
 
+def _migrate_legacy_status(state: dict) -> dict:
+    """Migrate old STORM status values to new DramaRouter status (D-14).
+
+    Old statuses: "", "brainstorming", "storm_discovering",
+                  "storm_researching", "storm_outlining", "acting"
+    New statuses: "setup", "acting"
+
+    Rule: actors exist → "acting", otherwise → "setup"
+
+    Args:
+        state: The drama state dict (mutated in-place).
+
+    Returns:
+        The same state dict with migrated status.
+    """
+    actors = state.get("actors", {})
+    if actors and len(actors) > 0:
+        state["status"] = "acting"
+    else:
+        state["status"] = "setup"
+    return state
+
+
 def load_progress(save_name: str, tool_context=None) -> dict:
     """Load a previously saved drama.
 
@@ -435,6 +458,10 @@ def load_progress(save_name: str, tool_context=None) -> dict:
     with open(state_file, "r", encoding="utf-8") as f:
         save_data = json.load(f)
 
+    # Clear conversation log from previous drama to avoid cross-drama contamination
+    global _conversation_log
+    _conversation_log = []
+
     state = _get_state(tool_context)
     state.update(save_data)
     state["updated_at"] = datetime.now().isoformat()
@@ -444,6 +471,9 @@ def load_progress(save_name: str, tool_context=None) -> dict:
         if "working_memory" not in actor_data:
             from .memory_manager import migrate_legacy_memory
             migrate_legacy_memory(actor_name, tool_context)
+
+    # D-14: Auto-migrate old STORM status to DramaRouter status
+    _migrate_legacy_status(state)
 
     _set_state(state, tool_context)
     
