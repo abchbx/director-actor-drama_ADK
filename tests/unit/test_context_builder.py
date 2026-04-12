@@ -14,6 +14,8 @@ from app.context_builder import (
     _build_steer_section,
     _build_epilogue_section,
     _build_auto_advance_section,
+    _build_tension_section,
+    _build_conflict_section,
     _DIRECTOR_SECTION_PRIORITIES,
     DEFAULT_ACTOR_TOKEN_BUDGET,
     DEFAULT_DIRECTOR_TOKEN_BUDGET,
@@ -696,3 +698,119 @@ class TestPhase5Sections:
         mock_tool_context.state["drama"]["status"] = "ended"
         result = build_director_context(mock_tool_context)
         assert "【番外篇模式】" in result
+
+
+# ============================================================================
+# Phase 6: Tension & Conflict section tests
+# ============================================================================
+
+
+class TestBuildTensionSection:
+    """Tests for _build_tension_section() — Phase 6 D-14."""
+
+    def test_no_conflict_engine_returns_empty(self):
+        """_build_tension_section with no conflict_engine returns empty text."""
+        state = {}
+        result = _build_tension_section(state)
+        assert result["key"] == "tension"
+        assert result["text"] == ""
+
+    def test_normal_tension_displays_correctly(self):
+        """_build_tension_section with tension_score=45, is_boring=False, 2 active conflicts, 0 consecutive low."""
+        state = {
+            "conflict_engine": {
+                "tension_score": 45,
+                "is_boring": False,
+                "active_conflicts": [{"id": "c1"}, {"id": "c2"}],
+                "consecutive_low_tension": 0,
+            }
+        }
+        result = _build_tension_section(state)
+        assert result["key"] == "tension"
+        assert "45/100" in result["text"]
+        assert "正常" in result["text"]
+        assert "2 条" in result["text"]
+        assert "0 场" in result["text"]
+
+    def test_boring_tension_shows_warning(self):
+        """_build_tension_section with is_boring=True shows 低张力."""
+        state = {
+            "conflict_engine": {
+                "tension_score": 15,
+                "is_boring": True,
+                "active_conflicts": [],
+                "consecutive_low_tension": 3,
+            }
+        }
+        result = _build_tension_section(state)
+        assert "低张力" in result["text"]
+
+    def test_high_tension_shows_fire(self):
+        """_build_tension_section with tension_score=80 shows 高张力."""
+        state = {
+            "conflict_engine": {
+                "tension_score": 80,
+                "is_boring": False,
+                "active_conflicts": [],
+                "consecutive_low_tension": 0,
+            }
+        }
+        result = _build_tension_section(state)
+        assert "高张力" in result["text"]
+
+    def test_tension_section_in_director_context(self, mock_tool_context):
+        """build_director_context includes tension section when conflict_engine exists."""
+        mock_tool_context.state["drama"]["conflict_engine"] = {
+            "tension_score": 50,
+            "is_boring": False,
+            "active_conflicts": [],
+            "consecutive_low_tension": 0,
+        }
+        result = build_director_context(mock_tool_context)
+        assert "【张力状态】" in result
+
+    def test_tension_priority_is_5(self):
+        """_DIRECTOR_SECTION_PRIORITIES contains 'tension' key with value 5."""
+        assert "tension" in _DIRECTOR_SECTION_PRIORITIES
+        assert _DIRECTOR_SECTION_PRIORITIES["tension"] == 5
+
+
+class TestBuildConflictSectionExpanded:
+    """Tests for expanded _build_conflict_section() — Phase 6 D-15."""
+
+    def test_active_conflict_with_details(self):
+        """_build_conflict_section with active_conflicts shows type, description, involved_actors."""
+        state = {
+            "conflict_engine": {
+                "active_conflicts": [
+                    {
+                        "id": "conflict_5_escalation_1",
+                        "type": "escalation",
+                        "description": "现有分歧激化为更严重的对抗",
+                        "involved_actors": ["朱棣", "朱元璋"],
+                    }
+                ]
+            }
+        }
+        result = _build_conflict_section(state)
+        assert result["key"] == "conflicts"
+        assert "矛盾升级" in result["text"]
+        assert "现有分歧激化为更严重的对抗" in result["text"]
+        assert "朱棣" in result["text"]
+        assert "朱元璋" in result["text"]
+
+    def test_no_conflict_engine_returns_empty(self):
+        """_build_conflict_section with no conflict_engine returns empty."""
+        state = {}
+        result = _build_conflict_section(state)
+        assert result["text"] == ""
+
+    def test_active_conflict_string_format(self):
+        """_build_conflict_section with string-format conflicts still works."""
+        state = {
+            "conflict_engine": {
+                "active_conflicts": ["简单冲突描述"]
+            }
+        }
+        result = _build_conflict_section(state)
+        assert "简单冲突描述" in result["text"]
