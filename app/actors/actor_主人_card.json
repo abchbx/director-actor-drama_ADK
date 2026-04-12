@@ -1,0 +1,26 @@
+{
+  "name": "actor_主人",
+  "description": "演员 主人，角色：旁观者 - 社会秩序的隐喻",
+  "url": "http://localhost:9078/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_主人",
+      "name": "扮演主人",
+      "description": "以主人的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

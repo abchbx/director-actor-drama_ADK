@@ -1,0 +1,26 @@
+{
+  "name": "actor_汤汤（Tom）",
+  "description": "演员 汤汤（Tom），角色：主角 - 命运与本能的挣扎者",
+  "url": "http://localhost:9060/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_汤汤_Tom_",
+      "name": "扮演汤汤（Tom）",
+      "description": "以汤汤（Tom）的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

@@ -79,8 +79,18 @@ def _build_compression_prompt_working(entries: list[dict], actor_name: str) -> s
 5. 摘要长度控制在 150-200 字
 6. 特别标注涉及{actor_name}的情感变化和决策
 
-## 输出格式
-直接输出摘要文本，不要加前缀或标题。"""
+## 输出格式（严格 JSON）
+{{{{
+  "summary": "场景摘要文本...",
+  "tags": ["角色:朱棣", "地点:皇宫", "情感:愤怒", "冲突:权力争夺", "秘密发现"]
+}}}}
+
+### 标签生成规则
+- 从摘要中提取 3-8 个标签
+- 标签格式：前缀:值，前缀包括：角色、地点、情感、冲突、事件
+- 角色名必标（谁在场），冲突/事件类型必标（发生了什么）
+- 情感和地点视情况标注
+- 无前缀标签用于难以归类的重要关键词"""
 
 
 def _build_compression_prompt_arc(
@@ -190,6 +200,7 @@ async def compress_working_to_scene(
 
     使用 LLM 将工作记忆条目压缩为场景摘要。
     先尝试 LiteLlm，失败时回退到 httpx 直接 API 调用。
+    标签提取失败不阻塞压缩——tags 默认为空列表。
 
     Args:
         actor_name: The actor whose memory to compress.
@@ -197,12 +208,35 @@ async def compress_working_to_scene(
         tool_context: Tool context for state access.
 
     Returns:
-        dict with summary, scenes_covered, key_events.
+        dict with summary, scenes_covered, key_events, tags.
     """
     prompt = _build_compression_prompt_working(entries, actor_name)
 
     # Try LiteLlm first (A2 from RESEARCH.md)
-    summary_text = await _call_llm(prompt)
+    response_text = await _call_llm(prompt)
+
+    # Parse JSON response for summary + tags
+    summary_text = response_text
+    tags = []
+
+    try:
+        json_text = response_text.strip()
+        if "```json" in json_text:
+            json_text = json_text.split("```json")[1].split("```")[0].strip()
+        elif "```" in json_text:
+            json_text = json_text.split("```")[1].split("```")[0].strip()
+
+        parsed = json.loads(json_text)
+        if isinstance(parsed, dict):
+            summary_text = parsed.get("summary", response_text)
+            tags = parsed.get("tags", [])
+            if not isinstance(tags, list):
+                tags = []
+    except (json.JSONDecodeError, KeyError, IndexError):
+        # Fallback: use raw text as summary, try regex tag extraction
+        logger.warning(f"Failed to parse working→scene JSON for {actor_name}, using raw text")
+        from .semantic_retriever import _parse_tags_from_llm_output
+        tags = _parse_tags_from_llm_output(response_text)
 
     # Determine scenes covered
     scenes = sorted(set(e.get("scene", 0) for e in entries))
@@ -219,6 +253,7 @@ async def compress_working_to_scene(
         "summary": summary_text,
         "scenes_covered": scenes_covered,
         "key_events": key_events,
+        "tags": tags,
     }
 
 

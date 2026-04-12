@@ -8,6 +8,7 @@ Tests the 3-tier memory architecture:
 - Legacy memory migration
 """
 
+import pytest
 from unittest.mock import patch, AsyncMock
 from app.memory_manager import (
     add_working_memory,
@@ -405,3 +406,69 @@ class TestMarkCriticalMemory:
         )
         assert result["status"] == "error"
         assert "无效" in result["message"]
+
+
+# ============================================================================
+# Task 2 Tests (Phase 3): Tag generation in compression prompts
+# ============================================================================
+
+
+class TestCompressionPromptTags:
+    """Tests for tag generation in compression prompt and output."""
+
+    def test_compression_prompt_contains_tag_rules(self):
+        """_build_compression_prompt_working output contains '标签生成规则' and 'tags'."""
+        from app.memory_manager import _build_compression_prompt_working
+        entries = [{"entry": "测试记忆", "scene": 1}]
+        prompt = _build_compression_prompt_working(entries, "朱棣")
+        assert "标签生成规则" in prompt
+        assert "tags" in prompt
+
+    def test_compression_prompt_contains_json_format(self):
+        """_build_compression_prompt_working output contains JSON format with tags field."""
+        from app.memory_manager import _build_compression_prompt_working
+        entries = [{"entry": "测试记忆", "scene": 1}]
+        prompt = _build_compression_prompt_working(entries, "朱棣")
+        assert '"tags":' in prompt or 'tags' in prompt
+        assert "严格 JSON" in prompt
+
+    @pytest.mark.asyncio
+    async def test_compress_working_returns_tags(self, mock_tool_context):
+        """compress_working_to_scene returns dict with 'tags' key (list type)."""
+        from app.memory_manager import compress_working_to_scene
+        entries = [
+            {"entry": "朱棣在皇宫中与道衍商议", "importance": "normal", "scene": 1},
+            {"entry": "决定起兵靖难", "importance": "normal", "scene": 2},
+        ]
+        with patch("app.memory_manager._call_llm", new_callable=AsyncMock) as mock_llm:
+            mock_llm.return_value = '{"summary": "朱棣与道衍在皇宫商议起兵", "tags": ["角色:朱棣", "地点:皇宫", "冲突:起兵"]}'
+            result = await compress_working_to_scene("朱棣", entries, mock_tool_context)
+        assert "tags" in result
+        assert isinstance(result["tags"], list)
+        assert "角色:朱棣" in result["tags"]
+
+    @pytest.mark.asyncio
+    async def test_compress_working_tags_fallback_on_non_json(self, mock_tool_context):
+        """Tags fallback to regex extraction when LLM returns non-JSON."""
+        from app.memory_manager import compress_working_to_scene
+        entries = [
+            {"entry": "朱棣在皇宫中愤怒地商议", "importance": "normal", "scene": 1},
+        ]
+        with patch("app.memory_manager._call_llm", new_callable=AsyncMock) as mock_llm:
+            mock_llm.return_value = "朱棣与道衍在皇宫商议起兵，角色:朱棣，地点:皇宫"
+            result = await compress_working_to_scene("朱棣", entries, mock_tool_context)
+        assert "tags" in result
+        assert isinstance(result["tags"], list)
+
+    @pytest.mark.asyncio
+    async def test_compress_working_tags_default_empty(self, mock_tool_context):
+        """Tags default to empty list when no tags found (non-blocking)."""
+        from app.memory_manager import compress_working_to_scene
+        entries = [
+            {"entry": "普通对话", "importance": "normal", "scene": 1},
+        ]
+        with patch("app.memory_manager._call_llm", new_callable=AsyncMock) as mock_llm:
+            mock_llm.return_value = "这是一段没有标签格式的普通文本摘要。"
+            result = await compress_working_to_scene("朱棣", entries, mock_tool_context)
+        assert "tags" in result
+        assert isinstance(result["tags"], list)
