@@ -176,11 +176,11 @@ Plans:
 4. 冲突模板库包含 7 种类型（新角色登场、秘密发现、矛盾升级、信任背叛、意外事件、外部威胁、抉择困境）
 5. `used_conflict_types` 追踪近期已使用冲突类型，同一类型 8 场内不重复
 
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 
 Plans:
-- [ ] 06-01-PLAN.md — conflict_engine.py 核心模块（calculate_tension + CONFLICT_TEMPLATES + 冲突选择/去重/渐进升级）+ TDD 单元测试
-- [ ] 06-02-PLAN.md — 集成层（tools.py 薄代理 + state_manager.py 初始化/兼容 + agent.py §8 prompt + context_builder.py 张力/冲突段落）+ TDD 测试
+- [x] 06-01-PLAN.md — conflict_engine.py 核心模块（calculate_tension + CONFLICT_TEMPLATES + 冲突选择/去重/渐进升级）+ TDD 单元测试
+- [x] 06-02-PLAN.md — 集成层（tools.py 薄代理 + state_manager.py 初始化/兼容 + agent.py §8 prompt + context_builder.py 张力/冲突段落）+ TDD 测试
 
 **Depends on:** Phase 1, Phase 4（需要记忆和循环引擎基础）
 
