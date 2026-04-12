@@ -42,6 +42,8 @@ from .state_manager import (
     update_actor_emotion,
     update_actor_memory,
     update_script,
+    _get_state,
+    _set_state,
 )
 from .actor_service import (
     create_actor_service,
@@ -72,7 +74,7 @@ def start_drama(theme: str, tool_context: ToolContext) -> dict:
     """
     result = init_drama_state(theme, tool_context)
     if result["status"] == "success":
-        set_drama_status("brainstorming", tool_context)
+        set_drama_status("setup", tool_context)
         
         # Get the drama folder path
         folder_info = get_drama_folder(tool_context)
@@ -504,8 +506,6 @@ def next_scene(tool_context: ToolContext) -> dict:
     Returns:
         dict with the new scene info, transition info, and format guidance.
     """
-    from .context_builder import _extract_scene_transition
-
     result = advance_scene(tool_context)
     state = tool_context.state.get("drama", {})
     scene_num = state.get("current_scene", 1)
@@ -584,6 +584,151 @@ def user_action(action_description: str, tool_context: ToolContext) -> dict:
             "4. 更新角色的情绪和记忆"
         ),
         "action": action_description,
+    }
+
+
+def auto_advance(scenes: int, tool_context: ToolContext) -> dict:
+    """Enable auto-advance mode for N scenes. The director will advance N scenes autonomously.
+
+    设置自动推进模式，AI 将自主推进指定场数的戏剧。用户可随时输入任何内容中断。
+
+    Args:
+        scenes: Number of scenes to auto-advance. Default 3, soft cap at 10.
+
+    Returns:
+        dict with auto-advance status and guidance.
+    """
+    state = _get_state(tool_context)
+
+    # D-05: Soft cap at 10 with warning
+    if scenes > 10:
+        current = state.get("remaining_auto_scenes", 0)
+        return {
+            "status": "info",
+            "message": (
+                f"⚠️ 请求推进 {scenes} 场超过建议上限(10场)。\n"
+                f"大量自动推进可能消耗较多 token。建议使用 /auto 10 以内。\n"
+                f"如果确认，请再次发送 /auto {scenes}"
+            ),
+            "remaining_auto_scenes": current,
+        }
+
+    # D-04: Default 3 handled by caller (router/CLI passes 3 if no arg)
+    state["remaining_auto_scenes"] = scenes
+    _set_state(state, tool_context)
+
+    return {
+        "status": "success",
+        "message": (
+            f"🎬 自动推进模式已启动！将自主推进 {scenes} 场戏。\n"
+            f"每场结束后会提示剩余场数。\n"
+            f"输入任何内容即可中断，回到手动模式。"
+        ),
+        "remaining_auto_scenes": scenes,
+    }
+
+
+def steer_drama(direction: str, tool_context: ToolContext) -> dict:
+    """Set a directional guidance for the next scene. Lighter than /action which injects specific events.
+
+    设置下一场的方向引导，导演会在此方向上发挥创意。
+    与 /action 不同：/steer 给方向（"让朱棣更偏执"），/action 给事件（"朱棣发现密信"）。
+
+    Args:
+        direction: The direction or guidance for the next scene.
+
+    Returns:
+        dict with confirmation that the steer is set.
+    """
+    state = _get_state(tool_context)
+    state["steer_direction"] = direction
+    _set_state(state, tool_context)
+
+    return {
+        "status": "success",
+        "message": (
+            f"🧭 方向已设置：{direction}\n"
+            f"下一场将在此方向上发挥创意。\n"
+            f"效力仅一场，之后自动清除。"
+        ),
+        "steer_direction": direction,
+    }
+
+
+def end_drama(tool_context: ToolContext) -> dict:
+    """End the drama with epilogue narration, auto-save, and script export.
+
+    触发终幕机制：设置 drama_status 为 ended，提示导演生成终幕旁白，
+    自动保存存档，并导出完整剧本。结束后可继续番外篇。
+
+    Args:
+        tool_context: The tool context.
+
+    Returns:
+        dict with end status and epilogue template.
+    """
+    state = _get_state(tool_context)
+    state["status"] = "ended"
+
+    # A5 mitigation: Clear steer_direction on end to prevent residue
+    state["steer_direction"] = None
+
+    # Reset auto-advance counter
+    state["remaining_auto_scenes"] = 0
+
+    _set_state(state, tool_context)
+
+    return {
+        "status": "success",
+        "message": (
+            "🎭 终幕已触发！\n"
+            "请按照终幕协议生成终幕旁白：\n"
+            "1. 回顾全剧主线\n"
+            "2. 各角色结局\n"
+            "3. 主题升华\n"
+            "4. 落幕致辞\n\n"
+            "生成终幕旁白后，自动调用 save_drama 和 export_drama。\n"
+            "结束后用户仍可用 /next 继续番外篇。"
+        ),
+        "drama_status": "ended",
+        "epilogue_template": (
+            "🎭 终幕 ——\n"
+            "【回顾】全剧主线梳理\n"
+            "【角色结局】各角色命运\n"
+            "【主题升华】核心主题回响\n"
+            "【落幕致辞】最后的旁白"
+        ),
+    }
+
+
+def trigger_storm(focus_area: str, tool_context: ToolContext) -> dict:
+    """Trigger a lightweight perspective review of the current drama.
+
+    手动触发视角审视——让导演重新审视当前剧情，发现新的角度或未探索方向。
+    轻量版（Phase 5），Phase 8 将升级为完整 Dynamic STORM。
+
+    Args:
+        focus_area: Optional area to focus the review on (e.g., "角色关系", "权力斗争").
+
+    Returns:
+        dict with storm review status.
+    """
+    state = _get_state(tool_context)
+
+    # D-22: Ensure storm sub-dict exists
+    if "storm" not in state:
+        state["storm"] = {"last_review": {}}
+
+    _set_state(state, tool_context)
+
+    return {
+        "status": "success",
+        "message": (
+            f"🔍 视角审视已触发！聚焦领域：{focus_area}\n"
+            f"请重新审视当前剧情，输出 1-2 个新角度或未探索方向。\n"
+            f"格式：以【视角审视】标记输出。"
+        ),
+        "focus_area": focus_area,
     }
 
 
@@ -965,8 +1110,8 @@ def storm_discover_perspectives(theme: str, tool_context: ToolContext) -> dict:
     Returns:
         dict with discovered perspectives and guiding questions.
     """
-    # Transition to storm_discovering status
-    set_drama_status("storm_discovering", tool_context)
+    # Setup phase: status remains "setup" (D-14: no intermediate STORM statuses)
+    set_drama_status("setup", tool_context)
 
     perspectives = [
         {
@@ -1025,8 +1170,8 @@ def storm_discover_perspectives(theme: str, tool_context: ToolContext) -> dict:
             tool_context=tool_context,
         )
 
-    # Transition to storm_researching status for next phase
-    set_drama_status("storm_researching", tool_context)
+    # Setup phase: status remains "setup" (D-14: no intermediate STORM statuses)
+    set_drama_status("setup", tool_context)
 
     perspective_summary = "\n".join(
         f"  **{p['name']}**: {p['description']}" for p in perspectives
@@ -1142,7 +1287,7 @@ def storm_research_perspective(
 
     if researched >= total and total > 0:
         # All perspectives researched, transition to outlining
-        set_drama_status("storm_outlining", tool_context)
+        set_drama_status("setup", tool_context)
         next_msg = (
             f"\n\n所有 {total} 个视角已完成研究！系统将进入大纲合成阶段。"
             "请使用 /next 继续。"
