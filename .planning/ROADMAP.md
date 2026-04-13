@@ -51,6 +51,14 @@ Plans:
 - [x] 01-02-PLAN.md — Integration with state_manager.py & tools.py (actor_speak, mark_memory, load migration)
 - [x] 01-03-PLAN.md — Async LLM compression & edge cases (pending merge, LiteLlm fallback, serialization)
 
+**Plans:** 2/2 plans complete
+
+Plans:
+- [x] 08-01-PLAN.md — Core dynamic_storm.py module + TDD tests
+- [x] 08-02-PLAN.md — Integration layer (tools + state + context_builder + agent)
+
+**UAT:** 08-UAT.md — 15/15 passed, 0 issues
+
 **Success Criteria:**
 1. `app/memory_manager.py` 模块存在，实现 `add_working_memory()`、`build_actor_context()`、`check_and_compress()` 等函数
 2. 运行 20+ 场戏后，每个演员的 `working_memory` ≤ 5 条、`scene_summaries` 逐步增长、`arc_summary` 在阈值触发后被填充
@@ -75,6 +83,14 @@ Plans:
 - [x] 02-01-PLAN.md — context_builder.py 核心模块（estimate_tokens + 逐层裁剪 + build_actor_context_from_memory + build_director_context）+ 单元测试
 - [x] 02-02-PLAN.md — 迁移集成（memory_manager 重导出 + tools.py import 更新 + agent.py 导演工具注册 + 集成测试）
 
+**Plans:** 2/2 plans complete
+
+Plans:
+- [x] 08-01-PLAN.md — Core dynamic_storm.py module + TDD tests
+- [x] 08-02-PLAN.md — Integration layer (tools + state + context_builder + agent)
+
+**UAT:** 08-UAT.md — 15/15 passed, 0 issues
+
 **Success Criteria:**
 1. `app/context_builder.py` 模块存在，实现 `build_director_context()` 和 `build_actor_context_from_memory()` 函数
 2. 导演上下文包含：全局故事弧线 + 当前张力状态 + 近期场景标题 + 活跃冲突 + Dynamic STORM 视角
@@ -97,6 +113,14 @@ Plans:
 Plans:
 - [ ] 03-01-PLAN.md — semantic_retriever.py 核心模块（加权标签匹配、三层搜索、去重排序、标签解析、回填工具）+ memory_manager.py 压缩 prompt 标签生成
 - [ ] 03-02-PLAN.md — 集成层（tools.py 导演 Tool 注册 + context_builder.py 相关回忆段落 + agent.py instruction 更新）
+
+**Plans:** 2/2 plans complete
+
+Plans:
+- [x] 08-01-PLAN.md — Core dynamic_storm.py module + TDD tests
+- [x] 08-02-PLAN.md — Integration layer (tools + state + context_builder + agent)
+
+**UAT:** 08-UAT.md — 15/15 passed, 0 issues
 
 **Success Criteria:**
 1. `retrieve_relevant_scenes(tags, current_scene, tool_context)` 函数可用，返回 top-K 相关场景摘要
@@ -122,6 +146,14 @@ Plans:
 - [x] 04-01-PLAN.md — DramaRouter 重构（_setup_agent + _improv_director + 路由逻辑）
 - [x] 04-02-PLAN.md — 场景衔接信息增强（_extract_scene_transition + build_director_context 衔接段落）
 - [x] 04-03-PLAN.md — next_scene 返回值增强 + 旧状态迁移 + 单元测试
+
+**Plans:** 2/2 plans complete
+
+Plans:
+- [x] 08-01-PLAN.md — Core dynamic_storm.py module + TDD tests
+- [x] 08-02-PLAN.md — Integration layer (tools + state + context_builder + agent)
+
+**UAT:** 08-UAT.md — 15/15 passed, 0 issues
 
 **Success Criteria:**
 1. `app/agent.py` 中 `StormRouter` 演化为 `DramaRouter`，仅区分 setup 阶段和 improvise 阶段
@@ -149,6 +181,14 @@ Plans:
 - [x] 05-02-PLAN.md — Context Builder & State: steer/epilogue/auto-advance sections + state field init + load migration
 - [x] 05-03-PLAN.md — Director Prompt Restructure + Router + CLI: 7-section prompt + routing + auto-interrupt + CLI updates
 
+**Plans:** 2/2 plans complete
+
+Plans:
+- [x] 08-01-PLAN.md — Core dynamic_storm.py module + TDD tests
+- [x] 08-02-PLAN.md — Integration layer (tools + state + context_builder + agent)
+
+**UAT:** 08-UAT.md — 15/15 passed, 0 issues
+
 **Success Criteria:**
 1. 用户可通过 `/action` 注入事件、`/steer <direction>` 轻量引导、`/storm` 手动触发视角发现，与 AI 自主推进无缝切换
 2. `/end` 命令触发终幕旁白和完整剧本导出，戏剧优雅结束
@@ -168,6 +208,14 @@ Plans:
 - CONFLICT-02: 低张力自动注入
 - CONFLICT-03: 冲突模板库
 - CONFLICT-04: 冲突去重
+
+**Plans:** 2/2 plans complete
+
+Plans:
+- [x] 08-01-PLAN.md — Core dynamic_storm.py module + TDD tests
+- [x] 08-02-PLAN.md — Integration layer (tools + state + context_builder + agent)
+
+**UAT:** 08-UAT.md — 15/15 passed, 0 issues
 
 **Success Criteria:**
 1. `evaluate_tension(tool_context)` 工具可用，返回 `tension_score`（0-100）、`is_boring`、`suggested_action`
@@ -193,11 +241,26 @@ Plans:
 **Requirements:**
 - CONFLICT-05: 弧线追踪
 
+**Plans:** 2 plans
+
+Plans:
+- [ ] 07-01-PLAN.md — Core arc_tracker.py module + conflict_engine resolve extension + state initialization
+- [ ] 07-02-PLAN.md — Integration layer (tools + context_builder + agent.py §9 + inject_conflict enhancement)
+
+**Plans:** 2/2 plans complete
+
+Plans:
+- [x] 08-01-PLAN.md — Core dynamic_storm.py module + TDD tests
+- [x] 08-02-PLAN.md — Integration layer (tools + state + context_builder + agent)
+
+**UAT:** 08-UAT.md — 15/15 passed, 0 issues
+
 **Success Criteria:**
 1. `state["plot_threads"]` 维护结构化的剧情线索列表，每条线索包含 `id`、`description`、`status`（active/dormant/resolved）、`involved_actors`、`introduced_scene`
-2. 每个演员的角色弧线（成长/堕落/转变）在 `state["actors"][name]["arc_summary"]` 中追踪
+2. 每个演员的角色弧线（成长/堕落/转变）在 `state["actors"][name]["arc_progress"]` 中追踪
 3. 线索超过 8 场无更新时自动标记为 `dormant`，导演收到提醒
-4. 活跃冲突数上限为 3-4，注入新冲突前要求至少一条线索进入 `resolving` 状态
+4. 活跃冲突数上限为 3-4，注入新冲突前建议推进已有线索
+5. 冲突可通过 resolve_conflict_tool 从 active 移到 resolved_conflicts
 
 **Depends on:** Phase 6
 
@@ -211,6 +274,14 @@ Plans:
 - DSTORM-01: 动态视角发现
 - DSTORM-02: 新冲突注入
 - DSTORM-03: 世界观扩展
+
+**Plans:** 2/2 plans complete
+
+Plans:
+- [x] 08-01-PLAN.md — Core dynamic_storm.py module + TDD tests
+- [x] 08-02-PLAN.md — Integration layer (tools + state + context_builder + agent)
+
+**UAT:** 08-UAT.md — 15/15 passed, 0 issues
 
 **Success Criteria:**
 1. `dynamic_storm(focus_area, tool_context)` 工具可用，从当前剧情中挖掘未探索角度
@@ -230,6 +301,14 @@ Plans:
 **Requirements:**
 - DSTORM-04: 用户触发的 STORM
 - DSTORM-05: 渐进式 STORM
+
+**Plans:** 2/2 plans complete
+
+Plans:
+- [x] 08-01-PLAN.md — Core dynamic_storm.py module + TDD tests
+- [x] 08-02-PLAN.md — Integration layer (tools + state + context_builder + agent)
+
+**UAT:** 08-UAT.md — 15/15 passed, 0 issues
 
 **Success Criteria:**
 1. `/storm` 命令可用，用户可主动请求新视角发现，不受 N 场间隔限制
@@ -251,6 +330,12 @@ Plans:
 - COHERENCE-03: 角色一致性
 - COHERENCE-04: 矛盾修复
 
+**Plans:** 2 plans
+
+Plans:
+- [ ] 10-01-PLAN.md — coherence_checker.py 纯函数核心 + state_manager 初始化/兼容 + TDD 测试
+- [ ] 10-02-PLAN.md — 集成层（3 个 Tool 函数 + context_builder 升级 + agent.py §11 + tools 注册）
+
 **Success Criteria:**
 1. `app/coherence_checker.py` 模块存在，实现 `validate_consistency(tool_context)` 函数
 2. `state["established_facts"]` 维护已确立事实清单（谁是谁、在哪、发生了什么），新场景生成前自动检查
@@ -269,6 +354,14 @@ Plans:
 **Requirements:**
 - COHERENCE-05: 时间线追踪
 
+**Plans:** 2/2 plans complete
+
+Plans:
+- [x] 08-01-PLAN.md — Core dynamic_storm.py module + TDD tests
+- [x] 08-02-PLAN.md — Integration layer (tools + state + context_builder + agent)
+
+**UAT:** 08-UAT.md — 15/15 passed, 0 issues
+
 **Success Criteria:**
 1. `state["timeline"]` 包含 `current_time`（描述性时间，如"第三天黄昏"）和 `days_elapsed`
 2. 每场戏推进时间确定性更新，时间信息包含在演员和导演的 prompt 中
@@ -282,6 +375,14 @@ Plans:
 ## Phase 12: Integration & Polish
 
 **Goal:** 端到端集成测试、CLI 优化、性能调优、文档完善，确保系统可交付。
+
+**Plans:** 2/2 plans complete
+
+Plans:
+- [x] 08-01-PLAN.md — Core dynamic_storm.py module + TDD tests
+- [x] 08-02-PLAN.md — Integration layer (tools + state + context_builder + agent)
+
+**UAT:** 08-UAT.md — 15/15 passed, 0 issues
 
 **Success Criteria:**
 1. 端到端测试：`/start` → setup → 30+ 场戏（含冲突注入 + Dynamic STORM）→ `/save` → `/load` → 继续 → `/end`，全流程无错误
