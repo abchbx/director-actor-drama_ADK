@@ -24,6 +24,15 @@ def mock_tool_context():
                 "used_conflict_types": [],
                 "last_inject_scene": 0,
                 "consecutive_low_tension": 0,
+                "resolved_conflicts": [],
+            },
+            "plot_threads": [],
+            "established_facts": [],
+            "coherence_checks": {
+                "last_check_scene": 0,
+                "last_result": None,
+                "check_history": [],
+                "total_contradictions": 0,
             },
             "actors": {
                 "朱棣": {
@@ -45,8 +54,41 @@ def mock_tool_context():
                     },
                     "critical_memories": [],
                     "emotions": "neutral",
+                    "arc_progress": {
+                        "arc_type": "",
+                        "arc_stage": "",
+                        "progress": 0,
+                        "related_threads": [],
+                    },
                     "created_at": "2026-04-11T10:00:00",
-                }
+                },
+                "苏念": {
+                    "role": "宫女",
+                    "personality": "温柔聪慧，善于察言观色",
+                    "background": "后宫宫女，暗中传递消息",
+                    "knowledge_scope": "宫廷内幕",
+                    "memory": [],
+                    "working_memory": [],
+                    "scene_summaries": [],
+                    "arc_summary": {
+                        "structured": {
+                            "theme": "",
+                            "key_characters": [],
+                            "unresolved": [],
+                            "resolved": [],
+                        },
+                        "narrative": "",
+                    },
+                    "critical_memories": [],
+                    "emotions": "anxious",
+                    "arc_progress": {
+                        "arc_type": "",
+                        "arc_stage": "",
+                        "progress": 0,
+                        "related_threads": [],
+                    },
+                    "created_at": "2026-04-11T10:00:00",
+                },
             },
         }
     }

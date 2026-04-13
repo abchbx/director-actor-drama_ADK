@@ -14,14 +14,66 @@ from datetime import datetime
 from google.adk.agents.remote_a2a_agent import RemoteA2aAgent
 from google.adk.tools import ToolContext
 
+from .actor_service import (
+    create_actor_service,
+    get_actor_remote_config,
+    list_running_actors,
+    stop_actor_service,
+    stop_all_actor_services,
+)
+from .arc_tracker import (
+    ARC_STAGES,
+    ARC_TYPES,
+    create_thread_logic,
+    resolve_thread_logic,
+    set_actor_arc_logic,
+    update_thread_logic,
+)
+from .coherence_checker import (
+    MAX_CHECK_HISTORY,
+    add_fact_logic,
+    parse_contradictions,
+    repair_contradiction_logic,
+    validate_consistency_logic,
+    validate_consistency_prompt,
+)
+from .conflict_engine import (
+    CONFLICT_TEMPLATES,
+    calculate_tension,
+    generate_conflict_suggestion,
+    resolve_conflict,
+    select_conflict_type,
+    update_conflict_engine_state,
+)
+from .context_builder import (
+    _extract_scene_transition,
+    build_actor_context,
+    build_director_context,
+)
+from .dynamic_storm import (
+    STORM_INTERVAL,
+    check_keyword_overlap,
+    discover_perspectives_prompt,
+    parse_llm_perspectives,
+    suggest_conflict_types,
+    update_dynamic_storm_state,
+)
+from .memory_manager import (
+    add_working_memory,
+    detect_importance,
+    mark_critical_memory,
+)
+from .semantic_retriever import backfill_tags, retrieve_relevant_scenes
 from .state_manager import (
-    add_narration,
+    _get_state,
+    _set_state,
     add_conversation,
     add_dialogue,
+    add_narration,
     add_system_message,
     advance_scene,
-    export_script,
     export_conversations,
+    export_script,
     get_actor_info,
     get_all_actors,
     get_current_state,
@@ -35,36 +87,13 @@ from .state_manager import (
     set_drama_status,
     storm_add_perspective,
     storm_add_research_result,
+    storm_get_outline,
     storm_get_perspectives,
     storm_get_research_results,
     storm_set_outline,
-    storm_get_outline,
     update_actor_emotion,
     update_actor_memory,
     update_script,
-    _get_state,
-    _set_state,
-)
-from .actor_service import (
-    create_actor_service,
-    get_actor_remote_config,
-    stop_actor_service,
-    stop_all_actor_services,
-    list_running_actors,
-)
-from .context_builder import build_actor_context, build_director_context, _extract_scene_transition
-from .memory_manager import (
-    add_working_memory,
-    detect_importance,
-    mark_critical_memory,
-)
-from .semantic_retriever import retrieve_relevant_scenes, backfill_tags
-from .conflict_engine import (
-    calculate_tension,
-    generate_conflict_suggestion,
-    select_conflict_type,
-    update_conflict_engine_state,
-    CONFLICT_TEMPLATES,
 )
 
 
@@ -322,8 +351,9 @@ async def _call_a2a_sdk(card_file: str, prompt: str, actor_name: str, port: str)
     """
     import json
     import uuid
+
     import httpx
-    from a2a.client import ClientFactory, ClientConfig
+    from a2a.client import ClientConfig, ClientFactory
     from a2a.types import AgentCard, Message, Part, Role, Task
 
     def _extract_text_from_part(part) -> tuple[str | None, bool]:
@@ -752,35 +782,139 @@ def end_drama(tool_context: ToolContext) -> dict:
     }
 
 
-def trigger_storm(focus_area: str, tool_context: ToolContext) -> dict:
-    """Trigger a lightweight perspective review of the current drama.
+async def dynamic_storm(focus_area: str, tool_context: ToolContext, trigger_type: str = "auto") -> dict:
+    """Trigger Dynamic STORM to discover new perspectives from current drama.
 
-    手动触发视角审视——让导演重新审视当前剧情，发现新的角度或未探索方向。
-    轻量版（Phase 5），Phase 8 将升级为完整 Dynamic STORM。
+    触发动态STORM——从当前剧情中挖掘未探索角度，生成1-2个新视角。
+    新视角与已有视角去重，受已确立事实约束，结果合并入storm数据。
 
     Args:
-        focus_area: Optional area to focus the review on (e.g., "角色关系", "权力斗争").
+        focus_area: Optional area to focus the discovery on (e.g., "角色关系", "权力斗争").
+        trigger_type: Trigger type — "auto" (periodic/suggested), "manual" (user /storm),
+            or "tension_low". Affects prompt priority and return fields.
 
     Returns:
-        dict with storm review status.
+        dict with status, message, focus_area, new_perspectives, suggested_conflict_types,
+        overlap_warnings, scenes_since_last, integration_hint (manual only).
     """
     state = _get_state(tool_context)
 
-    # D-22: Ensure storm sub-dict exists
+    # Ensure storm sub-dict exists
     if "storm" not in state:
         state["storm"] = {"last_review": {}}
+    if "perspectives" not in state.get("storm", {}):
+        state["storm"]["perspectives"] = []
+
+    # Build prompt
+    prompt = discover_perspectives_prompt(state, focus_area)
+
+    # Call LLM for perspective generation
+    try:
+        from .memory_manager import _call_llm
+        response_text = await _call_llm(prompt)
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"❌ Dynamic STORM LLM调用失败：{e}",
+            "focus_area": focus_area,
+        }
+
+    # Parse LLM response
+    new_perspectives = parse_llm_perspectives(response_text)
+
+    if not new_perspectives:
+        # Still record the trigger attempt
+        ds_state = update_dynamic_storm_state(state, trigger_type=trigger_type, focus_area=focus_area, perspectives_found=0)
+        state["dynamic_storm"] = ds_state
+        _set_state(state, tool_context)
+        return {
+            "status": "success",
+            "message": "🔍 Dynamic STORM 触发，但未发现新视角。可能当前剧情已有充分探索。",
+            "focus_area": focus_area,
+            "new_perspectives": [],
+            "suggested_conflict_types": [],
+            "overlap_warnings": [],
+            "scenes_since_last": state.get("dynamic_storm", {}).get("scenes_since_last_storm", 0),
+        }
+
+    # Check overlap for each new perspective
+    existing_names = [p.get("name", "") for p in state["storm"].get("perspectives", [])]
+    overlap_warnings = []
+    for p in new_perspectives:
+        result = check_keyword_overlap(p.get("name", ""), existing_names)
+        if result.get("overlap_warning"):
+            overlap_warnings.append(result["overlap_warning"])
+
+    # Suggest conflict types for each new perspective
+    all_suggested_types = []
+    for p in new_perspectives:
+        types = suggest_conflict_types(p.get("description", ""))
+        all_suggested_types.extend(types)
+    suggested_conflict_types = list(dict.fromkeys(all_suggested_types))  # dedup preserving order
+
+    # Merge new perspectives into storm["perspectives"]
+    current_scene = state.get("current_scene", 0)
+    for p in new_perspectives:
+        p["source"] = "dynamic_storm"
+        p["discovered_scene"] = current_scene
+    state["storm"]["perspectives"].extend(new_perspectives)
+
+    # Update dynamic_storm state
+    ds_state = update_dynamic_storm_state(
+        state,
+        trigger_type=trigger_type,
+        focus_area=focus_area,
+        perspectives_found=len(new_perspectives),
+        new_perspectives=new_perspectives,
+    )
+    state["dynamic_storm"] = ds_state
 
     _set_state(state, tool_context)
 
-    return {
+    result = {
         "status": "success",
-        "message": (
-            f"🔍 视角审视已触发！聚焦领域：{focus_area}\n"
-            f"请重新审视当前剧情，输出 1-2 个新角度或未探索方向。\n"
-            f"格式：以【视角审视】标记输出。"
-        ),
+        "message": f"🔍 Dynamic STORM 触发！发现 {len(new_perspectives)} 个新视角",
         "focus_area": focus_area,
+        "new_perspectives": new_perspectives,
+        "suggested_conflict_types": suggested_conflict_types,
+        "overlap_warnings": overlap_warnings,
+        "scenes_since_last": 0,  # just triggered, so 0
     }
+
+    # Phase 9: manual trigger gets integration hint (D-09)
+    if trigger_type == "manual" and new_perspectives:
+        first_p = new_perspectives[0]
+        p_name = first_p.get("name", "新视角")
+        q = first_p.get("questions", [""])[0] if first_p.get("questions") else ""
+        hint_topic = q[:20].rstrip("？?。") if q else "新方向"
+        result["integration_hint"] = (
+            f"新视角「{p_name}」已发现。"
+            f"建议先在下一场旁白中暗示{hint_topic}，再逐步让角色卷入。"
+            f"用 /steer 可指定融入方向。"
+        )
+
+    return result
+
+
+def trigger_storm(focus_area: str, tool_context: ToolContext) -> dict:
+    """Backward-compatible alias for dynamic_storm() (D-24/D-25).
+
+    trigger_storm() 的向后兼容别名，内部调用 dynamic_storm()。
+    返回值格式兼容旧版，但新增 new_perspectives 等字段。
+    传递 trigger_type="manual" 以标记为用户主动触发 (Phase 9 D-16)。
+    """
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                result = pool.submit(asyncio.run, dynamic_storm(focus_area, tool_context, trigger_type="manual")).result()
+            return result
+        else:
+            return loop.run_until_complete(dynamic_storm(focus_area, tool_context, trigger_type="manual"))
+    except RuntimeError:
+        return asyncio.run(dynamic_storm(focus_area, tool_context, trigger_type="manual"))
 
 
 def evaluate_tension(tool_context: ToolContext) -> dict:
@@ -810,6 +944,26 @@ def evaluate_tension(tool_context: ToolContext) -> dict:
     state["conflict_engine"] = updated_ce
     _set_state(state, tool_context)
 
+    # Phase 8: Extend suggested_action with dynamic_storm (D-09)
+    suggested_actions = [result["suggested_action"]]
+    suggested_storm_focus = None
+
+    scenes_since_last = state.get("dynamic_storm", {}).get("scenes_since_last_storm", 0)
+    consecutive_low = updated_ce.get("consecutive_low_tension", 0)
+
+    if scenes_since_last >= STORM_INTERVAL:
+        if "dynamic_storm" not in suggested_actions:
+            suggested_actions.append("dynamic_storm")
+        suggested_storm_focus = "周期性视角刷新"
+    if consecutive_low >= 3:
+        if "dynamic_storm" not in suggested_actions:
+            suggested_actions.append("dynamic_storm")
+        if not suggested_storm_focus:
+            suggested_storm_focus = "张力恢复"
+
+    # For backward compat: if only one action, keep as string; if multiple, join with comma
+    final_suggested_action = suggested_actions[0] if len(suggested_actions) == 1 else ",".join(suggested_actions)
+
     # Format display
     score = result["tension_score"]
     label = "低张力⚠️" if result["is_boring"] else ("高张力🔥" if score > 70 else "正常✅")
@@ -817,7 +971,8 @@ def evaluate_tension(tool_context: ToolContext) -> dict:
         "status": "success",
         "tension_score": score,
         "is_boring": result["is_boring"],
-        "suggested_action": result["suggested_action"],
+        "suggested_action": final_suggested_action,
+        "suggested_storm_focus": suggested_storm_focus,
         "signals": result["signals"],
         "message": (
             f"📊 张力评分：{score}/100（{label}）\n"
@@ -826,16 +981,17 @@ def evaluate_tension(tool_context: ToolContext) -> dict:
     }
 
 
-def inject_conflict(conflict_type: str | None, tool_context: ToolContext) -> dict:
+def inject_conflict(conflict_type: str | None = None, tool_context: ToolContext = None) -> dict:
     """Generate a conflict suggestion to inject when tension is low.
 
     当张力过低时，生成结构化冲突建议供导演融入下一场。
     冲突注入为"导演建议"模式——导演自由决定如何融入。
 
     Args:
-        conflict_type: Optional specific conflict type to inject. Must be one of:
-            new_character, secret_revealed, escalation, betrayal, accident,
-            external_threat, dilemma. If None, auto-selects an available type.
+        conflict_type: 冲突类型，可选值：new_character, secret_revealed,
+            escalation, betrayal, accident, external_threat, dilemma。
+            为 None 时自动选择可用类型（跳过8场去重窗口内的类型）。
+        tool_context: Tool context for state access.
 
     Returns:
         dict with conflict suggestion or status message.
@@ -865,6 +1021,13 @@ def inject_conflict(conflict_type: str | None, tool_context: ToolContext) -> dic
     if suggestion.get("status") == "success":
         updated_ce = update_conflict_engine_state(state, calculate_tension(state), suggestion)
         state["conflict_engine"] = updated_ce
+        # D-02: Wire thread_id on conflicts when involved_actors overlap with an active thread
+        active_threads = [t for t in state.get("plot_threads", []) if t.get("status") == "active"]
+        for thread in active_threads:
+            if set(suggestion["involved_actors"]) & set(thread.get("involved_actors", [])):
+                if state["conflict_engine"]["active_conflicts"]:
+                    state["conflict_engine"]["active_conflicts"][-1]["thread_id"] = thread["id"]
+                break
         _set_state(state, tool_context)
         return {
             "status": "success",
@@ -879,12 +1042,182 @@ def inject_conflict(conflict_type: str | None, tool_context: ToolContext) -> dic
         }
 
     # Non-success status (all_exhausted, limit_reached)
-    return {
+    result = {
         "status": suggestion.get("status", "info"),
         "message": suggestion.get("message", "无法生成冲突建议"),
         "urgency": suggestion.get("urgency", "normal"),
         **suggestion,
     }
+    # D-14: When limit_reached, suggest threads to advance
+    if suggestion.get("status") == "limit_reached":
+        active_threads = [
+            {"id": t["id"], "description": t["description"]}
+            for t in state.get("plot_threads", [])
+            if t.get("status") == "active"
+        ]
+        if active_threads:
+            result["suggested_threads"] = active_threads
+            thread_names = "、".join(t["description"][:15] for t in active_threads[:3])
+            result["message"] += f"\n💡 建议先推进线索：{thread_names}"
+    return result
+
+
+def create_thread(description: str, involved_actors: str, tool_context: ToolContext) -> dict:
+    """Create a new plot thread to track a story arc. Use when director discovers a new story thread.
+
+    创建新的剧情线索追踪。导演发现新的故事线时使用。
+    involved_actors 为逗号分隔的角色名（如 "朱棣,苏念"）。
+
+    Args:
+        description: Description of the plot thread.
+        involved_actors: Comma-separated actor names involved in this thread.
+
+    Returns:
+        dict with thread creation status and thread_id.
+    """
+    state = _get_state(tool_context)
+    state.setdefault("plot_threads", [])
+
+    # Parse comma-separated actor names
+    actor_list = [name.strip() for name in involved_actors.split(",") if name.strip()]
+
+    result = create_thread_logic(description, actor_list, state)
+    if result["status"] == "success":
+        _set_state(state, tool_context)
+        return {
+            "status": "success",
+            "thread_id": result["thread_id"],
+            "message": f"📌 线索已创建：[{result['thread_id']}] \"{description}\"",
+        }
+    return result
+
+
+def update_thread(thread_id: str, status: str | None, progress_note: str | None, tool_context: ToolContext) -> dict:
+    """Update a plot thread's status and/or add a progress note. Use when a story thread has new development.
+
+    更新剧情线索的状态和/或进展记录。线索有新进展时使用。
+
+    Args:
+        thread_id: The thread ID to update.
+        status: New status (active/dormant/resolving/resolved) or None to keep current.
+        progress_note: Progress note to append, or None.
+
+    Returns:
+        dict with update status.
+    """
+    state = _get_state(tool_context)
+    state.setdefault("plot_threads", [])
+
+    result = update_thread_logic(thread_id, status, progress_note, state)
+    if result["status"] == "success":
+        _set_state(state, tool_context)
+        updates = result.get("updates_applied", {})
+        parts = [f"线索 {thread_id} 已更新"]
+        if "status" in updates:
+            parts.append(f"状态 → {updates['status']}")
+        if "progress_note" in updates:
+            parts.append(f"进展：{updates['progress_note']}")
+        return {
+            "status": "success",
+            "message": " | ".join(parts),
+        }
+    return result
+
+
+def resolve_thread(thread_id: str, resolution: str, tool_context: ToolContext) -> dict:
+    """Resolve a plot thread with a resolution description. Use when a story thread naturally concludes.
+
+    解决剧情线索，标记为已解决。故事线自然结束时使用。
+
+    Args:
+        thread_id: The thread ID to resolve.
+        resolution: Description of how the thread was resolved.
+
+    Returns:
+        dict with resolution status.
+    """
+    state = _get_state(tool_context)
+    state.setdefault("plot_threads", [])
+
+    result = resolve_thread_logic(thread_id, resolution, state)
+    if result["status"] == "success":
+        _set_state(state, tool_context)
+        msg = f"✅ 线索 {thread_id} 已解决：{resolution}"
+        if result.get("linked_conflict_hint"):
+            msg += f"\n💡 {result['linked_conflict_hint']}"
+        return {
+            "status": "success",
+            "message": msg,
+            "linked_conflict_hint": result.get("linked_conflict_hint"),
+        }
+    return result
+
+
+def set_actor_arc(actor_name: str, arc_type: str | None, arc_stage: str | None, progress: int | None, tool_context: ToolContext) -> dict:
+    """Set or update an actor's character arc progress. Use when a character experiences a key turning point.
+
+    设置或更新演员的角色弧线进展。角色经历关键转折时使用。
+
+    Args:
+        actor_name: The actor's name.
+        arc_type: Arc type (growth/fall/transformation/redemption) or None to keep.
+        arc_stage: Arc stage (setup/development/climax/resolution) or None to keep.
+        progress: Progress percentage (0-100) or None to keep.
+
+    Returns:
+        dict with arc update status.
+    """
+    state = _get_state(tool_context)
+
+    result = set_actor_arc_logic(actor_name, arc_type, arc_stage, progress, None, state)
+    if result["status"] == "success":
+        _set_state(state, tool_context)
+        arc = result["arc_progress"]
+        arc_type_cn = ARC_TYPES.get(arc.get("arc_type", ""), "")
+        arc_stage_cn = ARC_STAGES.get(arc.get("arc_stage", ""), "")
+        parts = [f"🎭 {actor_name} 弧线已更新"]
+        if arc_type_cn:
+            parts.append(f"类型：{arc_type_cn}")
+        if arc_stage_cn:
+            parts.append(f"阶段：{arc_stage_cn}")
+        parts.append(f"进展：{arc.get('progress', 0)}%")
+        return {
+            "status": "success",
+            "message": " | ".join(parts),
+        }
+    return result
+
+
+def resolve_conflict_tool(conflict_id: str, tool_context: ToolContext) -> dict:
+    """Resolve an active conflict. Use when a conflict has been naturally resolved in the story.
+
+    解决活跃冲突，将其从活跃列表移到已解决列表。冲突在故事中自然消解时使用。
+
+    Args:
+        conflict_id: The ID of the conflict to resolve.
+
+    Returns:
+        dict with resolution status.
+    """
+    state = _get_state(tool_context)
+
+    # Ensure conflict_engine defaults
+    state.setdefault("conflict_engine", {
+        "tension_score": 0, "is_boring": False,
+        "tension_history": [], "active_conflicts": [],
+        "used_conflict_types": [], "last_inject_scene": 0,
+        "consecutive_low_tension": 0, "resolved_conflicts": [],
+    })
+    state["conflict_engine"].setdefault("resolved_conflicts", [])
+
+    result = resolve_conflict(conflict_id, state)
+    if result["status"] == "success":
+        _set_state(state, tool_context)
+        return {
+            "status": "success",
+            "message": f"✅ 冲突 {conflict_id} 已解决（第{result['resolved_at_scene']}场）",
+        }
+    return result
 
 
 def save_drama(save_name: str, tool_context: ToolContext) -> dict:
@@ -1646,4 +1979,173 @@ async def backfill_tags_tool(tool_context: ToolContext) -> dict:
         dict with backfill status and count of tagged summaries.
     """
     result = await backfill_tags(tool_context)
+    return result
+
+
+# ============================================================================
+# Coherence System Tools (Phase 10)
+# ============================================================================
+
+
+def add_fact(
+    fact: str,
+    category: str = "event",
+    importance: str = "medium",
+    *,
+    tool_context: ToolContext,
+) -> dict:
+    """Add an established fact to the drama state.
+
+    Use when director confirms a key story fact.
+    添加已确立事实到戏剧状态（D-38/D-09）。导演手动记录关键事实，
+    如角色生死、地点切换、关系变化、世界规则等。
+
+    Args:
+        fact: The fact text to record.
+        category: Fact category — event, identity, location,
+            relationship, rule. Defaults to "event".
+        importance: Fact importance — high, medium, low.
+            Defaults to "medium".
+
+    Returns:
+        dict with status, fact_id, and message.
+    """
+    state = _get_state(tool_context)
+    state.setdefault("established_facts", [])
+
+    result = add_fact_logic(fact, category, importance, state)
+    if result["status"] == "success":
+        _set_state(state, tool_context)
+        return {
+            "status": "success",
+            "fact_id": result["fact_id"],
+            "message": f"📌 事实已记录：{fact}",
+        }
+    return result
+
+
+async def validate_consistency(tool_context: ToolContext) -> dict:
+    """Run LLM-driven consistency check against established facts.
+
+    触发一致性检查（D-37）——启发式预筛选 + LLM 矛盾检测。
+    无相关事实时直接返回通过，有相关事实时调用 LLM 分析。
+
+    Args:
+        tool_context: Tool context for state access.
+
+    Returns:
+        dict with status, message, contradictions, facts_checked, scenes_analyzed.
+    """
+    state = _get_state(tool_context)
+    state.setdefault("established_facts", [])
+    state.setdefault("coherence_checks", {
+        "last_check_scene": 0,
+        "last_result": None,
+        "check_history": [],
+        "total_contradictions": 0,
+    })
+
+    # Step 1: Heuristic pre-filtering
+    logic_result = validate_consistency_logic(state)
+
+    # No relevant facts → pass
+    if not logic_result.get("relevant_facts"):
+        return {
+            "status": "success",
+            "message": "✅ 一致性检查通过，无需检查",
+            "contradictions": [],
+            "facts_checked": 0,
+            "scenes_analyzed": 0,
+        }
+
+    relevant_facts = logic_result["relevant_facts"]
+    recent_scenes = logic_result.get("recent_scenes", [])
+
+    # Step 2: Build prompt and call LLM (T-10-05: try/except for timeout)
+    prompt = validate_consistency_prompt(relevant_facts, recent_scenes)
+    try:
+        from .memory_manager import _call_llm
+        response_text = await _call_llm(prompt)
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"❌ 一致性检查 LLM 调用失败：{e}",
+            "contradictions": [],
+            "facts_checked": len(relevant_facts),
+            "scenes_analyzed": len(recent_scenes),
+        }
+
+    # Step 3: Parse contradictions
+    contradictions = parse_contradictions(response_text, relevant_facts)
+
+    # Step 4: Update coherence_checks state
+    cc = state["coherence_checks"]
+    current_scene = state.get("current_scene", 0)
+    cc["last_check_scene"] = current_scene
+    cc["last_result"] = len(contradictions) if contradictions else "clean"
+    cc["check_history"].append({
+        "scene": current_scene,
+        "contradictions_found": len(contradictions),
+        "facts_checked": len(relevant_facts),
+    })
+    # Keep only last MAX_CHECK_HISTORY entries
+    if len(cc["check_history"]) > MAX_CHECK_HISTORY:
+        cc["check_history"] = cc["check_history"][-MAX_CHECK_HISTORY:]
+    if contradictions:
+        prev = cc.get("total_contradictions", 0)
+        cc["total_contradictions"] = prev + len(contradictions)
+
+    _set_state(state, tool_context)
+
+    if contradictions:
+        return {
+            "status": "success",
+            "message": f"⚠️ 发现 {len(contradictions)} 处潜在矛盾",
+            "contradictions": contradictions,
+            "facts_checked": len(relevant_facts),
+            "scenes_analyzed": len(recent_scenes),
+        }
+    else:
+        return {
+            "status": "success",
+            "message": "✅ 一致性检查通过",
+            "contradictions": [],
+            "facts_checked": len(relevant_facts),
+            "scenes_analyzed": len(recent_scenes),
+        }
+
+
+def repair_contradiction(
+    fact_id: str,
+    repair_type: str,
+    tool_context: ToolContext,
+) -> dict:
+    """Mark a contradiction as repaired.
+
+    Use when director resolves a contradiction via narrative.
+    标记矛盾已修复（D-39）。导演通过修复性旁白自然圆回矛盾后，
+    调用此工具标记事实的修复状态。
+    repair_note 由导演通过旁白自然修复，此处留空。
+
+    Args:
+        fact_id: The ID of the fact whose contradiction is being repaired.
+        repair_type: Type of repair — "supplement" (补充式)
+            or "correction" (修正式).
+
+    Returns:
+        dict with status, fact_id, repair_type, and message.
+    """
+    state = _get_state(tool_context)
+
+    result = repair_contradiction_logic(
+        fact_id, repair_type, repair_note="", state=state
+    )
+    if result["status"] == "success":
+        _set_state(state, tool_context)
+        return {
+            "status": "success",
+            "fact_id": result["fact_id"],
+            "repair_type": result["repair_type"],
+            "message": "✅ 矛盾已标记修复",
+        }
     return result
