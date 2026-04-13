@@ -330,10 +330,10 @@ Plans:
 - COHERENCE-03: 角色一致性
 - COHERENCE-04: 矛盾修复
 
-**Plans:** 2 plans
+**Plans:** 1/2 plans complete
 
 Plans:
-- [ ] 10-01-PLAN.md — coherence_checker.py 纯函数核心 + state_manager 初始化/兼容 + TDD 测试
+- [x] 10-01-PLAN.md — coherence_checker.py 纯函数核心 + state_manager 初始化/兼容 + TDD 测试
 - [ ] 10-02-PLAN.md — 集成层（3 个 Tool 函数 + context_builder 升级 + agent.py §11 + tools 注册）
 
 **Success Criteria:**

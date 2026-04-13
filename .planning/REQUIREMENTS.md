@@ -38,10 +38,10 @@
 
 ### 连贯性保障 (COHERENCE)
 
-- [ ] **COHERENCE-01**: 一致性检查 — 新场景生成前检查与已确立事实的矛盾，若发现矛盾则提示导演修正
-- [ ] **COHERENCE-02**: 关键事实追踪 — 维护"已确立事实"清单（谁是谁、在哪、发生了什么），防止后续场景产生矛盾
+- [x] **COHERENCE-01**: 一致性检查 — 新场景生成前检查与已确立事实的矛盾，若发现矛盾则提示导演修正
+- [x] **COHERENCE-02**: 关键事实追踪 — 维护"已确立事实"清单（谁是谁、在哪、发生了什么），防止后续场景产生矛盾
 - [ ] **COHERENCE-03**: 角色一致性 — 确保演员行为符合其性格定义和累积记忆，避免人设崩塌
-- [ ] **COHERENCE-04**: 矛盾修复 — 检测到逻辑矛盾时自动生成修复性旁白（"其实..."、"之前未曾提及的是..."），而非直接报错中断
+- [x] **COHERENCE-04**: 矛盾修复 — 检测到逻辑矛盾时自动生成修复性旁白（"其实..."、"之前未曾提及的是..."），而非直接报错中断
 - [ ] **COHERENCE-05**: 时间线追踪 — 维护剧情时间线（事件发生顺序、时间跨度），防止时序矛盾和场景跳跃
 
 ## v2 Requirements (Deferred)
@@ -83,10 +83,10 @@
 | DSTORM-03 | Phase 8 | planned |
 | DSTORM-04 | Phase 9 | planned |
 | DSTORM-05 | Phase 9 | planned |
-| COHERENCE-01 | Phase 10 | planned |
-| COHERENCE-02 | Phase 10 | planned |
+| COHERENCE-01 | Phase 10 | partial (10-01 done) |
+| COHERENCE-02 | Phase 10 | partial (10-01 done) |
 | COHERENCE-03 | Phase 10 | planned |
-| COHERENCE-04 | Phase 10 | planned |
+| COHERENCE-04 | Phase 10 | partial (10-01 done) |
 | COHERENCE-05 | Phase 11 | planned |
 
 *Traceability filled from ROADMAP.md on 2026-04-11.*
