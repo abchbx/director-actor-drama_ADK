@@ -389,6 +389,14 @@ def init_drama_state(theme: str, tool_context=None) -> dict:
         "check_history": [],
         "total_contradictions": 0,
     }
+    # Phase 11: Timeline Tracking fields (D-26/D-27)
+    state["timeline"] = {
+        "current_time": "第一天",  # D-04: initial value
+        "days_elapsed": 1,  # D-04: start at day 1
+        "current_period": None,  # D-26: no period initially
+        "time_periods": [],  # D-26: empty list
+        "last_jump_check": None,  # D-26: no check yet
+    }
     state["created_at"] = datetime.now().isoformat()
     state["updated_at"] = datetime.now().isoformat()
 
@@ -590,6 +598,17 @@ def load_progress(save_name: str, tool_context=None) -> dict:
             "last_result": None,
             "check_history": [],
             "total_contradictions": 0,
+        },
+    )
+    # Phase 11: Timeline Tracking backward compatibility (D-28)
+    state.setdefault(
+        "timeline",
+        {
+            "current_time": "第一天",
+            "days_elapsed": 1,
+            "current_period": None,
+            "time_periods": [],
+            "last_jump_check": None,
         },
     )
 

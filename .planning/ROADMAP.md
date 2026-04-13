@@ -354,13 +354,11 @@ Plans:
 **Requirements:**
 - COHERENCE-05: 时间线追踪
 
-**Plans:** 2/2 plans complete
+**Plans:** 2 plans
 
 Plans:
-- [x] 08-01-PLAN.md — Core dynamic_storm.py module + TDD tests
-- [x] 08-02-PLAN.md — Integration layer (tools + state + context_builder + agent)
-
-**UAT:** 08-UAT.md — 15/15 passed, 0 issues
+- [ ] 11-01-PLAN.md — Core timeline_tracker.py module + TDD tests + state_manager init/compat
+- [ ] 11-02-PLAN.md — Integration layer (tools + context_builder + agent + coherence_checker)
 
 **Success Criteria:**
 1. `state["timeline"]` 包含 `current_time`（描述性时间，如"第三天黄昏"）和 `days_elapsed`
