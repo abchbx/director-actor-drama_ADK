@@ -32,7 +32,7 @@ def _get_drama_folder(theme: str) -> str:
 
 def _ensure_drama_dirs(theme: str) -> dict:
     """Ensure all necessary directories exist for a drama.
-    
+
     Creates the following structure:
     dramas/<sanitized_theme>/
     ├── state.json              # Main drama state
@@ -40,7 +40,7 @@ def _ensure_drama_dirs(theme: str) -> dict:
     ├── scenes/                 # Individual scene files
     ├── conversations/          # Conversation logs
     └── exports/                # Exported scripts
-    
+
     Returns:
         dict with paths to each directory.
     """
@@ -90,7 +90,7 @@ def _save_conversations(theme: str):
         return
     conv_dir = _get_conversations_dir(theme)
     os.makedirs(conv_dir, exist_ok=True)
-    
+
     filepath = os.path.join(conv_dir, "conversation_log.json")
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump(_conversation_log, f, ensure_ascii=False, indent=2)
@@ -103,20 +103,20 @@ def add_conversation(
     tool_context=None,
 ) -> dict:
     """Add a conversation entry to the log.
-    
+
     Args:
         speaker: Name of the speaker (director or actor name).
         content: The conversation/dialogue content.
         conversation_type: Type of conversation (dialogue, narration, action, system).
         tool_context: Tool context for state access.
-    
+
     Returns:
         dict with status.
     """
     state = _get_state(tool_context)
     theme = state.get("theme", "")
     current_scene = state.get("current_scene", 0)
-    
+
     entry = {
         "speaker": speaker,
         "content": content,
@@ -124,13 +124,13 @@ def add_conversation(
         "scene": current_scene,
         "timestamp": datetime.now().isoformat(),
     }
-    
+
     _conversation_log.append(entry)
-    
+
     # Persist to disk
     if theme:
         _save_conversations(theme)
-    
+
     return {"status": "success", "entry": entry}
 
 
@@ -140,17 +140,21 @@ def add_dialogue(
     tool_context=None,
 ) -> dict:
     """Add an actor's dialogue to the conversation log.
-    
+
     Args:
         actor_name: Name of the actor speaking.
         dialogue: The dialogue content.
         tool_context: Tool context for state access.
-    
+
     Returns:
         dict with status.
     """
-    return add_conversation(speaker=actor_name, content=dialogue, 
-                           conversation_type="dialogue", tool_context=tool_context)
+    return add_conversation(
+        speaker=actor_name,
+        content=dialogue,
+        conversation_type="dialogue",
+        tool_context=tool_context,
+    )
 
 
 def add_action(
@@ -159,17 +163,21 @@ def add_action(
     tool_context=None,
 ) -> dict:
     """Add an action/description to the conversation log.
-    
+
     Args:
         actor_name: Name of the actor performing the action.
         action: Description of the action.
         tool_context: Tool context for state access.
-    
+
     Returns:
         dict with status.
     """
-    return add_conversation(speaker=actor_name, content=action,
-                           conversation_type="action", tool_context=tool_context)
+    return add_conversation(
+        speaker=actor_name,
+        content=action,
+        conversation_type="action",
+        tool_context=tool_context,
+    )
 
 
 def add_system_message(
@@ -177,82 +185,91 @@ def add_system_message(
     tool_context=None,
 ) -> dict:
     """Add a system message to the conversation log.
-    
+
     Args:
         content: System message content.
         tool_context: Tool context for state access.
-    
+
     Returns:
         dict with status.
     """
-    return add_conversation(speaker="[系统]", content=content,
-                           conversation_type="system", tool_context=tool_context)
+    return add_conversation(
+        speaker="[系统]",
+        content=content,
+        conversation_type="system",
+        tool_context=tool_context,
+    )
 
 
 def get_conversation_log(scene: int | None = None, tool_context=None) -> dict:
     """Get the conversation log, optionally filtered by scene.
-    
+
     Args:
         scene: Optional scene number to filter by. If None, returns all.
         tool_context: Tool context for state access.
-    
+
     Returns:
         dict with conversation entries.
     """
     global _conversation_log
-    
+
     state = _get_state(tool_context)
     theme = state.get("theme", "")
-    
+
     # Load from disk if not in memory
     if theme and not _conversation_log:
         conv_file = os.path.join(_get_conversations_dir(theme), "conversation_log.json")
         if os.path.exists(conv_file):
             with open(conv_file, "r", encoding="utf-8") as f:
                 _conversation_log = json.load(f)
-    
+
     if scene is not None:
         entries = [e for e in _conversation_log if e.get("scene") == scene]
     else:
         entries = _conversation_log.copy()
-    
+
     return {"status": "success", "entries": entries, "count": len(entries)}
 
 
 def export_conversations(format: str = "markdown", tool_context=None) -> dict:
     """Export conversation log to a formatted file.
-    
+
     Args:
         format: Export format ("markdown", "json", "txt").
         tool_context: Tool context for state access.
-    
+
     Returns:
         dict with export status and file path.
     """
     global _conversation_log
-    
+
     state = _get_state(tool_context)
     theme = state.get("theme", "")
     if not theme:
         return {"status": "error", "message": "No active drama."}
-    
+
     # Ensure conversations are loaded
     if not _conversation_log:
         conv_file = os.path.join(_get_conversations_dir(theme), "conversation_log.json")
         if os.path.exists(conv_file):
             with open(conv_file, "r", encoding="utf-8") as f:
                 _conversation_log = json.load(f)
-    
+
     if not _conversation_log:
         return {"status": "info", "message": "No conversations to export."}
-    
+
     conv_dir = _get_conversations_dir(theme)
     os.makedirs(conv_dir, exist_ok=True)
-    
+
     if format == "markdown":
         filepath = os.path.join(conv_dir, "conversation_log.md")
-        lines = [f"# 对话记录: {theme}", "", f"> 导出时间: {datetime.now().isoformat()}", ""]
-        
+        lines = [
+            f"# 对话记录: {theme}",
+            "",
+            f"> 导出时间: {datetime.now().isoformat()}",
+            "",
+        ]
+
         current_scene = -1
         for entry in _conversation_log:
             scene = entry.get("scene", 0)
@@ -260,11 +277,11 @@ def export_conversations(format: str = "markdown", tool_context=None) -> dict:
                 current_scene = scene
                 lines.append(f"## 第{scene}场" if scene > 0 else "## 序幕")
                 lines.append("")
-            
+
             speaker = entry.get("speaker", "Unknown")
             content = entry.get("content", "")
             entry_type = entry.get("type", "dialogue")
-            
+
             if entry_type == "action":
                 lines.append(f"**{speaker}**: *（{content}）*")
             elif entry_type == "system":
@@ -272,15 +289,15 @@ def export_conversations(format: str = "markdown", tool_context=None) -> dict:
             else:
                 lines.append(f"**{speaker}**: {content}")
             lines.append("")
-        
+
         with open(filepath, "w", encoding="utf-8") as f:
             f.write("\n".join(lines))
-    
+
     elif format == "json":
         filepath = os.path.join(conv_dir, "conversation_log.json")
         with open(filepath, "w", encoding="utf-8") as f:
             json.dump(_conversation_log, f, ensure_ascii=False, indent=2)
-    
+
     else:  # txt
         filepath = os.path.join(conv_dir, "conversation_log.txt")
         lines = []
@@ -290,7 +307,7 @@ def export_conversations(format: str = "markdown", tool_context=None) -> dict:
             lines.append(f"{speaker}: {content}")
         with open(filepath, "w", encoding="utf-8") as f:
             f.write("\n".join(lines))
-    
+
     return {
         "status": "success",
         "message": f"Conversations exported to: {filepath}",
@@ -302,7 +319,7 @@ def export_conversations(format: str = "markdown", tool_context=None) -> dict:
 
 def clear_conversation_log(tool_context=None) -> dict:
     """Clear the in-memory conversation log (does not delete saved file).
-    
+
     Returns:
         dict with status.
     """
@@ -330,10 +347,10 @@ def init_drama_state(theme: str, tool_context=None) -> dict:
         dict with initialization status.
     """
     global _current_drama_folder
-    
+
     # Create drama-specific directories
     dirs = _ensure_drama_dirs(theme)
-    
+
     state = _get_state(tool_context)
     state["theme"] = theme
     state["status"] = "setup"
@@ -354,19 +371,36 @@ def init_drama_state(theme: str, tool_context=None) -> dict:
         "used_conflict_types": [],
         "last_inject_scene": 0,
         "consecutive_low_tension": 0,
+        "resolved_conflicts": [],  # Phase 7 (D-22)
+    }
+    # Phase 7: Arc Tracking fields (D-34)
+    state["plot_threads"] = []
+    # Phase 8: Dynamic STORM fields (D-27/D-28)
+    state["dynamic_storm"] = {
+        "scenes_since_last_storm": 0,
+        "trigger_history": [],
+        "discovered_perspectives": [],
+    }
+    # Phase 10: Coherence System fields (D-31/D-32/D-33)
+    state["established_facts"] = []
+    state["coherence_checks"] = {
+        "last_check_scene": 0,
+        "last_result": None,
+        "check_history": [],
+        "total_contradictions": 0,
     }
     state["created_at"] = datetime.now().isoformat()
     state["updated_at"] = datetime.now().isoformat()
-    
+
     _set_state(state, tool_context)
     _save_state_to_file(theme, state)
-    
+
     _current_drama_folder = theme
-    
+
     return {
-        "status": "success", 
+        "status": "success",
         "message": f"Drama initialized with theme: {theme}",
-        "drama_folder": dirs["root"]
+        "drama_folder": dirs["root"],
     }
 
 
@@ -377,7 +411,7 @@ def save_progress(save_name: str = "", tool_context=None) -> dict:
     Optional named snapshots can also be created.
 
     Args:
-        save_name: Optional name for a named save snapshot. 
+        save_name: Optional name for a named save snapshot.
                    If empty, just updates the main state.json.
 
     Returns:
@@ -390,15 +424,17 @@ def save_progress(save_name: str = "", tool_context=None) -> dict:
 
     # Ensure directories exist
     dirs = _ensure_drama_dirs(theme)
-    
+
     # Always save main state
     state["updated_at"] = datetime.now().isoformat()
     _save_state_to_file(theme, state)
-    
+
     # Create named snapshot if requested
     snapshot_path = None
     if save_name:
-        snapshot_path = os.path.join(dirs["root"], f"snapshot_{_sanitize_name(save_name)}.json")
+        snapshot_path = os.path.join(
+            dirs["root"], f"snapshot_{_sanitize_name(save_name)}.json"
+        )
         with open(snapshot_path, "w", encoding="utf-8") as f:
             json.dump(state, f, ensure_ascii=False, indent=2)
         message = f"Snapshot '{save_name}' saved"
@@ -406,11 +442,11 @@ def save_progress(save_name: str = "", tool_context=None) -> dict:
         message = "Progress auto-saved"
 
     return {
-        "status": "success", 
+        "status": "success",
         "message": message,
         "drama_folder": dirs["root"],
         "state_file": _get_state_file(theme),
-        "snapshot_path": snapshot_path
+        "snapshot_path": snapshot_path,
     }
 
 
@@ -455,17 +491,23 @@ def load_progress(save_name: str, tool_context=None) -> dict:
     # First try loading as a theme (main state.json in drama folder)
     theme = save_name
     state_file = _get_state_file(theme)
-    
+
     if not os.path.exists(state_file):
         # Try to find a snapshot with that name
         folder = _get_drama_folder(theme)
-        snapshot_file = os.path.join(folder, f"snapshot_{_sanitize_name(save_name)}.json")
+        snapshot_file = os.path.join(
+            folder, f"snapshot_{_sanitize_name(save_name)}.json"
+        )
         if os.path.exists(snapshot_file):
             state_file = snapshot_file
         else:
             # List available dramas
             if os.path.exists(DRAMAS_DIR):
-                dramas = [d for d in os.listdir(DRAMAS_DIR) if os.path.isdir(os.path.join(DRAMAS_DIR, d))]
+                dramas = [
+                    d
+                    for d in os.listdir(DRAMAS_DIR)
+                    if os.path.isdir(os.path.join(DRAMAS_DIR, d))
+                ]
                 if dramas:
                     return {
                         "status": "error",
@@ -488,6 +530,7 @@ def load_progress(save_name: str, tool_context=None) -> dict:
     for actor_name, actor_data in state.get("actors", {}).items():
         if "working_memory" not in actor_data:
             from .memory_manager import migrate_legacy_memory
+
             migrate_legacy_memory(actor_name, tool_context)
 
     # D-14: Auto-migrate old STORM status to DramaRouter status
@@ -502,18 +545,56 @@ def load_progress(save_name: str, tool_context=None) -> dict:
         state["storm"]["last_review"] = {}
 
     # Phase 6: Ensure conflict_engine exists for backward compatibility (D-18)
-    state.setdefault("conflict_engine", {
-        "tension_score": 0,
-        "is_boring": False,
-        "tension_history": [],
-        "active_conflicts": [],
-        "used_conflict_types": [],
-        "last_inject_scene": 0,
-        "consecutive_low_tension": 0,
-    })
+    state.setdefault(
+        "conflict_engine",
+        {
+            "tension_score": 0,
+            "is_boring": False,
+            "tension_history": [],
+            "active_conflicts": [],
+            "used_conflict_types": [],
+            "last_inject_scene": 0,
+            "consecutive_low_tension": 0,
+        },
+    )
+
+    # Phase 7: Arc Tracking backward compatibility (D-35/D-36/D-37)
+    state.setdefault("plot_threads", [])
+    # Ensure arc_progress exists for each actor
+    _default_arc_progress = {
+        "arc_type": "",
+        "arc_stage": "",
+        "progress": 0,
+        "related_threads": [],
+    }
+    for actor_name, actor_data in state.get("actors", {}).items():
+        actor_data.setdefault("arc_progress", _default_arc_progress.copy())
+    # Ensure resolved_conflicts exists in conflict_engine
+    if "conflict_engine" in state:
+        state["conflict_engine"].setdefault("resolved_conflicts", [])
+    # Phase 8: Dynamic STORM backward compatibility (D-29)
+    state.setdefault(
+        "dynamic_storm",
+        {
+            "scenes_since_last_storm": 0,
+            "trigger_history": [],
+            "discovered_perspectives": [],
+        },
+    )
+    # Phase 10: Coherence System backward compatibility (D-34)
+    state.setdefault("established_facts", [])
+    state.setdefault(
+        "coherence_checks",
+        {
+            "last_check_scene": 0,
+            "last_result": None,
+            "check_history": [],
+            "total_contradictions": 0,
+        },
+    )
 
     _set_state(state, tool_context)
-    
+
     global _current_drama_folder
     _current_drama_folder = save_data.get("theme", "")
 
@@ -538,36 +619,44 @@ def list_dramas() -> dict:
     """
     dramas = []
     os.makedirs(DRAMAS_DIR, exist_ok=True)
-    
+
     for folder in sorted(os.listdir(DRAMAS_DIR)):
         folder_path = os.path.join(DRAMAS_DIR, folder)
         if not os.path.isdir(folder_path):
             continue
-        
+
         state_file = os.path.join(folder_path, "state.json")
         if os.path.exists(state_file):
             try:
                 with open(state_file, "r", encoding="utf-8") as fh:
                     data = json.load(fh)
-                dramas.append({
-                    "folder": folder,
-                    "theme": data.get("theme", folder),
-                    "status": data.get("status", "unknown"),
-                    "updated_at": data.get("updated_at", "Unknown"),
-                    "current_scene": data.get("current_scene", 0),
-                })
+                dramas.append(
+                    {
+                        "folder": folder,
+                        "theme": data.get("theme", folder),
+                        "status": data.get("status", "unknown"),
+                        "updated_at": data.get("updated_at", "Unknown"),
+                        "current_scene": data.get("current_scene", 0),
+                    }
+                )
             except (json.JSONDecodeError, OSError):
-                dramas.append({"folder": folder, "theme": "Corrupted", "status": "error"})
+                dramas.append(
+                    {"folder": folder, "theme": "Corrupted", "status": "error"}
+                )
         else:
             # Check for snapshots
-            snapshots = [f for f in os.listdir(folder_path) if f.startswith("snapshot_")]
+            snapshots = [
+                f for f in os.listdir(folder_path) if f.startswith("snapshot_")
+            ]
             if snapshots:
-                dramas.append({
-                    "folder": folder,
-                    "theme": folder,
-                    "status": "snapshot_only",
-                    "snapshots": snapshots,
-                })
+                dramas.append(
+                    {
+                        "folder": folder,
+                        "theme": folder,
+                        "status": "snapshot_only",
+                        "snapshots": snapshots,
+                    }
+                )
 
     return {"status": "success", "dramas": dramas}
 
@@ -621,7 +710,11 @@ def update_script(
     state["scenes"] = scenes
     state["updated_at"] = datetime.now().isoformat()
     _set_state(state, tool_context)
-    return {"status": "success", "message": f"Scene {scene_number} updated: {scene_title}", "content": content}
+    return {
+        "status": "success",
+        "message": f"Scene {scene_number} updated: {scene_title}",
+        "content": content,
+    }
 
 
 def add_narration(narration_text: str, tool_context=None) -> dict:
@@ -635,10 +728,12 @@ def add_narration(narration_text: str, tool_context=None) -> dict:
     """
     state = _get_state(tool_context)
     narration_log = state.get("narration_log", [])
-    narration_log.append({
-        "text": narration_text,
-        "timestamp": datetime.now().isoformat(),
-    })
+    narration_log.append(
+        {
+            "text": narration_text,
+            "timestamp": datetime.now().isoformat(),
+        }
+    )
     state["narration_log"] = narration_log
     _set_state(state, tool_context)
     return {"status": "success", "message": "Narration added."}
@@ -677,10 +772,10 @@ def register_actor(
         "personality": personality,
         "background": background,
         "knowledge_scope": knowledge_scope,
-        "memory": [],               # D-13: 保留旧字段（只读）
-        "working_memory": [],       # D-12: Tier 1 — 工作记忆
-        "scene_summaries": [],      # D-12: Tier 2 — 场景摘要
-        "arc_summary": {            # D-12: Tier 3 — 全局摘要
+        "memory": [],  # D-13: 保留旧字段（只读）
+        "working_memory": [],  # D-12: Tier 1 — 工作记忆
+        "scene_summaries": [],  # D-12: Tier 2 — 场景摘要
+        "arc_summary": {  # D-12: Tier 3 — 全局摘要
             "structured": {
                 "theme": "",
                 "key_characters": [],
@@ -689,8 +784,14 @@ def register_actor(
             },
             "narrative": "",
         },
-        "critical_memories": [],    # D-07: 关键记忆（独立存储）
+        "critical_memories": [],  # D-07: 关键记忆（独立存储）
         "emotions": "neutral",
+        "arc_progress": {  # Phase 7 (D-05/D-08)
+            "arc_type": "",
+            "arc_stage": "",
+            "progress": 0,
+            "related_threads": [],
+        },
         "created_at": datetime.now().isoformat(),
     }
     if port is not None:
@@ -700,7 +801,10 @@ def register_actor(
 
     state["actors"] = actors
     _set_state(state, tool_context)
-    return {"status": "success", "message": f"Actor '{actor_name}' registered as {role}."}
+    return {
+        "status": "success",
+        "message": f"Actor '{actor_name}' registered as {role}.",
+    }
 
 
 def update_actor_memory(actor_name: str, memory_entry: str, tool_context=None) -> dict:
@@ -750,7 +854,10 @@ def update_actor_emotion(actor_name: str, emotion: str, tool_context=None) -> di
     actors[actor_name]["emotions"] = emotion
     state["actors"] = actors
     _set_state(state, tool_context)
-    return {"status": "success", "message": f"Emotion updated for '{actor_name}': {emotion}"}
+    return {
+        "status": "success",
+        "message": f"Emotion updated for '{actor_name}': {emotion}",
+    }
 
 
 def get_actor_info(actor_name: str, tool_context=None) -> dict:
@@ -827,7 +934,7 @@ def get_drama_folder(tool_context=None) -> dict:
     theme = state.get("theme", "")
     if not theme:
         return {"status": "error", "message": "No active drama."}
-    
+
     dirs = _ensure_drama_dirs(theme)
     return {
         "status": "success",
@@ -847,6 +954,9 @@ def advance_scene(tool_context=None) -> dict:
     """
     state = _get_state(tool_context)
     state["current_scene"] = state.get("current_scene", 0) + 1
+    # Phase 8: Increment dynamic_storm counter (D-08/D-30)
+    ds = state.setdefault("dynamic_storm", {})
+    ds["scenes_since_last_storm"] = ds.get("scenes_since_last_storm", 0) + 1
     # Preserve "ended" status (epilogue mode) — only set "acting" if not ended
     if state.get("status") != "ended":
         state["status"] = "acting"
@@ -924,7 +1034,9 @@ def export_script(tool_context=None) -> dict:
         lines.append(f"**合成策略**: {outline.get('synthesis_strategy', 'N/A')}")
         lines.append("")
         for act in outline.get("acts", []):
-            lines.append(f"### 第{act.get('act_number', 0)}幕: {act.get('title', 'Untitled')}")
+            lines.append(
+                f"### 第{act.get('act_number', 0)}幕: {act.get('title', 'Untitled')}"
+            )
             lines.append("")
             lines.append(f"{act.get('description', '')}")
             lines.append(f"- 核心冲突: {act.get('key_conflict', 'N/A')}")
@@ -940,7 +1052,9 @@ def export_script(tool_context=None) -> dict:
     # Scenes
     scenes = state.get("scenes", [])
     for scene in scenes:
-        lines.append(f"## 第{scene.get('scene_number', 0)}场: {scene.get('title', 'Untitled')}")
+        lines.append(
+            f"## 第{scene.get('scene_number', 0)}场: {scene.get('title', 'Untitled')}"
+        )
         lines.append("")
         desc = scene.get("description", "")
         if desc:
@@ -1017,11 +1131,13 @@ def storm_add_perspective(
     storm_data = state.get("storm", {})
     perspectives = storm_data.get("perspectives", [])
 
-    perspectives.append({
-        "name": perspective_name,
-        "description": description,
-        "questions": questions,
-    })
+    perspectives.append(
+        {
+            "name": perspective_name,
+            "description": description,
+            "questions": questions,
+        }
+    )
 
     storm_data["perspectives"] = perspectives
     state["storm"] = storm_data
@@ -1063,18 +1179,23 @@ def storm_add_research_result(
     storm_data = state.get("storm", {})
     results = storm_data.get("research_results", [])
 
-    results.append({
-        "perspective": perspective_name,
-        "questions": questions,
-        "findings": findings,
-        "timestamp": datetime.now().isoformat(),
-    })
+    results.append(
+        {
+            "perspective": perspective_name,
+            "questions": questions,
+            "findings": findings,
+            "timestamp": datetime.now().isoformat(),
+        }
+    )
 
     storm_data["research_results"] = results
     state["storm"] = storm_data
     _set_state(state, tool_context)
 
-    return {"status": "success", "message": f"Research result for '{perspective_name}' added."}
+    return {
+        "status": "success",
+        "message": f"Research result for '{perspective_name}' added.",
+    }
 
 
 def storm_get_research_results(tool_context=None) -> dict:

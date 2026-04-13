@@ -385,3 +385,181 @@ class TestGenerateFactId:
         state = _make_state()
         fact_id = _generate_fact_id("something happened", 5, state["established_facts"])
         assert "fact_5_fact" in fact_id
+
+
+# ============================================================================
+# Task 2: State manager init/load + parse_contradictions tests
+# ============================================================================
+
+
+class TestInitDramaStateCoherence:
+    """Test init_drama_state initializes coherence fields."""
+
+    def test_initializes_established_facts_empty_list(self):
+        """Test 1: init_drama_state 初始化 established_facts 为空列表"""
+        from unittest.mock import MagicMock
+
+        from app.state_manager import init_drama_state
+
+        tc = MagicMock()
+        tc.state = {"drama": {}}
+        result = init_drama_state("测试主题", tool_context=tc)
+        state = tc.state.get("drama", {})
+        assert state.get("established_facts") == []
+
+    def test_initializes_coherence_checks_sub_object(self):
+        """Test 2: init_drama_state 初始化 coherence_checks 子对象"""
+        from unittest.mock import MagicMock
+
+        from app.state_manager import init_drama_state
+
+        tc = MagicMock()
+        tc.state = {"drama": {}}
+        result = init_drama_state("测试主题", tool_context=tc)
+        state = tc.state.get("drama", {})
+        cc = state.get("coherence_checks", {})
+        assert cc.get("last_check_scene") == 0
+        assert cc.get("last_result") is None
+        assert cc.get("check_history") == []
+        assert cc.get("total_contradictions") == 0
+
+
+class TestLoadProgressCoherence:
+    """Test load_progress backward compatibility for coherence fields."""
+
+    def test_setdefault_established_facts(self):
+        """Test 3: load_progress 对缺少 established_facts 的旧存档 setdefault 补全"""
+        import json
+        import os
+        import tempfile
+        from unittest.mock import MagicMock
+
+        from app.state_manager import load_progress, _ensure_drama_dirs
+
+        theme = "__test_coherence_load__"
+        dirs = _ensure_drama_dirs(theme)
+
+        # Create a save file WITHOUT established_facts (simulating old save)
+        old_state = {
+            "theme": theme,
+            "status": "acting",
+            "current_scene": 5,
+            "scenes": [],
+            "actors": {},
+            "narration_log": [],
+        }
+        state_file = os.path.join(dirs["root"], "state.json")
+        with open(state_file, "w", encoding="utf-8") as f:
+            json.dump(old_state, f, ensure_ascii=False)
+
+        tc = MagicMock()
+        tc.state = {"drama": {}}
+        result = load_progress(theme, tool_context=tc)
+        state = tc.state.get("drama", {})
+        assert state.get("established_facts") == []
+
+    def test_setdefault_coherence_checks(self):
+        """Test 4: load_progress 对缺少 coherence_checks 的旧存档补全默认值"""
+        import json
+        import os
+
+        from unittest.mock import MagicMock
+
+        from app.state_manager import load_progress, _ensure_drama_dirs
+
+        theme = "__test_coherence_load2__"
+        dirs = _ensure_drama_dirs(theme)
+
+        # Create a save file WITHOUT coherence_checks (simulating old save)
+        old_state = {
+            "theme": theme,
+            "status": "acting",
+            "current_scene": 3,
+            "scenes": [],
+            "actors": {},
+            "narration_log": [],
+        }
+        state_file = os.path.join(dirs["root"], "state.json")
+        with open(state_file, "w", encoding="utf-8") as f:
+            json.dump(old_state, f, ensure_ascii=False)
+
+        tc = MagicMock()
+        tc.state = {"drama": {}}
+        result = load_progress(theme, tool_context=tc)
+        state = tc.state.get("drama", {})
+        cc = state.get("coherence_checks", {})
+        assert cc.get("last_check_scene") == 0
+        assert cc.get("last_result") is None
+        assert cc.get("check_history") == []
+        assert cc.get("total_contradictions") == 0
+
+
+class TestParseContradictions:
+    """Test parse_contradictions function for LLM response parsing."""
+
+    def test_parses_json_code_block(self):
+        """Test 5: parse_contradictions 能解析 ```json 块中的矛盾列表"""
+        from app.coherence_checker import parse_contradictions
+
+        response = '''```json
+{
+    "contradictions": [
+        {
+            "fact_id": "fact_5_起兵_1",
+            "fact_text": "朱棣已起兵",
+            "scene_text": "朱棣仍在犹豫",
+            "explanation": "起兵与犹豫矛盾"
+        }
+    ],
+    "has_contradiction": true
+}
+```'''
+        facts = [
+            {
+                "id": "fact_5_起兵_1",
+                "fact": "朱棣已起兵",
+                "category": "event",
+                "actors": ["朱棣"],
+                "importance": "high",
+            },
+        ]
+        result = parse_contradictions(response, facts)
+        assert len(result) == 1
+        assert result[0]["fact_id"] == "fact_5_起兵_1"
+        assert result[0]["severity"] == "high"
+
+    def test_parses_pure_json_response(self):
+        """Test 6: parse_contradictions 能解析纯 JSON 响应"""
+        from app.coherence_checker import parse_contradictions
+
+        response = '{"contradictions": [{"fact_id": "fact_5_起兵_1", "fact_text": "朱棣已起兵", "scene_text": "犹豫中", "explanation": "矛盾"}], "has_contradiction": true}'
+        facts = [
+            {
+                "id": "fact_5_起兵_1",
+                "fact": "朱棣已起兵",
+                "category": "event",
+                "actors": ["朱棣"],
+                "importance": "medium",
+            },
+        ]
+        result = parse_contradictions(response, facts)
+        assert len(result) == 1
+        assert result[0]["severity"] == "medium"
+
+    def test_no_contradictions_returns_empty_list(self):
+        """Test 7: parse_contradictions 无矛盾时返回空列表"""
+        from app.coherence_checker import parse_contradictions
+
+        response = '{"contradictions": [], "has_contradiction": false}'
+        facts = []
+        result = parse_contradictions(response, facts)
+        assert result == []
+
+    def test_invalid_json_returns_empty_list(self):
+        """Test that parse_contradictions handles invalid JSON gracefully."""
+        from app.coherence_checker import parse_contradictions
+
+        response = "This is not JSON at all"
+        facts = []
+        result = parse_contradictions(response, facts)
+        assert result == []

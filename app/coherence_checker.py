@@ -9,9 +9,11 @@ Core components:
 - validate_consistency_logic / validate_consistency_prompt for LLM-driven consistency checks
 - generate_repair_narration_prompt for contradiction narration
 - repair_contradiction_logic for appending repair notes
+- parse_contradictions for LLM response parsing with multi-layer fallback
 - Helper functions: _extract_actor_names, _check_fact_overlap, _filter_relevant_facts, _generate_fact_id
 """
 
+import json
 import re
 from datetime import datetime
 
@@ -435,3 +437,61 @@ def repair_contradiction_logic(
         "repair_type": repair_type,
         "message": "✅ 矛盾已标记修复",
     }
+
+
+def parse_contradictions(response_text: str, relevant_facts: list[dict]) -> list[dict]:
+    """Parse LLM response for contradiction detection results.
+
+    解析 LLM 一致性检查响应，多层 JSON 解析 fallback（D-14/T-10-03）。
+    先尝试 ```json 块提取，再 fallback 到正则匹配 JSON 对象。
+    为每个 contradiction 添加 severity 字段（从对应 fact 的 importance 继承）。
+    解析失败返回空列表而非崩溃。
+
+    Args:
+        response_text: Raw LLM response text.
+        relevant_facts: List of relevant fact dicts for severity lookup.
+
+    Returns:
+        List of contradiction dicts with fact_id, fact_text, scene_text,
+        explanation, and severity fields. Empty list on parse failure.
+    """
+    parsed = None
+
+    # Strategy 1: Extract from ```json code block
+    json_block_match = re.search(r"```json\s*(.*?)\s*```", response_text, re.DOTALL)
+    if json_block_match:
+        try:
+            parsed = json.loads(json_block_match.group(1))
+        except json.JSONDecodeError:
+            parsed = None
+
+    # Strategy 2: Regex match JSON object
+    if parsed is None:
+        json_match = re.search(r"\{.*\}", response_text, re.DOTALL)
+        if json_match:
+            try:
+                parsed = json.loads(json_match.group(0))
+            except json.JSONDecodeError:
+                parsed = None
+
+    # Parse failure: return empty list
+    if parsed is None:
+        return []
+
+    # Extract contradictions
+    if not parsed.get("has_contradiction", False):
+        return []
+
+    contradictions = parsed.get("contradictions", [])
+    if not contradictions:
+        return []
+
+    # Build severity lookup from relevant_facts
+    severity_map = {f["id"]: f.get("importance", "medium") for f in relevant_facts}
+
+    # Add severity to each contradiction
+    for c in contradictions:
+        fact_id = c.get("fact_id", "")
+        c["severity"] = severity_map.get(fact_id, "medium")
+
+    return contradictions
