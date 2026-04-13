@@ -22,6 +22,7 @@ from .memory_manager import _merge_pending_compression
 from .state_manager import _get_state, _set_state
 from .semantic_retriever import retrieve_relevant_scenes, _extract_auto_tags, _normalize_scene_range
 from .conflict_engine import CONFLICT_TEMPLATES
+from .arc_tracker import ARC_TYPES, ARC_STAGES, DORMANT_THRESHOLD
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +51,9 @@ _ACTOR_SECTION_PRIORITIES = {
     "arc_summary": 3,
     "critical_memories": 4,
     "emotion": 5,
+    "actor_threads": 5,  # Phase 7 (D-32)
     "anchor": 6,
+    "actor_dna": 7,  # Phase 10 (D-26) — character consistency constraint
     "semantic_recall": 0,
 }
 
@@ -63,6 +66,7 @@ _DIRECTOR_SECTION_PRIORITIES = {
     "global_arc": 5,
     "facts": 5,
     "tension": 5,
+    "arc_tracking": 5,  # Phase 7 (D-12)
     "actor_emotions": 6,
     "last_scene_transition": 7,
     "steer": 8,
@@ -194,6 +198,60 @@ def _truncate_sections(sections: list[dict], token_budget: int) -> list[dict]:
 # ============================================================================
 
 
+def _build_actor_dna_text(
+    actor_name: str, actor_data: dict, tool_context: ToolContext
+) -> str:
+    """Build actor DNA anchor text for character consistency constraint.
+
+    角色一致性约束锚点（D-23~D-27）——包含性格核心、关键记忆、已确立事实。
+    三项内容均有则全部展示，缺少某项则省略该行。三项都无则返回空字符串。
+    仅包含涉及当前演员的 high importance 事实（T-10-07: 不泄露其他演员事实）。
+
+    Args:
+        actor_name: The actor's name.
+        actor_data: The actor data dict from state.
+        tool_context: Tool context for state access.
+
+    Returns:
+        Formatted anchor text string, or empty string if no DNA content.
+    """
+    parts = []
+
+    # Personality core (D-24)
+    personality = actor_data.get("personality", "")
+    if personality:
+        parts.append(f"性格核心：{personality}")
+
+    # Critical memory — take the most important 1 (D-24)
+    critical_memories = actor_data.get("critical_memories", [])
+    if critical_memories:
+        mem = critical_memories[-1]  # most recent critical memory
+        entry = mem.get("entry", "")
+        scene = mem.get("scene", "?")
+        parts.append(f"关键记忆：[第{scene}场] {entry}")
+
+    # Established facts involving this actor (high importance only, T-10-07)
+    state = _get_state(tool_context)
+    established_facts = state.get("established_facts", [])
+    actor_high_facts = [
+        f
+        for f in established_facts
+        if isinstance(f, dict)
+        and f.get("importance") == "high"
+        and actor_name in f.get("actors", [])
+    ]
+    if actor_high_facts:
+        fact = actor_high_facts[-1]  # take the most important recent one
+        fact_text = fact.get("fact", "")
+        scene = fact.get("scene", "?")
+        parts.append(f"已确立事实：{fact_text}（第{scene}场）")
+
+    if not parts:
+        return ""
+
+    return "【角色锚点】（你必须遵守的约束）\n" + "\n".join(parts)
+
+
 def _assemble_actor_sections(
     actor_name: str, actor_data: dict, tool_context: ToolContext
 ) -> list[dict]:
@@ -225,6 +283,17 @@ def _assemble_actor_sections(
         "priority": _ACTOR_SECTION_PRIORITIES["anchor"],
         "truncatable": False,
     })
+
+    # Phase 10: Actor DNA anchor — character consistency constraint
+    # (D-23~D-27, priority 7)
+    dna_lines = _build_actor_dna_text(actor_name, actor_data, tool_context)
+    if dna_lines:
+        sections.append({
+            "key": "actor_dna",
+            "text": dna_lines,
+            "priority": 7,  # D-26: highest priority, not truncatable
+            "truncatable": False,
+        })
 
     # Current emotion (priority 5, never truncated)
     emotion = actor_data.get("emotions", "neutral")
@@ -268,6 +337,36 @@ def _assemble_actor_sections(
             "key": "arc_summary",
             "text": arc_full,
             "priority": _ACTOR_SECTION_PRIORITIES["arc_summary"],
+            "truncatable": True,
+        })
+
+    # Phase 7: Actor's active threads + arc_progress (priority 5, D-29/D-31)
+    plot_threads = tool_context.state.get("drama", {}).get("plot_threads", [])
+    active_threads_for_actor = [
+        t for t in plot_threads
+        if actor_name in t.get("involved_actors", []) and t.get("status") == "active"
+    ]
+    arc_progress = actor_data.get("arc_progress", {})
+    if active_threads_for_actor or arc_progress.get("arc_type"):
+        thread_lines = []
+        for t in active_threads_for_actor:
+            thread_lines.append(f"- {t['description']}（涉及：{'、'.join(t['involved_actors'])}）")
+        arc_lines = []
+        arc_type_cn = ARC_TYPES.get(arc_progress.get("arc_type", ""), "")
+        arc_stage_cn = ARC_STAGES.get(arc_progress.get("arc_stage", ""), "")
+        if arc_type_cn:
+            arc_lines.append(f"- [{arc_type_cn}] 你正在经历{arc_stage_cn}阶段（进展：{arc_progress.get('progress', 0)}%）")
+        combined_lines = []
+        if thread_lines:
+            combined_lines.append("【你的剧情线索】")
+            combined_lines.extend(thread_lines)
+        if arc_lines:
+            combined_lines.append("【你的角色弧线】")
+            combined_lines.extend(arc_lines)
+        sections.append({
+            "key": "actor_threads",
+            "text": "\n".join(combined_lines),
+            "priority": _ACTOR_SECTION_PRIORITIES["actor_threads"],
             "truncatable": True,
         })
 
@@ -641,10 +740,80 @@ def _build_tension_section(state: dict) -> dict:
     return {"key": "tension", "text": text, "priority": _DIRECTOR_SECTION_PRIORITIES["tension"], "truncatable": False}
 
 
-def _build_dynamic_storm_section(state: dict) -> dict:
-    """Build the dynamic STORM section (D-04 forward-compatible).
+def _build_arc_tracking_section(state: dict) -> dict:
+    """Build the arc tracking section for director context (D-10/D-11).
 
-    仅当 state 中存在 dynamic_storm 且有 trigger_history 时才生成内容。
+    显示所有剧情线索（active/dormant/resolved）和休眠警告。
+    dormant 自动检测：current_scene - last_updated_scene > DORMANT_THRESHOLD 的线程标记 ⚠️。
+    注意：此函数不修改 state，仅在展示时标记 dormant。
+
+    Args:
+        state: The drama state dict.
+
+    Returns:
+        Section dict for arc tracking.
+    """
+    plot_threads = state.get("plot_threads", [])
+    if not plot_threads:
+        return {"key": "arc_tracking", "text": "", "priority": _DIRECTOR_SECTION_PRIORITIES["arc_tracking"], "truncatable": True}
+
+    current_scene = state.get("current_scene", 0)
+
+    # Categorize threads
+    active_threads = []
+    dormant_threads = []
+    resolving_threads = []
+    resolved_threads = []
+
+    for t in plot_threads:
+        status = t.get("status", "active")
+        if status == "resolved":
+            resolved_threads.append(t)
+        elif status == "resolving":
+            resolving_threads.append(t)
+        elif status == "active":
+            gap = current_scene - t.get("last_updated_scene", 0)
+            if gap > DORMANT_THRESHOLD:
+                dormant_threads.append((t, gap))
+            else:
+                active_threads.append(t)
+        elif status == "dormant":
+            gap = current_scene - t.get("last_updated_scene", 0)
+            dormant_threads.append((t, gap))
+
+    # Build header
+    header = f"活跃线索：{len(active_threads)} 条 | 休眠线索：{len(dormant_threads)} 条 | 已解决：{len(resolved_threads)} 条"
+
+    lines = [header]
+
+    # List dormant threads with ⚠️ warning
+    for item in dormant_threads:
+        if isinstance(item, tuple):
+            t, gap = item
+        else:
+            t = item
+            gap = current_scene - t.get("last_updated_scene", 0)
+        lines.append(f"⚠️ 休眠线索：[{t['id']}] \"{t['description']}\" — {gap} 场未更新")
+
+    # List active threads
+    for t in active_threads:
+        actors_str = "、".join(t.get("involved_actors", []))
+        lines.append(f"- [active] {t['id']}: \"{t['description']}\"（涉及：{actors_str}）")
+
+    # List resolving threads
+    for t in resolving_threads:
+        actors_str = "、".join(t.get("involved_actors", []))
+        lines.append(f"- [resolving] {t['id']}: \"{t['description']}\"（涉及：{actors_str}）")
+
+    text = "【弧线追踪】\n" + "\n".join(lines)
+    return {"key": "arc_tracking", "text": text, "priority": _DIRECTOR_SECTION_PRIORITIES["arc_tracking"], "truncatable": True}
+
+
+def _build_dynamic_storm_section(state: dict) -> dict:
+    """Build the dynamic STORM section (D-32/D-33 fully implemented).
+
+    构建 Dynamic STORM 上下文段落：距上次视角发现的场次数、建议间隔、
+    最近发现摘要、张力低迷时强烈建议触发。
 
     Args:
         state: The drama state dict.
@@ -652,23 +821,79 @@ def _build_dynamic_storm_section(state: dict) -> dict:
     Returns:
         Section dict for dynamic STORM.
     """
+    from .dynamic_storm import STORM_INTERVAL
+
     dynamic_storm = state.get("dynamic_storm")
     if not dynamic_storm:
         return {"key": "dynamic_storm", "text": "", "priority": _DIRECTOR_SECTION_PRIORITIES["dynamic_storm"], "truncatable": True}
 
-    triggers = dynamic_storm.get("trigger_history", [])
-    if not triggers:
-        return {"key": "dynamic_storm", "text": "", "priority": _DIRECTOR_SECTION_PRIORITIES["dynamic_storm"], "truncatable": True}
+    lines = []
+    scenes_since = dynamic_storm.get("scenes_since_last_storm", 0)
+    lines.append(f"距上次视角发现：{scenes_since} 场 | 建议间隔：{STORM_INTERVAL} 场")
 
-    lines = [f"- {t}" if isinstance(t, str) else f"- {t.get('event', str(t))}" for t in triggers]
-    text = "【最新STORM发现】\n" + "\n".join(lines)
+    # Most recent discovery
+    trigger_history = dynamic_storm.get("trigger_history", [])
+    if trigger_history:
+        last = trigger_history[-1]
+        scene_num = last.get("scene", "?")
+        focus = last.get("focus_area", "")
+        focus_str = f"——聚焦：{focus}" if focus else ""
+        lines.append(f"最近发现：[第{scene_num}场]{focus_str} （发现 {last.get('perspectives_found', 0)} 个新视角）")
+
+    # Suggestion when interval exceeded
+    if scenes_since >= STORM_INTERVAL:
+        lines.append(f"⚡ 已达建议间隔——建议调用 dynamic_storm() 发现新视角")
+
+    # Strong suggestion when tension is low
+    conflict_engine = state.get("conflict_engine", {})
+    consecutive_low = conflict_engine.get("consecutive_low_tension", 0)
+    if consecutive_low >= 3:
+        lines.append("🔥 张力持续低迷——强烈建议调用 dynamic_storm() 发现新视角")
+
+    # Phase 9: 🆕 freshness markers for recently discovered perspectives (D-01/D-03)
+    discovered = dynamic_storm.get("discovered_perspectives", [])
+    current_scene = state.get("current_scene", 0)
+    fresh_names = set()  # track names already shown to avoid duplicates
+
+    # Check discovered_perspectives list
+    fresh_perspectives = []
+    for p in discovered:
+        age = current_scene - p.get("discovered_scene", 0)
+        if 0 <= age <= 2:
+            fresh_perspectives.append((p, age))
+            fresh_names.add(p.get("name", ""))
+
+    # Also check storm.perspectives for dynamic_storm sourced ones with freshness
+    storm = state.get("storm", {})
+    perspectives = storm.get("perspectives", [])
+    for p in perspectives:
+        if p.get("source") == "dynamic_storm" and p.get("name", "") not in fresh_names:
+            age = current_scene - p.get("discovered_scene", 0)
+            if 0 <= age <= 2:
+                fresh_perspectives.append((p, age))
+                fresh_names.add(p.get("name", ""))
+
+    if fresh_perspectives:
+        lines.append("")  # blank line separator
+        for p, age in fresh_perspectives:
+            name = p.get("name", "未命名视角")
+            desc = p.get("description", "")
+            desc_short = desc[:40] + "..." if len(desc) > 40 else desc
+            age_label = f"{age}场前发现" if age > 0 else "本场发现"
+            lines.append(f"🆕 {name}（{age_label}）——{desc_short}")
+        lines.append("💡 建议逐步融入新视角：第1场旁白暗示 → 第2场角色感知 → 第3场成为驱动力")
+
+    text = "【Dynamic STORM】\n" + "\n".join(lines)
     return {"key": "dynamic_storm", "text": text, "priority": _DIRECTOR_SECTION_PRIORITIES["dynamic_storm"], "truncatable": True}
 
 
 def _build_facts_section(state: dict) -> dict:
-    """Build the established facts section (D-04 forward-compatible).
+    """Build the established facts section with importance labels and check reminders.
 
-    仅当 state 中存在 established_facts 且非空时才生成内容。
+    展示 high/medium importance 事实 + 检查提醒（D-05/D-28）。
+    high importance 标记为 [核心]，medium 标记为 [category 中文名]。
+    距上次检查 ≥ COHERENCE_CHECK_INTERVAL 场时显示检查提醒。
+    兼容旧格式 facts（isinstance 检查 list 中元素是 str 还是 dict）（T-10-06）。
 
     Args:
         state: The drama state dict.
@@ -676,17 +901,107 @@ def _build_facts_section(state: dict) -> dict:
     Returns:
         Section dict for established facts.
     """
-    facts = state.get("established_facts")
-    if not facts:
-        return {"key": "facts", "text": "", "priority": _DIRECTOR_SECTION_PRIORITIES["facts"], "truncatable": True}
+    from .coherence_checker import COHERENCE_CHECK_INTERVAL
 
-    if isinstance(facts, list):
-        lines = [f"- {f}" if isinstance(f, str) else f"- {f.get('fact', str(f))}" for f in facts]
-    else:
-        lines = [str(facts)]
+    facts = state.get("established_facts", [])
+    coherence_checks = state.get("coherence_checks", {})
+    current_scene = state.get("current_scene", 0)
 
-    text = "【已确立事实】\n" + "\n".join(lines)
-    return {"key": "facts", "text": text, "priority": _DIRECTOR_SECTION_PRIORITIES["facts"], "truncatable": True}
+    # Category and importance labels (D-05/D-28)
+    CATEGORY_LABELS = {
+        "event": "事件",
+        "identity": "身份",
+        "location": "地点",
+        "relationship": "关系",
+        "rule": "规则",
+    }
+    IMPORTANCE_LABELS = {"high": "核心", "medium": ""}
+
+    lines = []
+
+    # Filter and format facts (T-10-06: compatible with old format)
+    display_facts = []
+    for f in facts:
+        if isinstance(f, str):
+            # Old format: plain string — treat as medium event
+            display_facts.append({
+                "fact": f,
+                "importance": "medium",
+                "category": "event",
+                "scene": 0,
+                "actors": [],
+            })
+        elif isinstance(f, dict):
+            # Only show high/medium importance (D-05/D-28)
+            if f.get("importance") in ("high", "medium"):
+                display_facts.append(f)
+
+    # Header line
+    if display_facts or coherence_checks.get("last_check_scene", 0) > 0:
+        total_count = len(facts) if isinstance(facts, list) else 0
+        header_parts = [f"事实总数：{total_count} 条"]
+
+        last_check_scene = coherence_checks.get("last_check_scene", 0)
+        if last_check_scene > 0:
+            last_result = coherence_checks.get("last_result", None)
+            if last_result == "clean" or last_result == 0:
+                result_str = "无矛盾"
+            elif isinstance(last_result, int) and last_result > 0:
+                result_str = f"发现{last_result}处矛盾"
+            else:
+                result_str = "无矛盾"
+            header_parts.append(
+                f"上次检查：第{last_check_scene}场（{result_str}）"
+            )
+
+        lines.append(" | ".join(header_parts))
+
+    # Check reminder (D-17/D-28)
+    last_check_scene = coherence_checks.get("last_check_scene", 0)
+    scenes_since_check = current_scene - last_check_scene
+    if (
+        current_scene > 0
+        and scenes_since_check >= COHERENCE_CHECK_INTERVAL
+        and display_facts
+    ):
+        lines.append(
+            f"💡 距上次检查已 {scenes_since_check} 场，"
+            f"建议调用 validate_consistency() 检查一致性"
+        )
+
+    # Fact lines
+    for f in display_facts:
+        importance = f.get("importance", "medium")
+        category = f.get("category", "event")
+        fact_text = f.get("fact", str(f))
+        scene = f.get("scene", 0)
+        actors = f.get("actors", [])
+
+        # Label
+        importance_label = IMPORTANCE_LABELS.get(importance, "")
+        if importance_label:
+            label = f"[{importance_label}]"
+        else:
+            category_label = CATEGORY_LABELS.get(category, category)
+            label = f"[{category_label}]"
+
+        # Actors
+        actors_str = ""
+        if actors:
+            actors_str = f"，涉及：{'、'.join(actors)}"
+
+        # Scene
+        scene_str = f"（第{scene}场确立{actors_str}）" if scene > 0 else ""
+
+        lines.append(f"{label} {fact_text}{scene_str}")
+
+    text = "【已确立事实】\n" + "\n".join(lines) if lines else ""
+    return {
+        "key": "facts",
+        "text": text,
+        "priority": _DIRECTOR_SECTION_PRIORITIES["facts"],
+        "truncatable": True,
+    }
 
 
 def _build_steer_section(state: dict) -> dict:
@@ -915,6 +1230,7 @@ def build_director_context(
         _build_global_arc_section(state),               # priority 5
         _build_facts_section(state),                    # priority 5
         _build_tension_section(state),                  # priority 5 — Phase 6
+        _build_arc_tracking_section(state),             # priority 5 — Phase 7
         _build_recent_scenes_section(state),            # priority 4
         _build_conflict_section(state),                 # priority 4
         _build_storm_section(state),                    # priority 3

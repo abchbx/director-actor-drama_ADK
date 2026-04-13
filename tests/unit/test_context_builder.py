@@ -16,7 +16,11 @@ from app.context_builder import (
     _build_auto_advance_section,
     _build_tension_section,
     _build_conflict_section,
+    _build_arc_tracking_section,
+    _build_facts_section,
+    _build_actor_dna_text,
     _DIRECTOR_SECTION_PRIORITIES,
+    _ACTOR_SECTION_PRIORITIES,
     DEFAULT_ACTOR_TOKEN_BUDGET,
     DEFAULT_DIRECTOR_TOKEN_BUDGET,
 )
@@ -306,10 +310,12 @@ class TestBuildDirectorContext:
 
     def test_includes_dynamic_storm_when_present(self, mock_tool_context):
         mock_tool_context.state["drama"]["dynamic_storm"] = {
-            "trigger_history": ["角色冲突触发"]
+            "scenes_since_last_storm": 5,
+            "trigger_history": [{"scene": 3, "trigger_type": "auto", "focus_area": "权力", "perspectives_found": 2}],
+            "discovered_perspectives": [],
         }
         result = build_director_context(mock_tool_context)
-        assert "【最新STORM发现】" in result
+        assert "【Dynamic STORM】" in result
 
     def test_skips_established_facts_when_absent(self, mock_tool_context):
         result = build_director_context(mock_tool_context)
@@ -814,3 +820,328 @@ class TestBuildConflictSectionExpanded:
         }
         result = _build_conflict_section(state)
         assert "简单冲突描述" in result["text"]
+
+
+# ============================================================================
+# Phase 7: Arc Tracking section tests
+# ============================================================================
+
+
+class TestBuildArcTrackingSection:
+    """Test _build_arc_tracking_section for director context."""
+
+    def test_no_threads_returns_empty(self):
+        state = {"plot_threads": []}
+        result = _build_arc_tracking_section(state)
+        assert result["key"] == "arc_tracking"
+        assert result["text"] == ""
+
+    def test_active_threads_displayed(self):
+        state = {
+            "current_scene": 5,
+            "plot_threads": [
+                {
+                    "id": "thread_3_复仇_1",
+                    "description": "林风对朱棣的复仇计划",
+                    "status": "active",
+                    "involved_actors": ["朱棣", "苏念"],
+                    "last_updated_scene": 4,
+                },
+            ],
+        }
+        result = _build_arc_tracking_section(state)
+        assert result["key"] == "arc_tracking"
+        assert "弧线追踪" in result["text"]
+        assert "活跃线索：1 条" in result["text"]
+        assert "林风对朱棣的复仇计划" in result["text"]
+        assert "朱棣" in result["text"]
+
+    def test_dormant_thread_shows_warning(self):
+        state = {
+            "current_scene": 20,
+            "plot_threads": [
+                {
+                    "id": "thread_3_爱情_1",
+                    "description": "苏念与朱棣的秘密关系",
+                    "status": "active",
+                    "involved_actors": ["朱棣", "苏念"],
+                    "last_updated_scene": 5,
+                },
+            ],
+        }
+        result = _build_arc_tracking_section(state)
+        assert "⚠️" in result["text"]
+        assert "15 场未更新" in result["text"]
+
+    def test_resolved_threads_counted(self):
+        state = {
+            "current_scene": 10,
+            "plot_threads": [
+                {
+                    "id": "thread_1_秘密_1",
+                    "description": "旧线索",
+                    "status": "resolved",
+                    "involved_actors": ["朱棣"],
+                    "last_updated_scene": 5,
+                },
+            ],
+        }
+        result = _build_arc_tracking_section(state)
+        assert "已解决：1 条" in result["text"]
+
+    def test_priority_is_5(self):
+        state = {"plot_threads": [{"id": "t1", "description": "测试", "status": "active", "involved_actors": [], "last_updated_scene": 1}]}
+        result = _build_arc_tracking_section(state)
+        assert result["priority"] == 5
+        assert result["truncatable"] is True
+
+    def test_arc_tracking_in_director_section_priorities(self):
+        assert "arc_tracking" in _DIRECTOR_SECTION_PRIORITIES
+        assert _DIRECTOR_SECTION_PRIORITIES["arc_tracking"] == 5
+
+
+class TestActorThreadSection:
+    """Test actor thread/arc section in _assemble_actor_sections."""
+
+    def test_actor_with_active_threads(self, mock_tool_context):
+        """Actor context includes threads involving them."""
+        mock_tool_context.state["drama"]["plot_threads"] = [
+            {
+                "id": "thread_3_复仇_1",
+                "description": "林风对朱棣的复仇计划",
+                "status": "active",
+                "involved_actors": ["朱棣", "苏念"],
+                "last_updated_scene": 3,
+            },
+        ]
+        ctx = build_actor_context_from_memory("朱棣", mock_tool_context)
+        assert "你的剧情线索" in ctx
+        assert "复仇计划" in ctx
+
+    def test_actor_with_no_threads(self, mock_tool_context):
+        """Actor without threads doesn't show thread section."""
+        ctx = build_actor_context_from_memory("朱棣", mock_tool_context)
+        # Should NOT show thread section when no threads exist
+        assert "你的剧情线索" not in ctx
+
+    def test_actor_with_arc_progress(self, mock_tool_context):
+        """Actor with arc_progress shows arc section."""
+        mock_tool_context.state["drama"]["actors"]["朱棣"]["arc_progress"] = {
+            "arc_type": "growth",
+            "arc_stage": "development",
+            "progress": 60,
+            "related_threads": [],
+        }
+        ctx = build_actor_context_from_memory("朱棣", mock_tool_context)
+        assert "你的角色弧线" in ctx
+        assert "成长" in ctx
+        assert "60%" in ctx
+
+    def test_only_active_threads_shown_not_dormant(self, mock_tool_context):
+        """Only active threads shown to actor, not dormant."""
+        mock_tool_context.state["drama"]["plot_threads"] = [
+            {
+                "id": "thread_1_旧线_1",
+                "description": "旧的线索",
+                "status": "dormant",
+                "involved_actors": ["朱棣"],
+                "last_updated_scene": 1,
+            },
+            {
+                "id": "thread_2_新线_1",
+                "description": "新的线索",
+                "status": "active",
+                "involved_actors": ["朱棣"],
+                "last_updated_scene": 3,
+            },
+        ]
+        ctx = build_actor_context_from_memory("朱棣", mock_tool_context)
+        assert "新的线索" in ctx
+        assert "旧的线索" not in ctx
+
+    def test_actor_threads_in_section_priorities(self):
+        assert "actor_threads" in _ACTOR_SECTION_PRIORITIES
+        assert _ACTOR_SECTION_PRIORITIES["actor_threads"] == 5
+
+
+# ============================================================================
+# Phase 10: _build_facts_section tests
+# ============================================================================
+
+
+class TestBuildFactsSection:
+    """Test _build_facts_section for Phase 10 coherence system."""
+
+    def test_high_importance_fact_marked_as_core(self):
+        """Test 1: _build_facts_section 展示 high importance 事实标记为 [核心]"""
+        state = {
+            "established_facts": [
+                {
+                    "id": "fact_5_起兵_1",
+                    "fact": "朱棣已起兵",
+                    "category": "event",
+                    "importance": "high",
+                    "actors": ["朱棣"],
+                    "scene": 5,
+                }
+            ],
+            "coherence_checks": {
+                "last_check_scene": 0,
+                "last_result": None,
+                "check_history": [],
+                "total_contradictions": 0,
+            },
+            "current_scene": 10,
+        }
+        result = _build_facts_section(state)
+        assert result["text"]
+        assert "[核心]" in result["text"]
+        assert "朱棣已起兵" in result["text"]
+
+    def test_medium_importance_fact_marked_with_category_cn(self):
+        """Test 2: _build_facts_section 展示 medium importance 事实标记为 category 中文名"""
+        state = {
+            "established_facts": [
+                {
+                    "id": "fact_3_旧部_1",
+                    "fact": "林风是朱棣的旧部",
+                    "category": "relationship",
+                    "importance": "medium",
+                    "actors": ["林风", "朱棣"],
+                    "scene": 3,
+                }
+            ],
+            "coherence_checks": {
+                "last_check_scene": 0,
+                "last_result": None,
+                "check_history": [],
+                "total_contradictions": 0,
+            },
+            "current_scene": 10,
+        }
+        result = _build_facts_section(state)
+        assert result["text"]
+        assert "[关系]" in result["text"]
+        assert "林风是朱棣的旧部" in result["text"]
+
+    def test_low_importance_fact_not_shown(self):
+        """Test 3: _build_facts_section 不展示 low importance 事实"""
+        state = {
+            "established_facts": [
+                {
+                    "id": "fact_1_天气_1",
+                    "fact": "那天下雨",
+                    "category": "event",
+                    "importance": "low",
+                    "actors": [],
+                    "scene": 1,
+                }
+            ],
+            "coherence_checks": {
+                "last_check_scene": 0,
+                "last_result": None,
+                "check_history": [],
+                "total_contradictions": 0,
+            },
+            "current_scene": 10,
+        }
+        result = _build_facts_section(state)
+        # Low importance facts should not appear in the text
+        if result["text"]:
+            assert "那天下雨" not in result["text"]
+
+    def test_check_reminder_every_5_scenes(self):
+        """Test 4: _build_facts_section 每 5 场显示检查提醒"""
+        state = {
+            "established_facts": [
+                {
+                    "id": "fact_5_起兵_1",
+                    "fact": "朱棣已起兵",
+                    "category": "event",
+                    "importance": "high",
+                    "actors": ["朱棣"],
+                    "scene": 5,
+                }
+            ],
+            "coherence_checks": {
+                "last_check_scene": 3,
+                "last_result": "clean",
+                "check_history": [],
+                "total_contradictions": 0,
+            },
+            "current_scene": 10,
+        }
+        result = _build_facts_section(state)
+        assert result["text"]
+        assert "💡" in result["text"]
+        assert "validate_consistency" in result["text"]
+
+    def test_no_facts_returns_empty_text(self):
+        """Test 5: _build_facts_section 无事实时返回空文本（或有检查提醒）"""
+        state = {
+            "established_facts": [],
+            "coherence_checks": {
+                "last_check_scene": 0,
+                "last_result": None,
+                "check_history": [],
+                "total_contradictions": 0,
+            },
+            "current_scene": 1,
+        }
+        result = _build_facts_section(state)
+        # No facts and no check reminder needed → empty text
+        assert result["text"] == ""
+
+
+class TestActorDnaSection:
+    """Test actor_dna section for Phase 10 character consistency."""
+
+    def test_actor_dna_contains_personality_memory_and_facts(self):
+        """Test 6: 角色锚点段落包含性格核心+关键记忆+已确立事实"""
+        tc = MagicMock()
+        tc.state = {
+            "drama": {
+                "actors": {
+                    "朱棣": {
+                        "role": "燕王",
+                        "personality": "果断、野心勃勃、多疑",
+                        "working_memory": [],
+                        "scene_summaries": [],
+                        "arc_summary": {"structured": {}, "narrative": ""},
+                        "critical_memories": [
+                            {
+                                "entry": "你发现了密信的内容",
+                                "scene": 3,
+                                "reason": "关键转折",
+                            }
+                        ],
+                        "emotions": "neutral",
+                    }
+                },
+                "established_facts": [
+                    {
+                        "id": "fact_5_起兵_1",
+                        "fact": "朱棣已起兵",
+                        "category": "event",
+                        "importance": "high",
+                        "actors": ["朱棣"],
+                        "scene": 5,
+                    }
+                ],
+                "current_scene": 10,
+            }
+        }
+        actor_data = tc.state["drama"]["actors"]["朱棣"]
+        result = _build_actor_dna_text("朱棣", actor_data, tc)
+        assert result
+        assert "性格核心" in result
+        assert "果断" in result
+        assert "关键记忆" in result
+        assert "密信" in result
+        assert "已确立事实" in result
+        assert "起兵" in result
+
+    def test_actor_dna_priority_7_and_not_truncatable(self):
+        """Test 7: 角色锚点段落优先级 7 且 truncatable=False"""
+        assert "actor_dna" in _ACTOR_SECTION_PRIORITIES
+        assert _ACTOR_SECTION_PRIORITIES["actor_dna"] == 7

@@ -20,9 +20,11 @@ from typing import AsyncGenerator
 
 from .tools import (
     actor_speak,
+    add_fact,                # Phase 10
     auto_advance,
     backfill_tags_tool,
     create_actor,
+    create_thread,           # Phase 7
     director_narrate,
     end_drama,
     evaluate_tension,
@@ -33,8 +35,12 @@ from .tools import (
     load_drama,
     mark_memory,
     next_scene,
+    repair_contradiction,    # Phase 10
+    resolve_conflict_tool,   # Phase 7
+    resolve_thread,          # Phase 7
     retrieve_relevant_scenes_tool,
     save_drama,
+    set_actor_arc,           # Phase 7
     show_cast,
     show_status,
     start_drama,
@@ -42,8 +48,11 @@ from .tools import (
     storm_discover_perspectives,
     storm_synthesize_outline,
     trigger_storm,
+    dynamic_storm,
     update_emotion,
+    update_thread,           # Phase 7
     user_action,
+    validate_consistency,    # Phase 10
     write_scene,
 )
 
@@ -167,12 +176,13 @@ _improv_director = Agent(
 
 ⚠️ 番外篇模式：/end 后如果用户继续 /next 或 /action，以番外篇/后日谈风格叙事。场景标注「番外第 X 场」。
 
-## §5 视角审视（/storm）
-当用户发送 /storm [焦点] 时：
-1. 调用 trigger_storm(focus_area) 触发审视
-2. 重新审视当前剧情，输出 1-2 个新角度或未探索方向
-3. 以【视角审视】标记输出，与正常旁白区分
-4. 审视结果可融入后续场景，但不要当场强行使用
+## §5 Dynamic STORM（/storm）
+当用户发送 /storm [焦点] 或 evaluate_tension() 建议触发时：
+1. 调用 dynamic_storm(focus_area) 发现新视角
+2. 新视角自动合并入 storm 数据——后续场景自然融入
+3. 发现新视角后，考虑基于新角度调用 inject_conflict() 注入冲突
+4. 新视角必须与已发生事件一致，是扩展而非推翻
+5. 审视结果可融入后续场景，但不要当场强行使用
 
 ## §6 选项呈现规范
 ⚠️ 每场结束后（无论手动/自动模式），在导演批注区提供 2-3 个选项：
@@ -243,6 +253,33 @@ _improv_director = Agent(
 冲突建议为"导演建议"——你自由决定如何融入剧情，不必照搬提示。
 活跃冲突上限 4 条，超出时优先解决已有冲突。
 同类型冲突 8 场内不会重复推荐。
+
+## §9 弧线追踪与线索管理
+- 注意【弧线追踪】段落中的休眠线索⚠️——被遗忘的故事线需要重新激活或收束
+- 当角色经历关键转折时，使用 set_actor_arc 更新弧线类型和进展
+- 当发现新的故事线索时，使用 create_thread 创建追踪
+- 当线索有进展时，使用 update_thread 更新状态和进展记录
+- 当线索自然结束时，使用 resolve_thread 标记为已解决
+- 当冲突已解决时，使用 resolve_conflict_tool 标记为已解决
+- 活跃冲突达上限时，优先推进已有线索或解决冲突，而非继续注入
+
+## §10 Dynamic STORM（视角重新发现）
+- 每 8 场左右（或张力持续低迷时），调用 dynamic_storm() 重新发现新视角
+- evaluate_tension() 返回 suggested_action 包含 "dynamic_storm" 时，优先调用
+- 用户可通过 /storm [焦点] 手动触发（不受间隔限制，优先响应用户请求）
+- 新视角发现后，考虑基于新角度调用 inject_conflict() 注入冲突
+- 新视角必须与已发生事件一致，是扩展而非推翻
+- 每次 Dynamic STORM 仅发现 1-2 个新视角，避免过载导致剧情失焦
+- 🆕 标记的视角是最近 2 场内发现的新角度，建议逐步融入：
+  第 1 场：旁白暗示 → 第 2 场：角色感知 → 第 3 场：成为驱动力
+
+## §11 一致性保障
+- 每场 write_scene 后，考虑用 add_fact 记录关键事实
+  （角色生死、地点切换、关系变化、世界规则）
+- 【已确立事实】段落显示提醒时，调用 validate_consistency() 检查一致性
+- 发现矛盾时，用修复性旁白（"其实..."、"之前未曾提及的是..."）
+  自然圆回，不要报错中断
+- 高严重度矛盾必须修复，中严重度建议修复，低严重度可忽略
 
 ## 🎭 A2A 多 Agent 架构
 本系统采用 A2A（Agent-to-Agent）协议实现真正的多 Agent 架构：
@@ -365,8 +402,17 @@ _improv_director = Agent(
         steer_drama,
         end_drama,
         trigger_storm,
+        dynamic_storm,
         evaluate_tension,
         inject_conflict,
+        create_thread,
+        update_thread,
+        resolve_thread,
+        set_actor_arc,
+        resolve_conflict_tool,
+        add_fact,                # Phase 10
+        validate_consistency,    # Phase 10
+        repair_contradiction,    # Phase 10
     ],
 )
 
