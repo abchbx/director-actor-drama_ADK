@@ -37,6 +37,7 @@ from .coherence_checker import (
     validate_consistency_logic,
     validate_consistency_prompt,
 )
+from .timeline_tracker import advance_time_logic, detect_timeline_jump_logic
 from .conflict_engine import (
     CONFLICT_TEMPLATES,
     calculate_tension,
@@ -509,6 +510,19 @@ def write_scene(
     result["scene_title"] = scene_title
     result["scene_description"] = scene_description
     result["dialogue_content"] = dialogue_content
+
+    # Phase 11: Auto-record time_label in scene data (D-08)
+    state = _get_state(tool_context)
+    timeline = state.get("timeline", {})
+    current_time = timeline.get("current_time", "")
+    if current_time:
+        # Update the scene dict with time_label
+        scenes = state.get("scenes", [])
+        for s in scenes:
+            if s.get("scene_number") == scene_number:
+                s["time_label"] = current_time
+                break
+        _set_state(state, tool_context)
 
     # Build a complete formatted version of the scene record
     top_line = "━" * 30
@@ -1983,6 +1997,80 @@ async def backfill_tags_tool(tool_context: ToolContext) -> dict:
 
 
 # ============================================================================
+# Timeline Tracking Tools (Phase 11)
+# ============================================================================
+
+
+def advance_time(
+    time_description: str,
+    day: int | None = None,
+    period: str | None = None,
+    flashback: bool = False,
+    *,
+    tool_context: ToolContext,
+) -> dict:
+    """Advance the drama timeline. Use when scene time changes.
+
+    推进时间线（D-31/D-07）。导演声明时间推进——换天、换时段、闪回时调用。
+
+    Args:
+        time_description: Full descriptive time, e.g. "第三天黄昏".
+        day: Day number (optional, parsed from time_description if omitted).
+        period: Time period (optional, must be one of: 清晨/上午/中午/下午/黄昏/夜晚/深夜).
+        flashback: Set True for flashback scenes.
+
+    Returns:
+        dict with status, message, and timeline info.
+    """
+    state = _get_state(tool_context)
+    state.setdefault("timeline", {
+        "current_time": "第一天",
+        "days_elapsed": 1,
+        "current_period": None,
+        "time_periods": [],
+        "last_jump_check": None,
+    })
+
+    result = advance_time_logic(state, time_description, day, period, flashback)
+    if result["status"] in ("success", "info"):
+        _set_state(state, tool_context)
+        return {
+            "status": result["status"],
+            "message": f"⏰ 时间推进至：{time_description}",
+            "timeline": result.get("timeline", state["timeline"]),
+        }
+    return result
+
+
+def detect_timeline_jump(tool_context: ToolContext) -> dict:
+    """Detect timeline jumps between scenes.
+
+    检测场景时间跳跃（D-32）。对比 time_periods 中相邻条目的天数差，
+    返回跳跃检测结果和建议。也可由 validate_consistency 自动触发。
+
+    Args:
+        tool_context: Tool context for state access.
+
+    Returns:
+        dict with status, jumps, max_gap.
+    """
+    state = _get_state(tool_context)
+    state.setdefault("timeline", {
+        "current_time": "第一天",
+        "days_elapsed": 1,
+        "current_period": None,
+        "time_periods": [],
+        "last_jump_check": None,
+    })
+
+    result = detect_timeline_jump_logic(state)
+    if result["status"] == "success":
+        state["timeline"]["last_jump_check"] = result
+        _set_state(state, tool_context)
+    return result
+
+
+# ============================================================================
 # Coherence System Tools (Phase 10)
 # ============================================================================
 
@@ -1991,6 +2079,7 @@ def add_fact(
     fact: str,
     category: str = "event",
     importance: str = "medium",
+    time_context: str | None = None,
     *,
     tool_context: ToolContext,
 ) -> dict:
@@ -2006,6 +2095,8 @@ def add_fact(
             relationship, rule. Defaults to "event".
         importance: Fact importance — high, medium, low.
             Defaults to "medium".
+        time_context: Optional time context for the fact, e.g. "第三天黄昏" (D-18/D-19).
+            Records when the fact occurred relative to the timeline.
 
     Returns:
         dict with status, fact_id, and message.
@@ -2015,6 +2106,13 @@ def add_fact(
 
     result = add_fact_logic(fact, category, importance, state)
     if result["status"] == "success":
+        if time_context is not None:
+            # Add time_context to the newly added fact (D-18/D-19)
+            established_facts = state["established_facts"]
+            for f in established_facts:
+                if f.get("id") == result["fact_id"]:
+                    f["time_context"] = time_context
+                    break
         _set_state(state, tool_context)
         return {
             "status": "success",

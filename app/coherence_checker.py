@@ -314,6 +314,12 @@ def validate_consistency_prompt(facts: list[dict], recent_scenes: list[dict]) ->
         "仅报告确信的矛盾，忽略模糊或可解释的差异"
     )
 
+    # Phase 11: Temporal consistency check instruction (D-17)
+    sections.append(
+        "检查事件时序：事实中标记了 time_context 的，其因果顺序应与时间线一致。"
+        "如果事实 A 发生在事实 B 之后但 time_context 更早，这是时序矛盾。"
+    )
+
     # Facts list
     fact_lines = []
     for i, f in enumerate(facts, 1):
