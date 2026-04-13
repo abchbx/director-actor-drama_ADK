@@ -23,6 +23,7 @@ from .state_manager import _get_state, _set_state
 from .semantic_retriever import retrieve_relevant_scenes, _extract_auto_tags, _normalize_scene_range
 from .conflict_engine import CONFLICT_TEMPLATES
 from .arc_tracker import ARC_TYPES, ARC_STAGES, DORMANT_THRESHOLD
+from .timeline_tracker import _build_time脉络, TIME_PERIODS
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,7 @@ _ACTOR_SECTION_PRIORITIES = {
     "emotion": 5,
     "actor_threads": 5,  # Phase 7 (D-32)
     "anchor": 6,
+    "current_time": 6,  # Phase 11 (D-22) — time info constrains behavior
     "actor_dna": 7,  # Phase 10 (D-26) — character consistency constraint
     "semantic_recall": 0,
 }
@@ -65,6 +67,7 @@ _DIRECTOR_SECTION_PRIORITIES = {
     "conflicts": 4,
     "global_arc": 5,
     "facts": 5,
+    "timeline": 5,     # Phase 11 (D-21)
     "tension": 5,
     "arc_tracking": 5,  # Phase 7 (D-12)
     "actor_emotions": 6,
@@ -304,6 +307,18 @@ def _assemble_actor_sections(
         "priority": _ACTOR_SECTION_PRIORITIES["emotion"],
         "truncatable": False,
     })
+
+    # Phase 11: Current time for actor (D-22)
+    state_ref = _get_state(tool_context)
+    timeline = state_ref.get("timeline", {})
+    current_time = timeline.get("current_time", "")
+    if current_time:
+        sections.append({
+            "key": "current_time",
+            "text": f"【当前时间】{current_time}",
+            "priority": _ACTOR_SECTION_PRIORITIES["current_time"],
+            "truncatable": False,
+        })
 
     # Critical memories (priority 4, never truncated — D-07)
     critical = actor_data.get("critical_memories", [])
@@ -1004,6 +1019,69 @@ def _build_facts_section(state: dict) -> dict:
     }
 
 
+def _build_timeline_section(state: dict) -> dict:
+    """Build the timeline section for director context (D-20/D-23).
+
+    导演上下文【时间线】段落——展示当前时间、累计天数、场景覆盖、
+    最近跳跃检测结果和时间脉络。
+
+    Args:
+        state: The drama state dict.
+
+    Returns:
+        Section dict for timeline.
+    """
+    timeline = state.get("timeline")
+    if not timeline:
+        return {"key": "timeline", "text": "", "priority": _DIRECTOR_SECTION_PRIORITIES["timeline"], "truncatable": True}
+
+    current_time = timeline.get("current_time", "")
+    days_elapsed = timeline.get("days_elapsed", 1)
+    time_periods = timeline.get("time_periods", [])
+    last_jump_check = timeline.get("last_jump_check")
+
+    # Calculate scene coverage
+    if time_periods:
+        first_scene = time_periods[0].get("scene_range", [1])[0]
+        last_scene = time_periods[-1].get("scene_range", [1])[-1]
+        scene_coverage = f"第{first_scene}场～第{last_scene}场"
+    else:
+        scene_coverage = "尚未记录"
+
+    lines = []
+    # Header line (D-20)
+    lines.append(f"当前：{current_time} | 累计：{days_elapsed} 天 | 场景覆盖：{scene_coverage}")
+
+    # Jump detection alert (D-20)
+    if last_jump_check and last_jump_check.get("jumps"):
+        significant_jumps = [j for j in last_jump_check["jumps"] if j.get("severity") == "significant"]
+        if significant_jumps:
+            j = significant_jumps[-1]
+            lines.append(
+                f"💡 最近跳跃：第{j['from_scene']}场→第{j['to_scene']}场"
+                f"跨{j['day_gap']}天（显著跳跃），建议补充时间过渡"
+            )
+        elif last_jump_check["jumps"]:
+            j = last_jump_check["jumps"][-1]
+            lines.append(
+                f"💡 最近跳跃：第{j['from_scene']}场→第{j['to_scene']}场"
+                f"跨{j['day_gap']}天（轻微跳跃）"
+            )
+
+    # Time lineage (D-20)
+    time_脉络 = _build_time脉络(state)
+    if time_脉络:
+        lines.append(f"时间脉络：\n{time_脉络}")
+
+    text = "【时间线】\n" + "\n".join(lines) if lines else ""
+    return {
+        "key": "timeline",
+        "text": text,
+        "priority": _DIRECTOR_SECTION_PRIORITIES["timeline"],
+        "truncatable": True,
+    }
+
+
 def _build_steer_section(state: dict) -> dict:
     """Build the user steer guidance section (D-08/D-09).
 
@@ -1229,6 +1307,7 @@ def build_director_context(
         _build_actor_emotions_section(state),           # priority 6
         _build_global_arc_section(state),               # priority 5
         _build_facts_section(state),                    # priority 5
+        _build_timeline_section(state),               # priority 5 — Phase 11
         _build_tension_section(state),                  # priority 5 — Phase 6
         _build_arc_tracking_section(state),             # priority 5 — Phase 7
         _build_recent_scenes_section(state),            # priority 4
