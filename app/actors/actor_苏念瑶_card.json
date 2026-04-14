@@ -1,0 +1,26 @@
+{
+  "name": "actor_苏念瑶",
+  "description": "演员 苏念瑶，角色：二师姐/恋爱脑",
+  "url": "http://localhost:9068/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_苏念瑶",
+      "name": "扮演苏念瑶",
+      "description": "以苏念瑶的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

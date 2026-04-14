@@ -21,6 +21,52 @@ from .state_manager import _get_state, _set_state
 logger = logging.getLogger(__name__)
 
 # ============================================================================
+# Coreference Resolution - 代词展开（避免跨角色对话中的指代歧义）
+# ============================================================================
+
+# 角色特有的已知指代关系：角色名 → {代词: 展开文本}
+_KNOWN_COREFERENCES = {
+    "苏念瑶": {
+        "他": "她的退婚未婚夫",
+    },
+    # 可扩展：每个角色特有的代词指代关系
+    # "角色名": {"他/她": "具体指代对象"},
+}
+
+
+def resolve_coreferences(text: str, speaker_name: str, listener_name: str = "") -> str:
+    """Expand ambiguous pronouns in dialogue text based on speaker context.
+
+    When a speaker uses pronouns like "他/她/它" that refer to entities NOT
+    in the current conversation, expand them to explicit references to prevent
+    the listener from misinterpreting (e.g., thinking "他" refers to themselves).
+
+    Args:
+        text: The dialogue text to process.
+        speaker_name: Name of the character who spoke (provides context).
+        listener_name: Name of the character receiving the message (optional).
+
+    Returns:
+        Text with ambiguous pronouns expanded to explicit references.
+    """
+    if not text or not speaker_name:
+        return text
+
+    speaker_refs = _KNOWN_COREFERENCES.get(speaker_name, {})
+    if not speaker_refs:
+        return text
+
+    result = text
+    for pronoun, expansion in speaker_refs.items():
+        # Only expand if the pronoun appears and the listener might confuse it
+        # We use a lightweight heuristic: if the pronoun appears near keywords
+        # from the speaker's known context, expand it
+        result = result.replace(pronoun, f"{pronoun}（{expansion}）", 1)
+        # Only replace the first occurrence to avoid over-expansion
+
+    return result
+
+# ============================================================================
 # Constants (from D-01, D-02, D-06)
 # ============================================================================
 

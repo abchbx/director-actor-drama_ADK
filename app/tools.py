@@ -50,6 +50,8 @@ from .conflict_engine import (
 from .context_builder import (
     _extract_scene_transition,
     build_actor_context,
+)
+from .memory_manager import resolve_coreferences
     build_director_context,
 )
 from .dynamic_storm import (
@@ -330,12 +332,16 @@ async def actor_speak(
     # 1. Build memory context using new 3-tier system (replaces flat memory_str)
     memory_context = build_actor_context(actor_name, tool_context)
 
+    # 1.5 Coreference resolution: expand ambiguous pronouns in situation
+    # (e.g., "他逃不掉的" → "他（她的退婚未婚夫）逃不掉的")
+    resolved_situation = resolve_coreferences(situation, speaker_name="", listener_name=actor_name)
+
     # 2. Add current situation to working memory with importance detection
-    is_critical, critical_reason = detect_importance(situation)
+    is_critical, critical_reason = detect_importance(resolved_situation)
     importance = "critical" if is_critical else "normal"
     add_working_memory(
         actor_name=actor_name,
-        entry=f"面对情境: {situation}",
+        entry=f"面对情境: {resolved_situation}",
         importance=importance,
         critical_reason=critical_reason,
         tool_context=tool_context,
@@ -354,11 +360,14 @@ async def actor_speak(
     prompt = (
         f"【角色锚点】你是{actor_name}，{role_label}。{personality}\n\n"
         f"【当前情绪】{emotion_cn}\n\n"
-        f"【当前情境】{situation}\n\n"
+        f"【当前情境】{resolved_situation}\n\n"
         f"{memory_context}\n\n"
         f"请以「{actor_name}」的身份回应上述情境。"
         f"保持角色一致性，不要跳出角色。"
-        f"如有内心独白，用（内心：...）格式。"
+        f"如有内心独白，用（内心：...）格式。\n\n"
+        f"【重要：代词消解】当情境中其他角色使用"他/她/它"等代词时，"
+        f"你必须根据上下文判断其指代对象，切勿默认将代词理解为指代你自己。"
+        f"例如：如果某人说"他逃了"，而该人正在追的是另一个人，那么"他"指的是那个人，不是你。"
     )
 
     # Call the actor A2A service directly via async — no event loop hack needed

@@ -1,0 +1,26 @@
+{
+  "name": "actor_陈无痕",
+  "description": "演员 陈无痕，角色：三师兄/恋爱脑",
+  "url": "http://localhost:9093/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_陈无痕",
+      "name": "扮演陈无痕",
+      "description": "以陈无痕的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

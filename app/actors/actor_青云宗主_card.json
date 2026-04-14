@@ -1,0 +1,26 @@
+{
+  "name": "actor_青云宗主",
+  "description": "演员 青云宗主，角色：掌门/对立面",
+  "url": "http://localhost:9001/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_青云宗主",
+      "name": "扮演青云宗主",
+      "description": "以青云宗主的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}
