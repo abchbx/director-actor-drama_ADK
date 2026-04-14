@@ -372,19 +372,19 @@ Plans:
 
 ## Phase 12: Integration & Polish
 
-**Goal:** 端到端集成测试、CLI 优化、性能调优、文档完善，确保系统可交付。
+**Goal:** 端到端集成测试、CLI 优化、性能调优、已知 bug 修复，确保系统可交付。
 
-**Plans:** 2/2 plans complete
+**Plans:** 4 plans
 
 Plans:
-- [x] 08-01-PLAN.md — Core dynamic_storm.py module + TDD tests
-- [x] 08-02-PLAN.md — Integration layer (tools + state + context_builder + agent)
-
-**UAT:** 08-UAT.md — 15/15 passed, 0 issues
+- [ ] 12-01-PLAN.md — State manager 核心改造：debounce + conversation_log 迁移 + 场景归档
+- [ ] 12-02-PLAN.md — tools.py 修复与增强：actor_speak bug + 共享 AsyncClient + 崩溃恢复
+- [ ] 12-03-PLAN.md — CLI 用户体验优化：spinner + 场景摘要 + 中文错误提示
+- [ ] 12-04-PLAN.md — E2E 全流程测试 + 集成测试（5 条关键跨模块路径）
 
 **Success Criteria:**
 1. 端到端测试：`/start` → setup → 30+ 场戏（含冲突注入 + Dynamic STORM）→ `/save` → `/load` → 继续 → `/end`，全流程无错误
-2. 修复已知 bug：`actor_speak()` 算符优先级（line 246）、conversation_log 全局状态、`_sub_agents[0]` fallback
+2. 修复已知 bug：`actor_speak()` 算符优先级、conversation_log 全局状态、`_sub_agents[0]` fallback
 3. 性能优化：debounced state saving、场景归档（旧场景从 state.json 移至独立文件）、共享 httpx.AsyncClient
 4. CLI 命令完整可用：`/next`、`/action`、`/steer`、`/storm`、`/end`、`/save`、`/load`、`/export`
 5. 演员进程健康检查和崩溃恢复机制可用
