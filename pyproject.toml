@@ -91,6 +91,9 @@ build-backend = "hatchling.build"
 [tool.pytest.ini_options]
 pythonpath = "."
 asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "e2e: End-to-end tests with real LLM calls (run with pytest -m e2e)",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["app","frontend"]

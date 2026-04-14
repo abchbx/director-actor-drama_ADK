@@ -4,7 +4,7 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 12
 status: executing
-last_updated: "2026-04-14T02:58:39Z"
+last_updated: "2026-04-14T03:25:26.713Z"
 progress:
   total_phases: 12
   completed_phases: 9
@@ -51,6 +51,10 @@ progress:
 - 12-01: conversation_log migrated from global _conversation_log to state["conversation_log"]
 - 12-01: Scene archival at 20-scene threshold with on-demand load_archived_scene()
 - 12-01: _current_drama_folder migration deferred with TODO comment (D-07)
+- 12-02: Error detection uses explicit [ERROR:xxx] prefix markers instead of fragile Chinese string matching
+- 12-02: Shared AsyncClient uses lazy singleton with is_closed check for auto-rebuild
+- 12-02: Crash recovery uses passive detection (connection error triggers restart) not polling
+- 12-02: MAX_CRASH_COUNT=3 limits infinite restart loops (T-12-04 mitigation)
 - 12-03: Rich Live start/stop for spinner (not context manager — no __aenter__/__aexit__)
 - 12-03: Scene summary format ── 第N场：标题 ── 参演：角色1、角色2
 - 12-03: Chinese error messages with rate_limit/timeout/api_key pattern matching + 💡 suggestion
