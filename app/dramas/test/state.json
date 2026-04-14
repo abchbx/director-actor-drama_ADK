@@ -1,98 +1,45 @@
 {
   "theme": "test",
-  "actors": {
-    "朱棣": {
-      "working_memory": [],
-      "scene_summaries": [
-        {
-          "summary": "第2摘要",
-          "scenes_covered": "2",
-          "key_events": [
-            "事件2"
-          ]
-        },
-        {
-          "summary": "第3摘要",
-          "scenes_covered": "3",
-          "key_events": [
-            "事件3"
-          ]
-        },
-        {
-          "summary": "第4摘要",
-          "scenes_covered": "4",
-          "key_events": [
-            "事件4"
-          ]
-        },
-        {
-          "summary": "第5摘要",
-          "scenes_covered": "5",
-          "key_events": [
-            "事件5"
-          ]
-        },
-        {
-          "summary": "第6摘要",
-          "scenes_covered": "6",
-          "key_events": [
-            "事件6"
-          ]
-        },
-        {
-          "summary": "第7摘要",
-          "scenes_covered": "7",
-          "key_events": [
-            "事件7"
-          ]
-        },
-        {
-          "summary": "第8摘要",
-          "scenes_covered": "8",
-          "key_events": [
-            "事件8"
-          ]
-        },
-        {
-          "summary": "第9摘要",
-          "scenes_covered": "9",
-          "key_events": [
-            "事件9"
-          ]
-        },
-        {
-          "summary": "第10摘要",
-          "scenes_covered": "10",
-          "key_events": [
-            "事件10"
-          ]
-        },
-        {
-          "summary": "第11摘要",
-          "scenes_covered": "11",
-          "key_events": [
-            "事件11"
-          ]
-        }
-      ],
-      "arc_summary": {
-        "structured": {
-          "theme": "测试",
-          "key_characters": [
-            "朱棣"
-          ],
-          "unresolved": [],
-          "resolved": []
-        },
-        "narrative": "故事弧线概述。"
-      },
-      "critical_memories": [],
-      "_pending_compression": {
-        "working_to_scene": null,
-        "scene_to_arc": null,
-        "pending_entries": [],
-        "result": null
-      }
-    }
-  }
+  "status": "setup",
+  "current_scene": 0,
+  "scenes": [],
+  "actors": {},
+  "narration_log": [],
+  "remaining_auto_scenes": 0,
+  "steer_direction": null,
+  "storm": {
+    "last_review": {}
+  },
+  "conflict_engine": {
+    "tension_score": 0,
+    "is_boring": false,
+    "tension_history": [],
+    "active_conflicts": [],
+    "used_conflict_types": [],
+    "last_inject_scene": 0,
+    "consecutive_low_tension": 0,
+    "resolved_conflicts": []
+  },
+  "plot_threads": [],
+  "dynamic_storm": {
+    "scenes_since_last_storm": 0,
+    "trigger_history": [],
+    "discovered_perspectives": []
+  },
+  "established_facts": [],
+  "coherence_checks": {
+    "last_check_scene": 0,
+    "last_result": null,
+    "check_history": [],
+    "total_contradictions": 0
+  },
+  "timeline": {
+    "current_time": "第一天",
+    "days_elapsed": 1,
+    "current_period": null,
+    "time_periods": [],
+    "last_jump_check": null
+  },
+  "created_at": "2026-04-13T12:33:59.759100",
+  "updated_at": "2026-04-13T12:33:59.759108"
 }

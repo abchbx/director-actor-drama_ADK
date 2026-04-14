@@ -34,19 +34,5 @@
   "scenes": [],
   "narration_log": [],
   "created_at": "2026-04-11T09:00:00",
-  "updated_at": "2026-04-12T12:53:44.909859",
-  "remaining_auto_scenes": 0,
-  "steer_direction": null,
-  "storm": {
-    "last_review": {}
-  },
-  "conflict_engine": {
-    "tension_score": 0,
-    "is_boring": false,
-    "tension_history": [],
-    "active_conflicts": [],
-    "used_conflict_types": [],
-    "last_inject_scene": 0,
-    "consecutive_low_tension": 0
-  }
+  "updated_at": "2026-04-11T10:00:00"
 }

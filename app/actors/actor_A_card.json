@@ -1,0 +1,26 @@
+{
+  "name": "actor_A",
+  "description": "演员 A，角色：主角",
+  "url": "http://localhost:9046/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_A",
+      "name": "扮演A",
+      "description": "以A的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

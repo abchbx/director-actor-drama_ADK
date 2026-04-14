@@ -1,59 +1,17 @@
 {
   "actors": {
-    "快演员": {
-      "working_memory": [
-        {
-          "entry": "条目7",
-          "importance": "normal",
-          "scene": 7
-        },
-        {
-          "entry": "条目8",
-          "importance": "normal",
-          "scene": 8
-        },
-        {
-          "entry": "条目9",
-          "importance": "normal",
-          "scene": 9
-        },
-        {
-          "entry": "条目10",
-          "importance": "normal",
-          "scene": 10
-        },
-        {
-          "entry": "条目11",
-          "importance": "normal",
-          "scene": 11
-        }
-      ],
-      "scene_summaries": [
-        {
-          "summary": "无法生成有效摘要。输入的 7 条工作记忆条目仅包含占位符文本（条目0-条目6），未提供具体场景内容。\n\n请提供实际的工作记忆条目内容，例如：\n- 角色动作和台词\n- 场景事件描述\n- 情感和决策变化\n\n这样我才能按照压缩规则生成 150-200 字的场景摘要和对应标签。",
-          "scenes_covered": "0-6",
-          "key_events": [
-            "条目0。",
-            "条目1。",
-            "条目2。",
-            "条目3。",
-            "条目4。",
-            "条目5。",
-            "条目6。"
-          ],
-          "tags": []
-        }
-      ],
+    "测试": {
       "arc_summary": {
         "structured": {
-          "theme": "",
-          "key_characters": [],
+          "theme": "权力",
+          "key_characters": [
+            "朱棣"
+          ],
           "unresolved": [],
           "resolved": []
         },
-        "narrative": ""
+        "narrative": "新的弧线摘要"
       },
-      "critical_memories": [],
       "_pending_compression": {
         "working_to_scene": null,
         "scene_to_arc": null,

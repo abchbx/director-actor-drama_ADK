@@ -1,0 +1,315 @@
+{
+  "theme": "两个朋友在咖啡店讨论人生",
+  "status": "acting",
+  "current_scene": 15,
+  "scenes": [
+    {
+      "scene_number": 1,
+      "title": "第1场",
+      "description": "场景1描述",
+      "content": "场景1对话",
+      "updated_at": "2026-04-14T04:32:22.888853",
+      "time_label": "第一天"
+    },
+    {
+      "scene_number": 2,
+      "title": "第2场",
+      "description": "场景2描述",
+      "content": "场景2对话",
+      "updated_at": "2026-04-14T04:32:28.208036",
+      "time_label": "第一天"
+    },
+    {
+      "scene_number": 3,
+      "title": "第3场",
+      "description": "场景3描述",
+      "content": "场景3对话",
+      "updated_at": "2026-04-14T04:32:35.730038",
+      "time_label": "第一天"
+    },
+    {
+      "scene_number": 4,
+      "title": "第4场",
+      "description": "场景4描述",
+      "content": "场景4对话",
+      "updated_at": "2026-04-14T04:32:35.730705",
+      "time_label": "第一天"
+    },
+    {
+      "scene_number": 5,
+      "title": "第5场",
+      "description": "场景5描述",
+      "content": "场景5对话",
+      "updated_at": "2026-04-14T04:32:35.731134",
+      "time_label": "第一天"
+    },
+    {
+      "scene_number": 6,
+      "title": "第6场",
+      "description": "场景6描述",
+      "content": "场景6对话",
+      "updated_at": "2026-04-14T04:32:35.731574",
+      "time_label": "第一天"
+    },
+    {
+      "scene_number": 7,
+      "title": "第7场",
+      "description": "场景7描述",
+      "content": "场景7对话",
+      "updated_at": "2026-04-14T04:32:35.731944",
+      "time_label": "第一天"
+    },
+    {
+      "scene_number": 8,
+      "title": "第8场",
+      "description": "场景8描述",
+      "content": "场景8对话",
+      "updated_at": "2026-04-14T04:32:35.732341",
+      "time_label": "第一天"
+    },
+    {
+      "scene_number": 9,
+      "title": "第9场",
+      "description": "场景9描述",
+      "content": "场景9对话",
+      "updated_at": "2026-04-14T04:32:42.478510",
+      "time_label": "第二天上午"
+    },
+    {
+      "scene_number": 10,
+      "title": "第10场",
+      "description": "场景10描述",
+      "content": "场景10对话",
+      "updated_at": "2026-04-14T04:32:42.479011",
+      "time_label": "第二天上午"
+    },
+    {
+      "scene_number": 11,
+      "title": "第11场",
+      "description": "场景11描述",
+      "content": "场景11对话",
+      "updated_at": "2026-04-14T04:32:42.479413",
+      "time_label": "第二天上午"
+    },
+    {
+      "scene_number": 12,
+      "title": "第12场",
+      "description": "场景12描述",
+      "content": "场景12对话",
+      "updated_at": "2026-04-14T04:32:42.479791",
+      "time_label": "第二天上午"
+    },
+    {
+      "scene_number": 13,
+      "title": "第13场",
+      "description": "场景13描述",
+      "content": "场景13对话",
+      "updated_at": "2026-04-14T04:32:42.480122",
+      "time_label": "第二天上午"
+    },
+    {
+      "scene_number": 14,
+      "title": "第14场",
+      "description": "场景14描述",
+      "content": "场景14对话",
+      "updated_at": "2026-04-14T04:32:42.480548",
+      "time_label": "第二天上午"
+    },
+    {
+      "scene_number": 15,
+      "title": "第15场",
+      "description": "场景15描述",
+      "content": "场景15对话",
+      "updated_at": "2026-04-14T04:32:42.480976",
+      "time_label": "第二天上午"
+    }
+  ],
+  "actors": {
+    "小明": {
+      "role": "咖啡店常客",
+      "personality": "活泼开朗，喜欢聊天",
+      "background": "附近公司白领",
+      "knowledge_scope": "日常话题",
+      "memory": [],
+      "working_memory": [
+        {
+          "entry": "我说：嘿！今天天气真不错啊！（内心：心情好好的一天~）\n\n老板，老样子来一杯美式！对了，最近你们店有没有上什么新品啊？",
+          "importance": "normal",
+          "scene": 1
+        },
+        {
+          "entry": "面对情境: 第2场情境",
+          "importance": "normal",
+          "scene": 2
+        },
+        {
+          "entry": "我说：太好了！美式咖啡配上午后的阳光，绝配！（内心：嘿嘿~）\n\n诶，你们这新出的拿铁不错诶，奶泡拉花挺精致的。小姐姐你们店员自己喝的话推荐哪款啊？我下次想换换口味试试~",
+          "importance": "normal",
+          "scene": 2
+        },
+        {
+          "entry": "面对情境: 第3场情境",
+          "importance": "normal",
+          "scene": 3
+        },
+        {
+          "entry": "我说：（内心：嗯...小姐姐说要给我推荐她们店员自己爱喝的咖啡呢~好期待！）\n\n哇真的吗？快说说看，你们自己都喝啥呀？",
+          "importance": "normal",
+          "scene": 3
+        }
+      ],
+      "scene_summaries": [],
+      "arc_summary": {
+        "structured": {
+          "theme": "",
+          "key_characters": [],
+          "unresolved": [],
+          "resolved": []
+        },
+        "narrative": ""
+      },
+      "critical_memories": [],
+      "emotions": "neutral",
+      "arc_progress": {
+        "arc_type": "",
+        "arc_stage": "",
+        "progress": 0,
+        "related_threads": []
+      },
+      "created_at": "2026-04-14T04:32:13.223419",
+      "port": 9004,
+      "_pending_compression": {
+        "working_to_scene": null,
+        "scene_to_arc": null,
+        "pending_entries": [
+          {
+            "entry": "面对情境: 第1场情境",
+            "importance": "normal",
+            "scene": 1
+          }
+        ],
+        "result": null
+      },
+      "crash_count": 0
+    },
+    "小红": {
+      "role": "咖啡店店员",
+      "personality": "温柔安静，善于倾听",
+      "background": "大学生兼职",
+      "knowledge_scope": "咖啡知识",
+      "memory": [],
+      "working_memory": [],
+      "scene_summaries": [],
+      "arc_summary": {
+        "structured": {
+          "theme": "",
+          "key_characters": [],
+          "unresolved": [],
+          "resolved": []
+        },
+        "narrative": ""
+      },
+      "critical_memories": [],
+      "emotions": "neutral",
+      "arc_progress": {
+        "arc_type": "",
+        "arc_stage": "",
+        "progress": 0,
+        "related_threads": []
+      },
+      "created_at": "2026-04-14T04:32:15.224403",
+      "port": 9014
+    }
+  },
+  "narration_log": [],
+  "remaining_auto_scenes": 0,
+  "steer_direction": null,
+  "storm": {
+    "last_review": {},
+    "perspectives": []
+  },
+  "conflict_engine": {
+    "tension_score": 0,
+    "is_boring": false,
+    "tension_history": [],
+    "active_conflicts": [],
+    "used_conflict_types": [],
+    "last_inject_scene": 0,
+    "consecutive_low_tension": 0,
+    "resolved_conflicts": []
+  },
+  "plot_threads": [],
+  "dynamic_storm": {
+    "scenes_since_last_storm": 7,
+    "trigger_history": [
+      {
+        "scene": 8,
+        "trigger_type": "manual",
+        "focus_area": "角色关系",
+        "perspectives_found": 0
+      }
+    ],
+    "discovered_perspectives": []
+  },
+  "established_facts": [],
+  "coherence_checks": {
+    "last_check_scene": 0,
+    "last_result": null,
+    "check_history": [],
+    "total_contradictions": 0
+  },
+  "timeline": {
+    "current_time": "第二天上午",
+    "days_elapsed": 2,
+    "current_period": "上午",
+    "time_periods": [
+      {
+        "label": "第二天上午",
+        "day": 2,
+        "period": "上午",
+        "scene_range": [
+          8,
+          8
+        ],
+        "flashback": false
+      }
+    ],
+    "last_jump_check": {
+      "status": "success",
+      "jumps": [],
+      "max_gap": 0
+    }
+  },
+  "created_at": "2026-04-14T04:32:11.209566",
+  "updated_at": "2026-04-14T04:32:42.481718",
+  "conversation_log": [
+    {
+      "speaker": "[系统]",
+      "content": "戏剧「两个朋友在咖啡店讨论人生」已创建，数据保存路径: /workspace/director-actor-drama/app/dramas/两个朋友在咖啡店讨论人生",
+      "type": "system",
+      "scene": 0,
+      "timestamp": "2026-04-14T04:32:11.222607"
+    },
+    {
+      "speaker": "小明",
+      "content": "嘿！今天天气真不错啊！（内心：心情好好的一天~）\n\n老板，老样子来一杯美式！对了，最近你们店有没有上什么新品啊？",
+      "type": "dialogue",
+      "scene": 1,
+      "timestamp": "2026-04-14T04:32:22.888582"
+    },
+    {
+      "speaker": "小明",
+      "content": "太好了！美式咖啡配上午后的阳光，绝配！（内心：嘿嘿~）\n\n诶，你们这新出的拿铁不错诶，奶泡拉花挺精致的。小姐姐你们店员自己喝的话推荐哪款啊？我下次想换换口味试试~",
+      "type": "dialogue",
+      "scene": 2,
+      "timestamp": "2026-04-14T04:32:28.207705"
+    },
+    {
+      "speaker": "小明",
+      "content": "（内心：嗯...小姐姐说要给我推荐她们店员自己爱喝的咖啡呢~好期待！）\n\n哇真的吗？快说说看，你们自己都喝啥呀？",
+      "type": "dialogue",
+      "scene": 3,
+      "timestamp": "2026-04-14T04:32:35.729751"
+    }
+  ]
+}

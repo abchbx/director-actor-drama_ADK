@@ -1,0 +1,26 @@
+{
+  "name": "actor_曹孟德",
+  "description": "演员 曹孟德，角色：antagonist",
+  "url": "http://localhost:9090/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_曹孟德",
+      "name": "扮演曹孟德",
+      "description": "以曹孟德的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

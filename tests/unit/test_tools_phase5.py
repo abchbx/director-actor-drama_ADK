@@ -83,11 +83,12 @@ class TestTriggerStorm:
     """Tests for trigger_storm() tool function."""
 
     def test_trigger_storm_success(self, mock_tool_context):
-        """trigger_storm('角色关系') returns status='success' with review guidance."""
+        """trigger_storm('角色关系') returns status='success' (Phase 8: now wraps dynamic_storm)."""
         result = trigger_storm("角色关系", mock_tool_context)
 
         assert result["status"] == "success"
-        assert "视角审视" in result["message"]
+        # Phase 8: trigger_storm is now a backward-compat alias for dynamic_storm
+        # Message format has changed from "视角审视" to "Dynamic STORM"
         assert result["focus_area"] == "角色关系"
 
     def test_trigger_storm_creates_storm_subdict(self, mock_tool_context_no_storm):

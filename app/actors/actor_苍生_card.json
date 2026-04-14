@@ -1,0 +1,26 @@
+{
+  "name": "actor_苍生",
+  "description": "演员 苍生，角色：ensemble",
+  "url": "http://localhost:9082/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_苍生",
+      "name": "扮演苍生",
+      "description": "以苍生的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

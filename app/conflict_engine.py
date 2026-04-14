@@ -425,7 +425,7 @@ def generate_conflict_suggestion(state: dict, conflict_type: str | None = None) 
 
 
 def _init_conflict_engine_defaults() -> dict:
-    """Return default conflict_engine sub-dict values (D-16).
+    """Return default conflict_engine sub-dict values (D-16, D-22 Phase 7).
 
     返回 conflict_engine 子对象的默认值。
     """
@@ -437,6 +437,7 @@ def _init_conflict_engine_defaults() -> dict:
         "used_conflict_types": [],
         "last_inject_scene": 0,
         "consecutive_low_tension": 0,
+        "resolved_conflicts": [],  # Phase 7 (D-22)
     }
 
 
@@ -517,3 +518,58 @@ def update_conflict_engine_state(
         conflict_engine["last_inject_scene"] = current_scene
 
     return conflict_engine
+
+
+def resolve_conflict(conflict_id: str, state: dict) -> dict:
+    """Resolve an active conflict by moving it to resolved_conflicts list.
+
+    将活跃冲突标记为已解决，从 active_conflicts 移到 resolved_conflicts（D-20）。
+    不删除历史——保留已解决冲突供后续 Dynamic STORM 分析。
+
+    Args:
+        conflict_id: The ID of the conflict to resolve.
+        state: Drama state dict with conflict_engine.
+
+    Returns:
+        dict with status and resolved conflict info.
+    """
+    conflict_engine = state.get("conflict_engine", {})
+    if not conflict_engine:
+        conflict_engine = _init_conflict_engine_defaults()
+
+    # Ensure resolved_conflicts exists
+    conflict_engine.setdefault("resolved_conflicts", [])
+
+    active_conflicts = conflict_engine.get("active_conflicts", [])
+
+    # Find conflict in active list
+    target_conflict = None
+    for c in active_conflicts:
+        if c.get("id") == conflict_id:
+            target_conflict = c
+            break
+
+    if target_conflict is None:
+        return {
+            "status": "error",
+            "message": f"冲突 {conflict_id} 不存在或已解决",
+        }
+
+    # Remove from active list
+    active_conflicts.remove(target_conflict)
+
+    # Add resolved_at_scene and move to resolved
+    current_scene = state.get("current_scene", 0)
+    target_conflict["resolved_at_scene"] = current_scene
+    conflict_engine["resolved_conflicts"].append(target_conflict)
+
+    # Trim resolved_conflicts to MAX_RESOLVED_CONFLICTS
+    from .arc_tracker import MAX_RESOLVED_CONFLICTS
+    if len(conflict_engine["resolved_conflicts"]) > MAX_RESOLVED_CONFLICTS:
+        conflict_engine["resolved_conflicts"] = conflict_engine["resolved_conflicts"][-MAX_RESOLVED_CONFLICTS:]
+
+    return {
+        "status": "success",
+        "conflict_id": conflict_id,
+        "resolved_at_scene": current_scene,
+    }

@@ -1,0 +1,26 @@
+{
+  "name": "actor_小明",
+  "description": "演员 小明，角色：咖啡店常客",
+  "url": "http://localhost:9004/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_小明",
+      "name": "扮演小明",
+      "description": "以小明的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

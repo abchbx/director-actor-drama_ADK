@@ -600,12 +600,11 @@ class TestImprovDirectorPhase5:
         assert "番外篇" in instruction
 
     def test_improv_prompt_contains_storm_protocol(self):
-        """§5: Prompt describes /storm perspective review."""
+        """§5: Prompt describes /storm Dynamic STORM perspective discovery."""
         from app.agent import _improv_director
 
         instruction = _improv_director.instruction
-        assert "trigger_storm" in instruction
-        assert "【视角审视】" in instruction
+        assert "dynamic_storm" in instruction
 
     def test_improv_prompt_contains_options_spec(self):
         """§6: Prompt describes options format."""

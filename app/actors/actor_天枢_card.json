@@ -1,0 +1,26 @@
+{
+  "name": "actor_天枢",
+  "description": "演员 天枢，角色：protagonist",
+  "url": "http://localhost:9036/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_天枢",
+      "name": "扮演天枢",
+      "description": "以天枢的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

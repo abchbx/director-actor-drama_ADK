@@ -127,7 +127,8 @@ class TestConflictEngineInit:
         expected_keys = {
             "tension_score", "is_boring", "tension_history",
             "active_conflicts", "used_conflict_types",
-            "last_inject_scene", "consecutive_low_tension"
+            "last_inject_scene", "consecutive_low_tension",
+            "resolved_conflicts",  # Phase 7
         }
         assert set(ce.keys()) == expected_keys
         assert ce["tension_score"] == 0

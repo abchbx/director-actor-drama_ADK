@@ -1,0 +1,26 @@
+{
+  "name": "actor_角色B",
+  "description": "演员 角色B，角色：配角",
+  "url": "http://localhost:9032/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_角色B",
+      "name": "扮演角色B",
+      "description": "以角色B的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}
