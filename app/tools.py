@@ -125,6 +125,59 @@ async def close_shared_client():
         _shared_httpx_client = None
 
 
+# ============================================================================
+# Crash Recovery (D-16/D-17/D-18/D-19) — passive detection + auto-restart
+# ============================================================================
+
+MAX_CRASH_COUNT = 3
+
+
+async def _restart_actor(actor_name: str, tool_context) -> dict:
+    """Restart a crashed actor service (D-17/D-18/D-19)."""
+    state = tool_context.state.get("drama", {}) if tool_context else {}
+    actor_data = state.get("actors", {}).get(actor_name, {})
+    crash_count = actor_data.get("crash_count", 0) + 1
+
+    if crash_count >= MAX_CRASH_COUNT:
+        return {
+            "status": "error",
+            "message": f"角色「{actor_name}」连续崩溃 {crash_count} 次，请用 /cast 查看状态后手动重建",
+        }
+
+    # Stop old process if any
+    stop_actor_service(actor_name)
+
+    # Extract memory for context restoration
+    memory_entries = []
+    working = actor_data.get("working_memory", [])
+    if working:
+        memory_entries = [e.get("entry", str(e)) for e in working]
+    critical = actor_data.get("critical_memories", [])
+    if critical:
+        memory_entries = [f"[关键] {m.get('entry', str(m))}" for m in critical] + memory_entries
+
+    # Restart with original config + memory
+    svc_result = create_actor_service(
+        actor_name=actor_name,
+        role=actor_data.get("role", ""),
+        personality=actor_data.get("personality", ""),
+        background=actor_data.get("background", ""),
+        knowledge_scope=actor_data.get("knowledge_scope", ""),
+        memory_entries=memory_entries,
+    )
+
+    # Update state: increment crash count + log
+    if "actors" in state and actor_name in state.get("actors", {}):
+        state["actors"][actor_name]["crash_count"] = crash_count
+        state["actors"][actor_name].setdefault("restart_log", []).append({
+            "time": datetime.now().isoformat(),
+            "reason": "auto_restart_after_crash",
+        })
+        _set_state(state, tool_context)
+
+    return svc_result
+
+
 def start_drama(theme: str, tool_context: ToolContext) -> dict:
     """Start a new drama with the given theme. Use this when user provides /start command.
 
@@ -317,7 +370,16 @@ async def actor_speak(
         err_type = type(e).__name__
         msg = str(e).lower()
         if "connect" in err_type or "refused" in msg or "connection" in msg:
-            actor_dialogue = f"[ERROR:connection] {actor_name}连接失败(端口:{port})"
+            # D-16: Passive crash detection → attempt auto-restart
+            restart_result = await _restart_actor(actor_name, tool_context)
+            if restart_result.get("status") == "success":
+                # D-17: Retry once after restart
+                try:
+                    actor_dialogue = await _call_a2a_sdk(card_file, prompt, actor_name, port)
+                except Exception:
+                    actor_dialogue = f"[ERROR:connection] {actor_name}重启后仍无法连接(端口:{port})"
+            else:
+                actor_dialogue = f"[ERROR:connection] {actor_name}重启失败: {restart_result.get('message', '未知错误')}"
         elif "timeout" in err_type or "timeout" in msg or "timed out" in msg:
             actor_dialogue = f"[ERROR:timeout] {actor_name}响应超时"
         else:
@@ -336,6 +398,13 @@ async def actor_speak(
     # Auto-log the dialogue to conversation record
     if not actor_dialogue.startswith("[ERROR:"):
         add_dialogue(actor_name=actor_name, dialogue=actor_dialogue, tool_context=tool_context)
+
+    # D-19: Reset crash_count on successful dialogue
+    if not actor_dialogue.startswith("[ERROR:"):
+        state = _get_state(tool_context)
+        if actor_name in state.get("actors", {}):
+            state["actors"][actor_name]["crash_count"] = 0
+            _set_state(state, tool_context)
 
     # Build a formatted version that the director can directly use
     formatted_lines = []

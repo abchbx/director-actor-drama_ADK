@@ -5,6 +5,7 @@ Covers:
 - Shared httpx.AsyncClient (get_shared_client / close_shared_client)
 - _call_a2a_sdk uses shared client
 - archive_old_scenes integration in next_scene
+- Actor crash recovery (passive detection + auto-restart)
 """
 
 import pytest
@@ -188,6 +189,269 @@ class TestNextSceneArchival:
             mock_archive.side_effect = lambda s: s  # passthrough
             result = next_scene(tool_context=tc)
             mock_archive.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Task 2: Actor crash recovery (passive detection + auto-restart)
+# ---------------------------------------------------------------------------
+
+
+class TestRestartActor:
+    """Test _restart_actor function."""
+
+    @pytest.mark.asyncio
+    async def test_restart_actor_calls_stop_and_create(self):
+        """_restart_actor calls stop_actor_service + create_actor_service."""
+        from app.tools import _restart_actor
+
+        tc = MagicMock()
+        tc.state = {
+            "drama": {
+                "actors": {
+                    "朱棣": {
+                        "role": "燕王",
+                        "personality": "沉稳",
+                        "background": "明太祖第四子",
+                        "knowledge_scope": "军事",
+                        "crash_count": 0,
+                        "working_memory": [],
+                        "critical_memories": [],
+                    }
+                }
+            }
+        }
+
+        with patch("app.tools.stop_actor_service") as mock_stop, \
+             patch("app.tools.create_actor_service") as mock_create:
+            mock_stop.return_value = {"status": "success", "message": "stopped"}
+            mock_create.return_value = {"status": "success", "message": "created", "port": 9001}
+
+            result = await _restart_actor("朱棣", tc)
+
+            mock_stop.assert_called_once_with("朱棣")
+            mock_create.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_restart_actor_increments_crash_count(self):
+        """_restart_actor increments crash_count and logs restart."""
+        from app.tools import _restart_actor
+
+        tc = MagicMock()
+        tc.state = {
+            "drama": {
+                "actors": {
+                    "朱棣": {
+                        "role": "燕王",
+                        "personality": "沉稳",
+                        "background": "明太祖第四子",
+                        "knowledge_scope": "军事",
+                        "crash_count": 1,
+                        "working_memory": [],
+                        "critical_memories": [],
+                    }
+                }
+            }
+        }
+
+        with patch("app.tools.stop_actor_service") as mock_stop, \
+             patch("app.tools.create_actor_service") as mock_create, \
+             patch("app.tools._set_state"):
+            mock_stop.return_value = {"status": "success"}
+            mock_create.return_value = {"status": "success", "port": 9001}
+
+            result = await _restart_actor("朱棣", tc)
+
+            # crash_count should be incremented to 2
+            assert tc.state["drama"]["actors"]["朱棣"]["crash_count"] == 2
+
+    @pytest.mark.asyncio
+    async def test_restart_actor_adds_restart_log(self):
+        """_restart_actor adds entry to restart_log with timestamp and reason."""
+        from app.tools import _restart_actor
+
+        tc = MagicMock()
+        tc.state = {
+            "drama": {
+                "actors": {
+                    "朱棣": {
+                        "role": "燕王",
+                        "personality": "沉稳",
+                        "background": "明太祖第四子",
+                        "knowledge_scope": "军事",
+                        "crash_count": 0,
+                        "working_memory": [],
+                        "critical_memories": [],
+                    }
+                }
+            }
+        }
+
+        with patch("app.tools.stop_actor_service") as mock_stop, \
+             patch("app.tools.create_actor_service") as mock_create, \
+             patch("app.tools._set_state"):
+            mock_stop.return_value = {"status": "success"}
+            mock_create.return_value = {"status": "success", "port": 9001}
+
+            result = await _restart_actor("朱棣", tc)
+
+            # restart_log should have an entry
+            log = tc.state["drama"]["actors"]["朱棣"]["restart_log"]
+            assert len(log) == 1
+            assert "time" in log[0]
+            assert log[0]["reason"] == "auto_restart_after_crash"
+
+    @pytest.mark.asyncio
+    async def test_restart_actor_max_crash_count(self):
+        """_restart_actor returns error when crash_count >= MAX_CRASH_COUNT (3)."""
+        from app.tools import _restart_actor
+
+        tc = MagicMock()
+        tc.state = {
+            "drama": {
+                "actors": {
+                    "朱棣": {
+                        "role": "燕王",
+                        "personality": "沉稳",
+                        "background": "明太祖第四子",
+                        "knowledge_scope": "军事",
+                        "crash_count": 2,  # Will become 3 on next crash
+                        "working_memory": [],
+                        "critical_memories": [],
+                    }
+                }
+            }
+        }
+
+        with patch("app.tools.stop_actor_service") as mock_stop, \
+             patch("app.tools.create_actor_service") as mock_create:
+            mock_stop.return_value = {"status": "success"}
+            mock_create.return_value = {"status": "success", "port": 9001}
+
+            result = await _restart_actor("朱棣", tc)
+
+            # crash_count is now 3, should return error
+            assert result["status"] == "error"
+            assert "3" in result["message"]
+            # stop + create should NOT have been called since we hit the limit
+            mock_stop.assert_not_called()
+            mock_create.assert_not_called()
+
+
+class TestActorSpeakCrashRecovery:
+    """Test actor_speak crash recovery integration."""
+
+    @pytest.mark.asyncio
+    async def test_actor_speak_connection_error_triggers_restart(self):
+        """actor_speak connection error triggers _restart_actor."""
+        from app.tools import actor_speak
+
+        tc = MagicMock()
+        tc.state = {
+            "drama": {
+                "theme": "测试戏剧",
+                "current_scene": 1,
+                "actors": {
+                    "朱棣": {
+                        "role": "燕王",
+                        "personality": "沉稳",
+                        "background": "明太祖第四子",
+                        "knowledge_scope": "军事",
+                        "emotions": "neutral",
+                        "working_memory": [],
+                        "critical_memories": [],
+                        "scene_summaries": [],
+                        "arc_summary": {"structured": {}, "narrative": ""},
+                        "crash_count": 0,
+                        "port": 9001,
+                    }
+                }
+            }
+        }
+
+        with patch("app.tools.get_actor_info") as mock_info, \
+             patch("app.tools.get_actor_remote_config") as mock_config, \
+             patch("app.tools.build_actor_context", return_value="ctx"), \
+             patch("app.tools.detect_importance", return_value=(False, None)), \
+             patch("app.tools.add_working_memory"), \
+             patch("app.tools._call_a2a_sdk", side_effect=ConnectionError("connection refused")), \
+             patch("app.tools._restart_actor", new_callable=AsyncMock) as mock_restart, \
+             patch("app.tools._get_state", return_value=tc.state["drama"]), \
+             patch("app.tools._set_state"):
+
+            mock_info.return_value = {
+                "status": "success",
+                "actor": tc.state["drama"]["actors"]["朱棣"],
+            }
+            mock_config.return_value = {
+                "card_file": "/tmp/test_card.json",
+                "card_url": "http://localhost:9001/.well-known/agent.json",
+                "rpc_url": "http://localhost:9001/",
+                "port": 9001,
+            }
+            mock_restart.return_value = {
+                "status": "success",
+                "message": "restarted",
+                "port": 9001,
+            }
+
+            result = await actor_speak("朱棣", "test situation", tc)
+
+            # _restart_actor should have been called
+            mock_restart.assert_called_once_with("朱棣", tc)
+
+    @pytest.mark.asyncio
+    async def test_actor_speak_crash_count_resets_on_success(self):
+        """After successful actor_speak, crash_count resets to 0."""
+        from app.tools import actor_speak
+
+        tc = MagicMock()
+        tc.state = {
+            "drama": {
+                "theme": "测试戏剧",
+                "current_scene": 1,
+                "actors": {
+                    "朱棣": {
+                        "role": "燕王",
+                        "personality": "沉稳",
+                        "background": "明太祖第四子",
+                        "knowledge_scope": "军事",
+                        "emotions": "neutral",
+                        "working_memory": [],
+                        "critical_memories": [],
+                        "scene_summaries": [],
+                        "arc_summary": {"structured": {}, "narrative": ""},
+                        "crash_count": 2,
+                        "port": 9001,
+                    }
+                }
+            }
+        }
+
+        with patch("app.tools.get_actor_info") as mock_info, \
+             patch("app.tools.get_actor_remote_config") as mock_config, \
+             patch("app.tools.build_actor_context", return_value="ctx"), \
+             patch("app.tools.detect_importance", return_value=(False, None)), \
+             patch("app.tools.add_working_memory"), \
+             patch("app.tools.add_dialogue"), \
+             patch("app.tools._call_a2a_sdk", new_callable=AsyncMock, return_value="我觉得应该这样做"), \
+             patch("app.tools._get_state", return_value=tc.state["drama"]), \
+             patch("app.tools._set_state"):
+
+            mock_info.return_value = {
+                "status": "success",
+                "actor": tc.state["drama"]["actors"]["朱棣"],
+            }
+            mock_config.return_value = {
+                "card_file": "/tmp/test_card.json",
+                "card_url": "http://localhost:9001/.well-known/agent.json",
+                "rpc_url": "http://localhost:9001/",
+                "port": 9001,
+            }
+
+            result = await actor_speak("朱棣", "test situation", tc)
+
+            # crash_count should be reset to 0
+            assert tc.state["drama"]["actors"]["朱棣"]["crash_count"] == 0
 
 
 # ---------------------------------------------------------------------------
