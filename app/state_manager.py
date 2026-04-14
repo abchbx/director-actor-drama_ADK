@@ -4,18 +4,25 @@ Handles saving/loading progress, script content, and actor states.
 Each drama gets its own isolated folder for complete data separation.
 """
 
+import atexit
 import json
 import os
+import threading
 from datetime import datetime
 from typing import Any, Optional
 
 # Base directory for all dramas
 DRAMAS_DIR = os.path.join(os.path.dirname(__file__), "dramas")
 # Current active drama folder (runtime state, not persisted)
+# TODO: Phase 12+ — migrate _current_drama_folder to ToolContext.state
 _current_drama_folder: Optional[str] = None
 
-# Conversation log storage
-_conversation_log: list[dict] = []
+# Debounce state saving (D-09)
+_save_dirty: bool = False
+_save_timer: threading.Timer | None = None
+_latest_theme: str = ""
+_latest_state_ref: dict = {}
+DEBOUNCE_SECONDS = 5
 
 
 def _sanitize_name(name: str) -> str:
@@ -79,21 +86,38 @@ def _save_state_to_file(theme: str, state: dict):
         json.dump(state, f, ensure_ascii=False, indent=2)
 
 
+def _flush_state():
+    """Internal: called by debounce timer to flush pending state to disk."""
+    global _save_dirty, _save_timer
+    if _save_dirty:
+        _save_state_to_file(_latest_theme, _latest_state_ref)
+        _save_dirty = False
+    _save_timer = None
+
+
+def flush_state_sync():
+    """Force-write any pending debounced state to disk immediately.
+
+    Call this before program exit or when an explicit save is needed.
+    Cancels any pending debounce timer and writes immediately.
+    """
+    global _save_dirty, _save_timer
+    if _save_timer is not None:
+        _save_timer.cancel()
+        _save_timer = None
+    if _save_dirty:
+        _save_state_to_file(_latest_theme, _latest_state_ref)
+        _save_dirty = False
+
+
 def _get_conversations_dir(theme: str) -> str:
-    """Get the conversations directory for a drama."""
+    """Get the conversations directory for a drama. [DEPRECATED: kept for backward compatibility only]"""
     return os.path.join(_get_drama_folder(theme), "conversations")
 
 
 def _save_conversations(theme: str):
-    """Save conversation log to disk."""
-    if not theme:
-        return
-    conv_dir = _get_conversations_dir(theme)
-    os.makedirs(conv_dir, exist_ok=True)
-
-    filepath = os.path.join(conv_dir, "conversation_log.json")
-    with open(filepath, "w", encoding="utf-8") as f:
-        json.dump(_conversation_log, f, ensure_ascii=False, indent=2)
+    """Save conversation log to disk. [DEPRECATED: conversation_log now lives in state, saved via debounce]"""
+    pass
 
 
 def add_conversation(
@@ -125,11 +149,10 @@ def add_conversation(
         "timestamp": datetime.now().isoformat(),
     }
 
-    _conversation_log.append(entry)
+    state.setdefault("conversation_log", []).append(entry)
 
-    # Persist to disk
-    if theme:
-        _save_conversations(theme)
+    # Trigger debounced save instead of immediate _save_conversations
+    _set_state(state, tool_context)
 
     return {"status": "success", "entry": entry}
 
@@ -211,22 +234,13 @@ def get_conversation_log(scene: int | None = None, tool_context=None) -> dict:
     Returns:
         dict with conversation entries.
     """
-    global _conversation_log
-
     state = _get_state(tool_context)
-    theme = state.get("theme", "")
-
-    # Load from disk if not in memory
-    if theme and not _conversation_log:
-        conv_file = os.path.join(_get_conversations_dir(theme), "conversation_log.json")
-        if os.path.exists(conv_file):
-            with open(conv_file, "r", encoding="utf-8") as f:
-                _conversation_log = json.load(f)
+    log = state.get("conversation_log", [])
 
     if scene is not None:
-        entries = [e for e in _conversation_log if e.get("scene") == scene]
+        entries = [e for e in log if e.get("scene") == scene]
     else:
-        entries = _conversation_log.copy()
+        entries = log.copy()
 
     return {"status": "success", "entries": entries, "count": len(entries)}
 
@@ -241,21 +255,14 @@ def export_conversations(format: str = "markdown", tool_context=None) -> dict:
     Returns:
         dict with export status and file path.
     """
-    global _conversation_log
-
     state = _get_state(tool_context)
     theme = state.get("theme", "")
     if not theme:
         return {"status": "error", "message": "No active drama."}
 
-    # Ensure conversations are loaded
-    if not _conversation_log:
-        conv_file = os.path.join(_get_conversations_dir(theme), "conversation_log.json")
-        if os.path.exists(conv_file):
-            with open(conv_file, "r", encoding="utf-8") as f:
-                _conversation_log = json.load(f)
+    log = state.get("conversation_log", [])
 
-    if not _conversation_log:
+    if not log:
         return {"status": "info", "message": "No conversations to export."}
 
     conv_dir = _get_conversations_dir(theme)
@@ -271,7 +278,7 @@ def export_conversations(format: str = "markdown", tool_context=None) -> dict:
         ]
 
         current_scene = -1
-        for entry in _conversation_log:
+        for entry in log:
             scene = entry.get("scene", 0)
             if scene != current_scene:
                 current_scene = scene
@@ -296,12 +303,12 @@ def export_conversations(format: str = "markdown", tool_context=None) -> dict:
     elif format == "json":
         filepath = os.path.join(conv_dir, "conversation_log.json")
         with open(filepath, "w", encoding="utf-8") as f:
-            json.dump(_conversation_log, f, ensure_ascii=False, indent=2)
+            json.dump(log, f, ensure_ascii=False, indent=2)
 
     else:  # txt
         filepath = os.path.join(conv_dir, "conversation_log.txt")
         lines = []
-        for entry in _conversation_log:
+        for entry in log:
             speaker = entry.get("speaker", "Unknown")
             content = entry.get("content", "")
             lines.append(f"{speaker}: {content}")
@@ -313,18 +320,19 @@ def export_conversations(format: str = "markdown", tool_context=None) -> dict:
         "message": f"Conversations exported to: {filepath}",
         "filepath": filepath,
         "format": format,
-        "total_entries": len(_conversation_log),
+        "total_entries": len(log),
     }
 
 
 def clear_conversation_log(tool_context=None) -> dict:
-    """Clear the in-memory conversation log (does not delete saved file).
+    """Clear the conversation log in state.
 
     Returns:
         dict with status.
     """
-    global _conversation_log
-    _conversation_log = []
+    state = _get_state(tool_context)
+    state["conversation_log"] = []
+    _set_state(state, tool_context)
     return {"status": "success", "message": "Conversation log cleared."}
 
 
@@ -399,6 +407,8 @@ def init_drama_state(theme: str, tool_context=None) -> dict:
     }
     state["created_at"] = datetime.now().isoformat()
     state["updated_at"] = datetime.now().isoformat()
+    # Phase 12: conversation_log initialization (D-06)
+    state["conversation_log"] = []
 
     _set_state(state, tool_context)
     _save_state_to_file(theme, state)
@@ -435,6 +445,7 @@ def save_progress(save_name: str = "", tool_context=None) -> dict:
 
     # Always save main state
     state["updated_at"] = datetime.now().isoformat()
+    flush_state_sync()
     _save_state_to_file(theme, state)
 
     # Create named snapshot if requested
@@ -526,13 +537,18 @@ def load_progress(save_name: str, tool_context=None) -> dict:
     with open(state_file, "r", encoding="utf-8") as f:
         save_data = json.load(f)
 
-    # Clear conversation log from previous drama to avoid cross-drama contamination
-    global _conversation_log
-    _conversation_log = []
-
     state = _get_state(tool_context)
     state.update(save_data)
     state["updated_at"] = datetime.now().isoformat()
+
+    # Phase 12: Backward compatibility — migrate old conversation_log.json (D-06)
+    if "conversation_log" not in state:
+        conv_file = os.path.join(_get_conversations_dir(theme), "conversation_log.json")
+        if os.path.exists(conv_file):
+            with open(conv_file, "r", encoding="utf-8") as f:
+                state["conversation_log"] = json.load(f)
+        else:
+            state["conversation_log"] = []
 
     # D-11: Auto-migrate old format actor.memory → new 3-tier structure
     for actor_name, actor_data in state.get("actors", {}).items():
@@ -1116,13 +1132,27 @@ def _get_state(tool_context) -> dict:
 
 
 def _set_state(state: dict, tool_context):
-    """Set drama state in tool context and persist to disk."""
+    """Set drama state in tool context with debounced disk persistence.
+
+    State is written to tool_context immediately but only persisted to
+    disk after DEBOUNCE_SECONDS. Use flush_state_sync() to force immediate
+    write (e.g. before program exit).
+    """
+    global _save_dirty, _save_timer, _latest_theme, _latest_state_ref
     if tool_context is not None:
         tool_context.state["drama"] = state
-        # Auto-save to disk when state changes
-        theme = state.get("theme")
+        theme = state.get("theme", "")
         if theme:
-            _save_state_to_file(theme, state)
+            _latest_theme = theme
+            _latest_state_ref = state
+            _save_dirty = True
+            # Cancel existing timer if any
+            if _save_timer is not None:
+                _save_timer.cancel()
+            # Create new debounced timer
+            _save_timer = threading.Timer(DEBOUNCE_SECONDS, _flush_state)
+            _save_timer.daemon = True
+            _save_timer.start()
 
 
 # ============================================================================
@@ -1259,3 +1289,81 @@ def storm_get_outline(tool_context=None) -> dict:
     outline = storm_data.get("outline", {})
 
     return {"status": "success", "outline": outline}
+
+
+# Register atexit to flush any pending state on program exit
+atexit.register(flush_state_sync)
+
+
+# ============================================================================
+# Scene Archival (D-10)
+# ============================================================================
+
+
+SCENE_ARCHIVE_THRESHOLD = 20
+
+
+def archive_old_scenes(state: dict) -> dict:
+    """Archive scenes beyond threshold to reduce state.json size (D-10).
+
+    When the number of scenes exceeds SCENE_ARCHIVE_THRESHOLD, the oldest
+    scenes are written to individual JSON files and replaced in state with
+    lightweight index metadata (scene_number, title, time_label, archived=True).
+
+    The most recent SCENE_ARCHIVE_THRESHOLD scenes always remain in full.
+
+    Args:
+        state: The drama state dict (mutated in-place).
+
+    Returns:
+        The same state dict with archived scenes replaced by index metadata.
+    """
+    scenes = state.get("scenes", [])
+    if len(scenes) <= SCENE_ARCHIVE_THRESHOLD:
+        return state
+
+    to_archive = scenes[:-SCENE_ARCHIVE_THRESHOLD]
+    keep = scenes[-SCENE_ARCHIVE_THRESHOLD:]
+
+    theme = state.get("theme", "")
+    if theme:
+        drama_folder = _get_drama_folder(theme)
+        scenes_dir = os.path.join(drama_folder, "scenes")
+        os.makedirs(scenes_dir, exist_ok=True)
+        for scene in to_archive:
+            scene_num = scene.get("scene_number", 0)
+            archive_path = os.path.join(scenes_dir, f"scene_{scene_num:04d}.json")
+            with open(archive_path, "w", encoding="utf-8") as f:
+                json.dump(scene, f, ensure_ascii=False, indent=2)
+
+    # Replace archived scenes with index metadata only
+    archived_indices = [
+        {
+            "scene_number": s.get("scene_number"),
+            "title": s.get("title", ""),
+            "time_label": s.get("time_label", ""),
+            "archived": True,
+        }
+        for s in to_archive
+    ]
+    state["scenes"] = archived_indices + keep
+    return state
+
+
+def load_archived_scene(theme: str, scene_num: int) -> dict | None:
+    """Load a single archived scene from disk.
+
+    Args:
+        theme: The drama theme (used to locate the drama folder).
+        scene_num: The scene number to load.
+
+    Returns:
+        The full scene dict if found, None otherwise.
+    """
+    archive_path = os.path.join(
+        _get_drama_folder(theme), "scenes", f"scene_{scene_num:04d}.json"
+    )
+    if os.path.exists(archive_path):
+        with open(archive_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return None
