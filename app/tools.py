@@ -11,6 +11,7 @@ drama creation: Discovery → Research → Outline → Directing.
 import os
 from datetime import datetime
 
+import httpx
 from google.adk.agents.remote_a2a_agent import RemoteA2aAgent
 from google.adk.tools import ToolContext
 
@@ -98,6 +99,32 @@ from .state_manager import (
 )
 
 
+# ============================================================================
+# Shared AsyncClient (D-11/D-12) — singleton for connection pooling
+# ============================================================================
+
+_shared_httpx_client: httpx.AsyncClient | None = None
+
+
+def get_shared_client() -> httpx.AsyncClient:
+    """Get or lazily create the shared httpx.AsyncClient (D-11/D-12)."""
+    global _shared_httpx_client
+    if _shared_httpx_client is None or _shared_httpx_client.is_closed:
+        _shared_httpx_client = httpx.AsyncClient(
+            timeout=httpx.Timeout(timeout=120.0),
+            limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
+        )
+    return _shared_httpx_client
+
+
+async def close_shared_client():
+    """Close the shared httpx.AsyncClient (D-12)."""
+    global _shared_httpx_client
+    if _shared_httpx_client is not None and not _shared_httpx_client.is_closed:
+        await _shared_httpx_client.aclose()
+        _shared_httpx_client = None
+
+
 def start_drama(theme: str, tool_context: ToolContext) -> dict:
     """Start a new drama with the given theme. Use this when user provides /start command.
 
@@ -112,7 +139,10 @@ def start_drama(theme: str, tool_context: ToolContext) -> dict:
     result = init_drama_state(theme, tool_context)
     if result["status"] == "success":
         set_drama_status("setup", tool_context)
-        
+
+        # Initialize shared AsyncClient (lazy init — ensures first call creates it)
+        get_shared_client()
+
         # Get the drama folder path
         folder_info = get_drama_folder(tool_context)
         folder_path = folder_info.get("folder", "dramas/<主题>")
@@ -287,14 +317,14 @@ async def actor_speak(
         err_type = type(e).__name__
         msg = str(e).lower()
         if "connect" in err_type or "refused" in msg or "connection" in msg:
-            actor_dialogue = f"[{actor_name}连接失败(端口:{port})。请用create_actor重启服务。]"
+            actor_dialogue = f"[ERROR:connection] {actor_name}连接失败(端口:{port})"
         elif "timeout" in err_type or "timeout" in msg or "timed out" in msg:
-            actor_dialogue = f"[{actor_name}响应超时。LLM推理可能较慢，稍后重试。]"
+            actor_dialogue = f"[ERROR:timeout] {actor_name}响应超时"
         else:
-            actor_dialogue = f"[{actor_name}调用失败({err_type}): {e}]"
+            actor_dialogue = f"[ERROR:{err_type}] {actor_name}调用失败: {e}"
 
     # Record actor's own dialogue in working memory (Pitfall 5: actor must remember what they said)
-    if not (actor_dialogue.startswith("[") and ("失败" in actor_dialogue or "超时" in actor_dialogue)):
+    if not actor_dialogue.startswith("[ERROR:"):
         add_working_memory(
             actor_name=actor_name,
             entry=f"我说：{actor_dialogue[:200]}",  # Truncate to avoid excessive length
@@ -304,15 +334,15 @@ async def actor_speak(
         )
 
     # Auto-log the dialogue to conversation record
-    if not (actor_dialogue.startswith("[") and ("失败" in actor_dialogue or "超时" in actor_dialogue)):
+    if not actor_dialogue.startswith("[ERROR:"):
         add_dialogue(actor_name=actor_name, dialogue=actor_dialogue, tool_context=tool_context)
 
     # Build a formatted version that the director can directly use
     formatted_lines = []
     formatted_lines.append(f"🎭 {actor_name}（{role_label} · {emotion_cn}）：")
 
-    # Check if dialogue starts with [error] - format differently
-    if actor_dialogue.startswith("[") and ("失败" in actor_dialogue or "超时" in actor_dialogue):
+    # Check if dialogue is an error — format differently
+    if actor_dialogue.startswith("[ERROR:"):
         formatted_lines.append(f"  ⚠️ {actor_dialogue}")
     else:
         # Split by newlines and indent each line as dialogue
@@ -353,7 +383,6 @@ async def _call_a2a_sdk(card_file: str, prompt: str, actor_name: str, port: str)
     import json
     import uuid
 
-    import httpx
     from a2a.client import ClientConfig, ClientFactory
     from a2a.types import AgentCard, Message, Part, Role, Task
 
@@ -394,7 +423,7 @@ async def _call_a2a_sdk(card_file: str, prompt: str, actor_name: str, port: str)
         card_data = json.load(f)
     agent_card = AgentCard(**card_data)
 
-    httpx_client = httpx.AsyncClient(timeout=httpx.Timeout(timeout=120))
+    httpx_client = get_shared_client()
     client_config = ClientConfig(httpx_client=httpx_client, streaming=False, polling=False)
     factory = ClientFactory(config=client_config)
     client = factory.create(card=agent_card)
@@ -432,12 +461,10 @@ async def _call_a2a_sdk(card_file: str, prompt: str, actor_name: str, port: str)
                                 if t and not is_thought:
                                     texts.append(t)
     
-    await httpx_client.aclose()
-
     if texts:
         return "\n".join(texts).strip()
     else:
-        return f"[{actor_name}已响应但无文本内容]"
+        return f"[ERROR:empty] {actor_name}已响应但无文本内容"
 
 
 
@@ -615,6 +642,11 @@ def next_scene(tool_context: ToolContext) -> dict:
     actor_names = list(actors_data.keys())
     actor_list = "、".join(actor_names) if actor_names else "（尚无演员）"
 
+    # Phase 12: Archive old scenes to reduce state size (D-10)
+    from .state_manager import archive_old_scenes
+    state = archive_old_scenes(state)
+    _set_state(state, tool_context)
+
     return {
         "status": "success",
         "current_scene": scene_num,
@@ -772,6 +804,18 @@ def end_drama(tool_context: ToolContext) -> dict:
     state["remaining_auto_scenes"] = 0
 
     _set_state(state, tool_context)
+
+    # Close shared AsyncClient (D-12)
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # Schedule for later — we're inside an async context
+            loop.create_task(close_shared_client())
+        else:
+            loop.run_until_complete(close_shared_client())
+    except RuntimeError:
+        asyncio.run(close_shared_client())
 
     return {
         "status": "success",
