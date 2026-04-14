@@ -2,23 +2,23 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 11
-status: Phase 11 Plan 02 complete — timeline integration layer done
-last_updated: "2026-04-13T12:55:00.000Z"
+current_phase: 12
+status: executing
+last_updated: "2026-04-14T02:35:00.000Z"
 progress:
   total_phases: 12
   completed_phases: 9
-  total_plans: 25
+  total_plans: 29
   completed_plans: 23
-  percent: 92
+  percent: 79
 ---
 
 # State
 
 **Project:** Director-Actor-Drama 无限畅写版
 **Milestone:** v1
-**Current Phase:** 11
-**Status:** Phase 11 Plan 02 complete — timeline integration layer done
+**Current Phase:** 12
+**Status:** Phase 12 executing — 12-01 complete
 
 ## Progress
 
@@ -36,8 +36,8 @@ progress:
 - [x] Phase 8: Dynamic STORM
 - [x] Phase 9: Progressive STORM
 - [x] Phase 10: Coherence System
-- [ ] Phase 11: Timeline Tracking (context gathered)
-- [ ] Phase 12: Integration & Polish
+- [x] Phase 11: Timeline Tracking
+- [ ] Phase 12: Integration & Polish (12-01 complete)
 
 ## Decisions
 
@@ -47,9 +47,13 @@ progress:
 - 11-16: Timeline validation integrated into validate_consistency()
 - 11-02: time_context added post-creation in Tool layer (logic function unchanged, same as repair_contradiction pattern)
 - 11-02: advance_time uses *, for keyword-only tool_context (consistent with add_fact)
+- 12-01: 5-second debounce via threading.Timer for _set_state()
+- 12-01: conversation_log migrated from global _conversation_log to state["conversation_log"]
+- 12-01: Scene archival at 20-scene threshold with on-demand load_archived_scene()
+- 12-01: _current_drama_folder migration deferred with TODO comment (D-07)
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-04-11)
 **Core value:** 无限畅写，逻辑不断
-**Current focus:** Phase 11 — timeline-tracking
+**Current focus:** Phase 12 — integration-polish

@@ -8,9 +8,13 @@ Actors run as independent A2A services, ensuring true multi-agent isolation.
 import asyncio
 import atexit
 import os
+import re
 import sys
 
 from dotenv import load_dotenv
+from rich.console import Console
+from rich.live import Live
+from rich.spinner import Spinner
 
 load_dotenv(os.path.join(os.path.dirname(__file__), "app", ".env"))
 
@@ -111,6 +115,21 @@ async def run_interactive():
             print(f"\n🎭 导演: {response}")
 
 
+def _extract_actors_from_response(resp: dict) -> str:
+    """Extract actor names from write_scene response for scene summary (D-15)."""
+    # Try explicit actors_in_scene field first
+    actors = resp.get("actors_in_scene", [])
+    if actors:
+        return "、".join(actors)
+    # Fallback: extract "🎭 角色名" pattern from dialogue/scene content
+    dialogue = resp.get("dialogue_content", "") or resp.get("formatted_scene", "")
+    pattern = r"🎭\s*(\S+?)（"
+    matches = re.findall(pattern, dialogue)
+    if matches:
+        return "、".join(matches)
+    return ""
+
+
 async def _send_message(runner: Runner, message: str) -> str:
     """Send a message to the agent and collect the response."""
     content = types.Content(
@@ -129,13 +148,36 @@ async def _send_message(runner: Runner, message: str) -> str:
         "message",
     ]
 
+    # Spinner for LLM wait indicator (D-13/D-14)
+    console = Console()
+    spinner = Spinner("dots", text=" 🤔 思考中...")
+    live = Live(spinner, console=console, transient=True)
+    spinner_active = False
+
     try:
         async for event in runner.run_async(
             user_id=USER_ID,
             session_id=SESSION_ID,
             new_message=content,
         ):
+            # Start spinner on first non-final event (LLM is processing)
+            if not spinner_active and not event.is_final_response():
+                try:
+                    live.start()
+                    spinner_active = True
+                except Exception:
+                    # Fallback: simple text indicator if Live fails
+                    print("⏳ 思考中...")
+                    spinner_active = True
+
             if event.is_final_response():
+                # Stop spinner before printing final response
+                if spinner_active:
+                    try:
+                        live.stop()
+                    except Exception:
+                        print("\r✅ 完成！\n")
+                    spinner_active = False
                 if event.content and event.content.parts:
                     for part in event.content.parts:
                         if part.text:
@@ -173,8 +215,42 @@ async def _send_message(runner: Runner, message: str) -> str:
                                     if text:
                                         print(f"\n{text}")
                                     break  # Only show the first matching key
+
+                            # D-15: Scene summary display
+                            if "scene_number" in resp and "scene_title" in resp:
+                                scene_num = resp.get("scene_number", "?")
+                                scene_title = resp.get("scene_title", "")
+                                actors_in_scene = _extract_actors_from_response(resp)
+                                if actors_in_scene:
+                                    print(f"\n── 第{scene_num}场：{scene_title} ── 参演：{actors_in_scene}")
+                                else:
+                                    print(f"\n── 第{scene_num}场：{scene_title} ──")
     except Exception as e:
-        return f"[错误] {e}"
+        # Ensure spinner is stopped on error (T-12-07)
+        if spinner_active:
+            try:
+                live.stop()
+            except Exception:
+                pass
+            spinner_active = False
+
+        # D-13: Unified Chinese error messages with fix suggestions
+        err_msg = str(e)
+        if "rate limit" in err_msg.lower() or "429" in err_msg:
+            return "[错误] API 调用频率超限，请稍等几秒后重试。"
+        elif "timeout" in err_msg.lower():
+            return "[错误] 请求超时，LLM 响应较慢。可重试当前操作。"
+        elif "api_key" in err_msg.lower() or "unauthorized" in err_msg.lower():
+            return "[错误] API 密钥无效，请检查 .env 中的配置。"
+        else:
+            return f"[错误] {err_msg}\n💡 如持续出现，可尝试 /save 保存后 /load 重新加载。"
+    finally:
+        # Ensure spinner is always stopped (T-12-07 mitigation)
+        if spinner_active:
+            try:
+                live.stop()
+            except Exception:
+                pass
 
     return "\n".join(response_parts)
 
