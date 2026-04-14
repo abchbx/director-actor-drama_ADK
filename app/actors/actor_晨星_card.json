@@ -1,0 +1,26 @@
+{
+  "name": "actor_晨星",
+  "description": "演员 晨星，角色：主角/追问者",
+  "url": "http://localhost:9033/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_晨星",
+      "name": "扮演晨星",
+      "description": "以晨星的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

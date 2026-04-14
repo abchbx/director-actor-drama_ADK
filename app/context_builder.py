@@ -56,6 +56,7 @@ _ACTOR_SECTION_PRIORITIES = {
     "anchor": 6,
     "current_time": 6,  # Phase 11 (D-22) — time info constrains behavior
     "actor_dna": 7,  # Phase 10 (D-26) — character consistency constraint
+    "memory_blocks": 7,  # Memory Blocks (Letta-inspired) — identity blocks, never truncated
     "semantic_recall": 0,
 }
 
@@ -298,6 +299,27 @@ def _assemble_actor_sections(
             "truncatable": False,
         })
 
+    # Memory Blocks (inspired by Letta) — structured identity/relationship blocks
+    # Priority 7 (same as actor_dna): identity is never truncated
+    from .memory_manager import init_memory_blocks, MEMORY_BLOCK_LABELS
+    actor_data = init_memory_blocks(actor_name, actor_data)
+    memory_blocks = actor_data.get("memory_blocks", {})
+    if memory_blocks:
+        block_lines = ["【自我认知（记忆块）】"]
+        for label, block in memory_blocks.items():
+            value = block.get("value", "") if isinstance(block, dict) else str(block)
+            label_desc = MEMORY_BLOCK_LABELS.get(label, label)
+            if value:
+                block_lines.append(f"[{label}]（{label_desc}）")
+                block_lines.append(f"  {value}")
+        if len(block_lines) > 1:
+            sections.append({
+                "key": "memory_blocks",
+                "text": "\n".join(block_lines),
+                "priority": 7,
+                "truncatable": False,
+            })
+
     # Current emotion (priority 5, never truncated)
     emotion = actor_data.get("emotions", "neutral")
     emotion_cn = _EMOTION_CN.get(emotion, emotion)
@@ -403,7 +425,14 @@ def _assemble_actor_sections(
     working = actor_data.get("working_memory", [])
     if working:
         recent = working[-5:]
-        items = [f"  第{e.get('scene', '?')}场: {e['entry']}" for e in recent]
+        items = []
+        for e in recent:
+            scene_str = f"第{e.get('scene', '?')}场"
+            # Show decay weight if available (Letta-inspired decay)
+            decay_w = e.get("decay_weight")
+            if decay_w is not None and decay_w < 0.5:
+                scene_str += f" [记忆模糊:{decay_w:.0%}]"
+            items.append(f"  {scene_str}: {e['entry']}")
         sections.append({
             "key": "working_memory",
             "text": "【最近的经历（详细）】\n" + "\n".join(items),

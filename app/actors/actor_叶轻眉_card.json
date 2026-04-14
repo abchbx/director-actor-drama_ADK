@@ -1,0 +1,26 @@
+{
+  "name": "actor_叶轻眉",
+  "description": "演员 叶轻眉，角色：悲剧性角色/小师弟的暗恋对象",
+  "url": "http://localhost:9053/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_叶轻眉",
+      "name": "扮演叶轻眉",
+      "description": "以叶轻眉的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

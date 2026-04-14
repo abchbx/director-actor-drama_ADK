@@ -1,0 +1,24 @@
+{
+  "actors": {
+    "测试": {
+      "arc_summary": {
+        "structured": {
+          "theme": "权力",
+          "key_characters": [
+            "朱棣"
+          ],
+          "unresolved": [],
+          "resolved": []
+        },
+        "narrative": "新的弧线摘要"
+      },
+      "_pending_compression": {
+        "working_to_scene": null,
+        "scene_to_arc": null,
+        "pending_entries": [],
+        "result": null
+      }
+    }
+  },
+  "theme": "测试"
+}

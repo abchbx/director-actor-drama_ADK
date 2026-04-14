@@ -6,16 +6,144 @@ Each drama gets its own isolated folder for complete data separation.
 
 import atexit
 import json
+import logging
 import os
 import threading
 from datetime import datetime
 from typing import Any, Optional
+
+logger = logging.getLogger(__name__)
 
 # Base directory for all dramas
 DRAMAS_DIR = os.path.join(os.path.dirname(__file__), "dramas")
 # Current active drama folder (runtime state, not persisted)
 # TODO: Phase 12+ — migrate _current_drama_folder to ToolContext.state
 _current_drama_folder: Optional[str] = None
+
+# ============================================================================
+# SceneContext — 场景共享认知状态（指代消解核心）
+# ============================================================================
+
+
+class SceneContext:
+    """Maintains the shared cognitive state of the current scene.
+
+    Tracks entities, pronoun mappings, and last-mentioned entities so that
+    the director (the only trusted context manager) can resolve ambiguous
+    pronouns before delivering dialogue to isolated actors.
+
+    Persisted as ``state["scene_context"]`` and saved to ``state.json``.
+    """
+
+    def __init__(self, data: dict | None = None):
+        d = data or {}
+        # Named entities in the current scene: {name: {type, description, ...}}
+        self.entities: dict[str, dict] = d.get("entities", {})
+        # Pronoun → entity name mapping: {"他": "李明", "她": "苏念瑶", "这里": "咖啡馆"}
+        self.pronoun_map: dict[str, str] = d.get("pronoun_map", {})
+        # Per-speaker pronoun usage: {speaker_name: {"他": "实体名", ...}}
+        self.speaker_refs: dict[str, dict[str, str]] = d.get("speaker_refs", {})
+        # Last-mentioned entity per pronoun type (for fallback resolution)
+        self.last_mentioned: dict[str, str] = d.get("last_mentioned", {})
+
+    def to_dict(self) -> dict:
+        return {
+            "entities": self.entities,
+            "pronoun_map": self.pronoun_map,
+            "speaker_refs": self.speaker_refs,
+            "last_mentioned": self.last_mentioned,
+        }
+
+    # --- Mutation helpers ---
+
+    def register_entity(self, name: str, entity_type: str = "character",
+                        description: str = "", **extra) -> None:
+        """Register or update an entity in the scene."""
+        entry = {"type": entity_type, "description": description, **extra}
+        self.entities[name] = entry
+        # Auto-map gendered pronouns for characters
+        if entity_type == "character":
+            gender = extra.get("gender", "")
+            if gender == "male" and "他" not in self.pronoun_map:
+                self.pronoun_map["他"] = name
+            elif gender == "female" and "她" not in self.pronoun_map:
+                self.pronoun_map["她"] = name
+
+    def set_speaker_ref(self, speaker: str, pronoun: str, entity_name: str,
+                        description: str = "") -> None:
+        """Set what *pronoun* refers to when *speaker* uses it.
+
+        Example: set_speaker_ref("苏念瑶", "他", "退婚未婚夫", description="她的退婚未婚夫")
+        """
+        if speaker not in self.speaker_refs:
+            self.speaker_refs[speaker] = {}
+        self.speaker_refs[speaker][pronoun] = entity_name
+        # Also update last_mentioned
+        self.last_mentioned[pronoun] = entity_name
+
+    def resolve_pronoun(self, pronoun: str, speaker: str = "") -> tuple[str, str]:
+        """Resolve a pronoun to (entity_name, description).
+
+        Resolution order:
+        1. speaker-specific mapping (speaker_refs[speaker][pronoun])
+        2. global pronoun_map (pronoun_map[pronoun])
+        3. last_mentioned fallback
+        4. empty string if unresolvable
+
+        Returns:
+            (entity_name, description) — description may be empty.
+        """
+        # 1. Speaker-specific
+        if speaker and speaker in self.speaker_refs:
+            entity = self.speaker_refs[speaker].get(pronoun, "")
+            if entity:
+                desc = self.entities.get(entity, {}).get("description", "")
+                return entity, desc
+        # 2. Global
+        entity = self.pronoun_map.get(pronoun, "")
+        if entity:
+            desc = self.entities.get(entity, {}).get("description", "")
+            return entity, desc
+        # 3. Last mentioned
+        entity = self.last_mentioned.get(pronoun, "")
+        if entity:
+            desc = self.entities.get(entity, {}).get("description", "")
+            return entity, desc
+        # 4. Unresolvable
+        return "", ""
+
+    def touch_entity(self, entity_name: str, pronoun: str = "") -> None:
+        """Mark an entity as recently mentioned, updating last_mentioned."""
+        if pronoun:
+            self.last_mentioned[pronoun] = entity_name
+        # Also try to infer pronoun from entity gender
+        if entity_name in self.entities:
+            gender = self.entities[entity_name].get("gender", "")
+            if gender == "male":
+                self.last_mentioned["他"] = entity_name
+            elif gender == "female":
+                self.last_mentioned["她"] = entity_name
+
+    def clear_scene(self) -> None:
+        """Reset transient per-scene state while keeping registered entities."""
+        self.pronoun_map.clear()
+        self.speaker_refs.clear()
+        self.last_mentioned.clear()
+
+
+def get_scene_context(tool_context=None) -> SceneContext:
+    """Get the current SceneContext from state, creating one if absent."""
+    state = _get_state(tool_context)
+    ctx_data = state.get("scene_context", {})
+    return SceneContext(ctx_data)
+
+
+def save_scene_context(scene_ctx: SceneContext, tool_context=None) -> None:
+    """Persist SceneContext into state (debounced save)."""
+    state = _get_state(tool_context)
+    state["scene_context"] = scene_ctx.to_dict()
+    _set_state(state, tool_context)
+
 
 # Debounce state saving (D-09)
 _save_dirty: bool = False
@@ -409,6 +537,8 @@ def init_drama_state(theme: str, tool_context=None) -> dict:
     state["updated_at"] = datetime.now().isoformat()
     # Phase 12: conversation_log initialization (D-06)
     state["conversation_log"] = []
+    # SceneContext: shared cognitive state for coreference resolution
+    state["scene_context"] = {}
 
     _set_state(state, tool_context)
     _save_state_to_file(theme, state)
@@ -627,6 +757,8 @@ def load_progress(save_name: str, tool_context=None) -> dict:
             "last_jump_check": None,
         },
     )
+    # SceneContext backward compatibility
+    state.setdefault("scene_context", {})
 
     _set_state(state, tool_context)
 

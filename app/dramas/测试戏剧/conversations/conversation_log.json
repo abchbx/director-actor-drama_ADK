@@ -1,0 +1,23 @@
+[
+  {
+    "speaker": "朱棣",
+    "content": "你好",
+    "type": "dialogue",
+    "scene": 1,
+    "timestamp": "2026-01-01T10:00:00"
+  },
+  {
+    "speaker": "苏念",
+    "content": "您好",
+    "type": "dialogue",
+    "scene": 2,
+    "timestamp": "2026-01-01T11:00:00"
+  },
+  {
+    "speaker": "朱棣",
+    "content": "出发",
+    "type": "dialogue",
+    "scene": 3,
+    "timestamp": "2026-01-01T12:00:00"
+  }
+]

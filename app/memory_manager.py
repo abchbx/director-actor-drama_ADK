@@ -12,6 +12,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 from typing import Optional
 
 from google.adk.tools import ToolContext
@@ -24,47 +25,125 @@ logger = logging.getLogger(__name__)
 # Coreference Resolution - 代词展开（避免跨角色对话中的指代歧义）
 # ============================================================================
 
-# 角色特有的已知指代关系：角色名 → {代词: 展开文本}
-_KNOWN_COREFERENCES = {
+# Chinese pronouns that commonly cause ambiguity in multi-actor dialogue
+_AMBIGUOUS_PRONOUNS = {"他", "她", "它", "他们", "她们", "它们", "这", "那", "这里", "那里", "这时", "那时"}
+
+# Fallback: static per-character coreferences for backward compat
+# (used only when SceneContext is empty / unavailable)
+_FALLBACK_COREFERENCES = {
     "苏念瑶": {
         "他": "她的退婚未婚夫",
     },
-    # 可扩展：每个角色特有的代词指代关系
-    # "角色名": {"他/她": "具体指代对象"},
 }
 
+# Regex pattern to match Chinese pronouns in text
+_PRONOUN_PATTERN = re.compile(r"(他|她|它|他们|她们|它们|这|那|这里|那里)")
 
-def resolve_coreferences(text: str, speaker_name: str, listener_name: str = "") -> str:
-    """Expand ambiguous pronouns in dialogue text based on speaker context.
 
-    When a speaker uses pronouns like "他/她/它" that refer to entities NOT
-    in the current conversation, expand them to explicit references to prevent
-    the listener from misinterpreting (e.g., thinking "他" refers to themselves).
+def resolve_coreferences(text: str, speaker_name: str = "",
+                         listener_name: str = "", tool_context=None) -> str:
+    """Expand ambiguous pronouns in dialogue text using SceneContext.
+
+    Resolution strategy (in priority order):
+    1. SceneContext from state — dynamic, per-speaker pronoun mappings
+    2. Fallback static _FALLBACK_COREFERENCES — backward compat
+    3. If neither available, return text unchanged
 
     Args:
         text: The dialogue text to process.
         speaker_name: Name of the character who spoke (provides context).
         listener_name: Name of the character receiving the message (optional).
+        tool_context: Tool context for accessing SceneContext state.
 
     Returns:
         Text with ambiguous pronouns expanded to explicit references.
     """
-    if not text or not speaker_name:
+    if not text:
         return text
 
-    speaker_refs = _KNOWN_COREFERENCES.get(speaker_name, {})
-    if not speaker_refs:
-        return text
+    # Try SceneContext-based resolution first
+    if tool_context is not None:
+        from .state_manager import get_scene_context
+        scene_ctx = get_scene_context(tool_context)
 
+        # Only resolve if we have some mappings available
+        if scene_ctx.pronoun_map or scene_ctx.speaker_refs:
+            return _resolve_with_scene_context(text, speaker_name, scene_ctx)
+
+    # Fallback to static mappings
+    if speaker_name:
+        speaker_refs = _FALLBACK_COREFERENCES.get(speaker_name, {})
+        if speaker_refs:
+            result = text
+            for pronoun, expansion in speaker_refs.items():
+                result = result.replace(pronoun, f"{pronoun}（{expansion}）", 1)
+            return result
+
+    return text
+
+
+def _resolve_with_scene_context(text: str, speaker_name: str,
+                                scene_ctx) -> str:
+    """Resolve pronouns using SceneContext data.
+
+    For each ambiguous pronoun found in text:
+    - Look up speaker-specific mapping first
+    - Fall back to global pronoun_map
+    - If resolved, append the entity description in parentheses
+    """
     result = text
-    for pronoun, expansion in speaker_refs.items():
-        # Only expand if the pronoun appears and the listener might confuse it
-        # We use a lightweight heuristic: if the pronoun appears near keywords
-        # from the speaker's known context, expand it
-        result = result.replace(pronoun, f"{pronoun}（{expansion}）", 1)
-        # Only replace the first occurrence to avoid over-expansion
+
+    # Find all pronouns in text and resolve them
+    matches = list(_PRONOUN_PATTERN.finditer(text))
+    if not matches:
+        return result
+
+    # Process matches in reverse order to preserve positions
+    for match in reversed(matches):
+        pronoun = match.group(1)
+        entity_name, description = scene_ctx.resolve_pronoun(pronoun, speaker=speaker_name)
+
+        if entity_name and description:
+            # Expand: "他" → "他（李明，她的恋人）"
+            expansion = f"{pronoun}（{entity_name}，{description}）"
+            result = result[:match.start()] + expansion + result[match.end():]
+        elif entity_name:
+            # Expand: "他" → "他（李明）"
+            expansion = f"{pronoun}（{entity_name}）"
+            result = result[:match.start()] + expansion + result[match.end():]
+        # If unresolvable, leave as-is (backward compat: preserve original text)
 
     return result
+
+
+def extract_and_register_entities(text: str, speaker_name: str = "",
+                                  tool_context=None) -> list[str]:
+    """Extract entities mentioned in text and update SceneContext.
+
+    This is a lightweight heuristic extractor that detects:
+    - Character names already registered in SceneContext
+    - Touches (marks as recently mentioned) any entity found
+
+    Returns list of entity names found.
+    """
+    if tool_context is None:
+        return []
+
+    from .state_manager import get_scene_context, save_scene_context
+
+    scene_ctx = get_scene_context(tool_context)
+    found = []
+
+    for entity_name in scene_ctx.entities:
+        if entity_name in text:
+            scene_ctx.touch_entity(entity_name)
+            found.append(entity_name)
+
+    if found:
+        save_scene_context(scene_ctx, tool_context)
+
+    return found
+
 
 # ============================================================================
 # Constants (from D-01, D-02, D-06)
@@ -100,6 +179,157 @@ _EMOTION_WORDS = {
 
 # Maximum entry text length (T-01-01: prevent injection via overly long text)
 ENTRY_TEXT_MAX_LENGTH = 500
+
+
+# ============================================================================
+# Memory Blocks (inspired by Letta's memory_blocks — structured identity/relationship)
+# ============================================================================
+
+# Default block labels and their descriptions
+MEMORY_BLOCK_LABELS = {
+    "persona": "角色核心自我认知——你是谁，你的核心信念和价值观",
+    "relationship": "与他人的关系认知——你如何看待与他人的关系",
+    "worldview": "世界观认知——你对这个世界的理解",
+    "goal": "当前目标——你现在最想做的事",
+}
+
+MEMORY_BLOCK_MAX_LENGTH = 500  # Max chars per block value
+
+
+def init_memory_blocks(actor_name: str, actor_data: dict) -> dict:
+    """Initialize memory blocks for an actor if not present.
+
+    借鉴 Letta 的 memory_blocks 概念，为演员创建结构化身份记忆块。
+    默认从 actor_data 中的已有信息（personality, background, knowledge_scope）
+    自动生成初始 persona_block 和 relationship_block。
+
+    Args:
+        actor_name: The actor's name.
+        actor_data: The actor data dict (mutated in place).
+
+    Returns:
+        The updated actor_data with memory_blocks initialized.
+    """
+    actor_data.setdefault("memory_blocks", {})
+
+    # Auto-generate persona block from existing personality + background
+    if "persona" not in actor_data["memory_blocks"]:
+        personality = actor_data.get("personality", "")
+        background = actor_data.get("background", "")
+        persona_parts = []
+        if personality:
+            persona_parts.append(f"性格：{personality}")
+        if background:
+            persona_parts.append(f"背景：{background}")
+        persona_value = "\n".join(persona_parts) if persona_parts else f"我是{actor_name}。"
+        actor_data["memory_blocks"]["persona"] = {
+            "label": "persona",
+            "value": persona_value[:MEMORY_BLOCK_MAX_LENGTH],
+            "updated_scene": 0,
+            "source": "auto_init",
+        }
+
+    # Auto-generate relationship block from knowledge_scope (which often includes who they know)
+    if "relationship" not in actor_data["memory_blocks"]:
+        knowledge = actor_data.get("knowledge_scope", "")
+        rel_value = f"我了解的范围：{knowledge}" if knowledge else "暂无明确的关系认知。"
+        actor_data["memory_blocks"]["relationship"] = {
+            "label": "relationship",
+            "value": rel_value[:MEMORY_BLOCK_MAX_LENGTH],
+            "updated_scene": 0,
+            "source": "auto_init",
+        }
+
+    return actor_data
+
+
+def update_memory_block(
+    actor_name: str,
+    block_label: str,
+    block_value: str,
+    tool_context: ToolContext,
+) -> dict:
+    """Update or create a memory block for an actor.
+
+    更新或创建演员的结构化记忆块。借鉴 Letta 的 memory_blocks 概念，
+    每个块有标签和值，代表角色的一个认知维度。
+
+    Args:
+        actor_name: The actor's name.
+        block_label: Block label (e.g., "persona", "relationship", "worldview", "goal").
+        block_value: The new value for the block.
+        tool_context: Tool context for state access.
+
+    Returns:
+        dict with status.
+    """
+    state = _get_state(tool_context)
+    actors = state.get("actors", {})
+
+    if actor_name not in actors:
+        return {"status": "error", "message": f"演员「{actor_name}」不存在。"}
+
+    if not block_label or not block_label.strip():
+        return {"status": "error", "message": "block_label 不能为空。"}
+
+    # Truncate value
+    block_value = block_value[:MEMORY_BLOCK_MAX_LENGTH]
+    current_scene = state.get("current_scene", 0)
+
+    actor_data = actors[actor_name]
+    actor_data.setdefault("memory_blocks", {})
+
+    old_value = actor_data["memory_blocks"].get(block_label, {}).get("value", "")
+
+    actor_data["memory_blocks"][block_label] = {
+        "label": block_label,
+        "value": block_value,
+        "updated_scene": current_scene,
+        "source": "actor_self_edit",
+    }
+
+    actors[actor_name] = actor_data
+    state["actors"] = actors
+    _set_state(state, tool_context)
+
+    label_desc = MEMORY_BLOCK_LABELS.get(block_label, block_label)
+    return {
+        "status": "success",
+        "message": f"✅ 「{actor_name}」的记忆块「{block_label}」已更新（{label_desc}）",
+        "block_label": block_label,
+        "old_value_preview": old_value[:80] + "..." if len(old_value) > 80 else old_value,
+        "new_value_preview": block_value[:80] + "..." if len(block_value) > 80 else block_value,
+    }
+
+
+def get_memory_blocks(actor_name: str, tool_context: ToolContext) -> dict:
+    """Get all memory blocks for an actor.
+
+    获取演员的所有结构化记忆块。
+
+    Args:
+        actor_name: The actor's name.
+        tool_context: Tool context for state access.
+
+    Returns:
+        dict with blocks data.
+    """
+    state = _get_state(tool_context)
+    actors = state.get("actors", {})
+
+    if actor_name not in actors:
+        return {"status": "error", "message": f"演员「{actor_name}」不存在。", "blocks": {}}
+
+    actor_data = actors[actor_name]
+    # Ensure initialized
+    actor_data = init_memory_blocks(actor_name, actor_data)
+    if "memory_blocks" not in actor_data or not actor_data["memory_blocks"]:
+        _set_state(state, tool_context)
+
+    return {
+        "status": "success",
+        "blocks": actor_data.get("memory_blocks", {}),
+    }
 
 
 # ============================================================================
@@ -540,6 +770,10 @@ def add_working_memory(
         "structured": {"theme": "", "key_characters": [], "unresolved": [], "resolved": []},
         "narrative": "",
     })
+    # Memory Blocks (Phase 12)
+    actor_data.setdefault("memory_blocks", {})
+    if not actor_data["memory_blocks"]:
+        actor_data = init_memory_blocks(actor_name, actor_data)
 
     # Add to working_memory (D-12 structure)
     memory_entry = {
@@ -791,6 +1025,9 @@ def migrate_legacy_memory(actor_name: str, tool_context: ToolContext) -> dict:
         "narrative": "",
     }
     actor_data["critical_memories"] = []
+    # Memory Blocks (Phase 12)
+    actor_data["memory_blocks"] = {}
+    actor_data = init_memory_blocks(actor_name, actor_data)
     # Keep old "memory" field (D-13: read-only preservation)
 
     actors[actor_name] = actor_data
@@ -838,14 +1075,16 @@ def detect_importance(entry_text: str, situation: str = "") -> tuple[bool, Optio
     return (False, None)
 
 
-def ensure_actor_memory_fields(actor_data: dict) -> dict:
+def ensure_actor_memory_fields(actor_data: dict, actor_name: str = "") -> dict:
     """Ensure actor data dict has all new memory fields.
 
     Utility function to add missing fields to actor dicts that were
     created before the memory architecture was implemented.
+    Also initializes memory_blocks if not present.
 
     Args:
         actor_data: The actor data dict to check/update.
+        actor_name: The actor's name (needed for memory_blocks init).
 
     Returns:
         The updated actor data dict (mutated in place and returned).
@@ -857,7 +1096,453 @@ def ensure_actor_memory_fields(actor_data: dict) -> dict:
         "narrative": "",
     })
     actor_data.setdefault("critical_memories", [])
+    # Memory Blocks (Phase 12+)
+    actor_data.setdefault("memory_blocks", {})
+    if actor_name and not actor_data["memory_blocks"]:
+        actor_data = init_memory_blocks(actor_name, actor_data)
     return actor_data
+
+
+# ============================================================================
+# Pre-Reasoning Hook (inspired by ReMe's pre_reasoning_hook pattern)
+# ============================================================================
+
+
+def pre_reasoning_hook(
+    actor_name: str,
+    tool_context: ToolContext,
+    *,
+    enable_compression: bool = True,
+    enable_recall: bool = True,
+) -> dict:
+    """Unified memory preparation hook called before each actor reasoning step.
+
+    借鉴 ReMe 的 pre_reasoning_hook 模式，在每次演员推理前自动执行：
+    1. 合并待处理的压缩结果（_merge_pending_compression）
+    2. 检查记忆容量并触发压缩（check_and_compress）
+    3. 可选：语义召回相关记忆片段（retrieve_relevant_scenes）
+    4. 应用记忆衰减权重（_apply_decay_weights）
+
+    这确保演员在每次回应前，记忆状态是最新的且经过优化的，
+    而非依赖零散的、分散在不同调用点的记忆管理。
+
+    Args:
+        actor_name: The actor whose memory to prepare.
+        tool_context: Tool context for state access.
+        enable_compression: Whether to run check_and_compress (default True).
+        enable_recall: Whether to run semantic recall for auto-tags (default True).
+
+    Returns:
+        dict with hook execution results:
+        - status: "success" or "error"
+        - merged: bool — whether pending compression was merged
+        - compression: result from check_and_compress (if enabled)
+        - recall: list of recalled memory fragments (if enabled)
+        - recall_tags: auto-generated tags used for recall
+        - decay_applied: bool — whether decay was applied
+    """
+    state = _get_state(tool_context)
+    actors = state.get("actors", {})
+
+    if actor_name not in actors:
+        return {"status": "error", "message": f"演员「{actor_name}」不存在。"}
+
+    actor_data = actors[actor_name]
+    result = {"status": "success", "merged": False, "compression": None, "recall": [], "recall_tags": [], "decay_applied": False}
+
+    # Step 1: Merge any completed pending compression results
+    # This ensures the latest compressed data is available before building context
+    merged = _merge_pending_compression(actor_name, actor_data, tool_context)
+    result["merged"] = merged
+
+    # Step 2: Check memory tier sizes and trigger compression if needed
+    # This keeps memory within limits before the actor sees it
+    if enable_compression:
+        compression_result = check_and_compress(actor_name, tool_context)
+        result["compression"] = compression_result
+
+    # Step 2.5: Apply memory decay weights
+    decay_result = _apply_decay_weights(actor_name, tool_context)
+    result["decay_applied"] = decay_result.get("applied", False)
+
+    # Step 3: Semantic recall — find relevant past memories based on auto-tags
+    # Inspired by ReMe's memory_search but adapted to our tag-weighted system
+    if enable_recall:
+        from .semantic_retriever import _extract_auto_tags, retrieve_relevant_scenes
+        from .context_builder import estimate_tokens
+
+        # Refresh state after compression
+        state = _get_state(tool_context)
+        actor_data = state.get("actors", {}).get(actor_name, {})
+
+        auto_tags = _extract_auto_tags(actor_data, tool_context)
+        result["recall_tags"] = auto_tags
+
+        if auto_tags:
+            current_scene = state.get("current_scene", 0)
+            # Actor-side recall: top-3, limited to own memories (D-07)
+            recall_results = retrieve_relevant_scenes(
+                tags=auto_tags,
+                current_scene=current_scene,
+                tool_context=tool_context,
+                actor_name=actor_name,
+                top_k=3,
+            )
+            result["recall"] = [
+                {
+                    "scenes_covered": r.get("scenes_covered", ""),
+                    "text": r.get("text", "")[:150],
+                    "matched_tags": r.get("matched_tags", []),
+                    "score": r.get("score", 0),
+                }
+                for r in recall_results
+            ]
+
+    return result
+
+
+# ============================================================================
+# Agent Self-Edit Functions (inspired by Letta's agent self-edit)
+# ============================================================================
+
+
+def actor_self_add_fact(
+    actor_name: str,
+    fact: str,
+    category: str = "event",
+    tool_context: ToolContext = None,
+) -> dict:
+    """Allow an actor to self-report a fact they consider important.
+
+    借鉴 Letta 的 Agent 自主记忆编辑概念。演员可以主动报告一个
+    他们认为重要的事实。与导演的 add_fact 不同：
+    - 演员报告的事实自动附带 actor_name 作为来源标记
+    - 默认 importance 为 medium（演员不能自行标记为 high）
+    - 事实会同时记录到演员的 working_memory 中
+
+    Args:
+        actor_name: The actor reporting the fact.
+        fact: The fact the actor wants to record.
+        category: Fact category — event, identity, location, relationship, rule.
+        tool_context: Tool context for state access.
+
+    Returns:
+        dict with status.
+    """
+    from .coherence_checker import add_fact_logic
+
+    state = _get_state(tool_context)
+    actors = state.get("actors", {})
+
+    if actor_name not in actors:
+        return {"status": "error", "message": f"演员「{actor_name}」不存在。"}
+
+    if not fact or not fact.strip():
+        return {"status": "error", "message": "事实内容不能为空。"}
+
+    # Truncate
+    fact = fact.strip()[:500]
+    state.setdefault("established_facts", [])
+
+    # Add fact with actor as source (medium importance, actor cannot set high)
+    result = add_fact_logic(fact, category, "medium", state)
+    if result["status"] == "success":
+        # Mark the fact as actor-sourced
+        for f in state["established_facts"]:
+            if f.get("id") == result["fact_id"]:
+                f["source"] = "actor_self_report"
+                f["actor"] = actor_name
+                break
+        _set_state(state, tool_context)
+
+        # Also add to actor's working memory
+        add_working_memory(
+            actor_name=actor_name,
+            entry=f"我记住了一个事实：{fact[:200]}",
+            importance="normal",
+            critical_reason=None,
+            tool_context=tool_context,
+        )
+
+        return {
+            "status": "success",
+            "fact_id": result["fact_id"],
+            "message": f"✅ 「{actor_name}」自主记录了事实：{fact[:100]}",
+        }
+    return result
+
+
+def actor_self_mark_memory(
+    actor_name: str,
+    memory_text: str,
+    reason: str,
+    tool_context: ToolContext = None,
+) -> dict:
+    """Allow an actor to mark a specific memory as critical.
+
+    借鉴 Letta 的 Agent 自主记忆编辑概念。演员可以主动标记
+    一段经历为关键记忆（如果记忆文本匹配最近的 working_memory 条目）。
+    与导演的 /mark 命令不同：
+    - 演员通过描述记忆内容来标记，而非索引
+    - 自动匹配最近的 working_memory 条目
+
+    Args:
+        actor_name: The actor marking the memory.
+        memory_text: Text describing the memory to mark (matched against recent entries).
+        reason: Why this is critical (must be from CRITICAL_REASONS).
+        tool_context: Tool context for state access.
+
+    Returns:
+        dict with status.
+    """
+    state = _get_state(tool_context)
+    actors = state.get("actors", {})
+
+    if actor_name not in actors:
+        return {"status": "error", "message": f"演员「{actor_name}」不存在。"}
+
+    if reason not in CRITICAL_REASONS:
+        return {"status": "error", "message": f"无效的 reason: {reason}，必须是: {', '.join(CRITICAL_REASONS)}"}
+
+    actor_data = actors[actor_name]
+    working = actor_data.get("working_memory", [])
+
+    if not working:
+        return {"status": "error", "message": f"演员「{actor_name}」没有工作记忆可标记。"}
+
+    # Find best matching entry by substring match
+    matched_idx = -1
+    for i in range(len(working) - 1, -1, -1):  # Search from newest
+        entry_text = working[i].get("entry", "")
+        if memory_text and memory_text in entry_text:
+            matched_idx = i
+            break
+
+    if matched_idx == -1:
+        # Fallback: mark the last entry
+        matched_idx = len(working) - 1
+
+    entry = working.pop(matched_idx)
+    critical_entry = {
+        "entry": entry["entry"],
+        "reason": reason,
+        "scene": entry.get("scene", 0),
+        "source": "actor_self_mark",
+    }
+    actor_data["critical_memories"].append(critical_entry)
+    actor_data["working_memory"] = working
+
+    actors[actor_name] = actor_data
+    state["actors"] = actors
+    _set_state(state, tool_context)
+
+    return {
+        "status": "success",
+        "message": f"✅ 「{actor_name}」自主标记了关键记忆（{reason}）",
+        "critical_entry": critical_entry,
+    }
+
+
+def actor_self_update_block(
+    actor_name: str,
+    block_label: str,
+    block_value: str,
+    tool_context: ToolContext = None,
+) -> dict:
+    """Allow an actor to update their own memory block.
+
+    借鉴 Letta 的 Agent 自主记忆编辑概念。演员可以主动更新
+    自己的结构化记忆块（persona, relationship, goal 等），
+    反映角色在剧情中的认知变化。
+
+    Args:
+        actor_name: The actor updating the block.
+        block_label: Block label to update.
+        block_value: New value for the block.
+        tool_context: Tool context for state access.
+
+    Returns:
+        dict with status.
+    """
+    return update_memory_block(actor_name, block_label, block_value, tool_context)
+
+
+# ============================================================================
+# Memory Decay System (inspired by Letta's forgetting curve)
+# ============================================================================
+
+# Decay parameters
+# Scene-based decay: memories lose weight as scenes pass
+# Using Ebbinghaus-inspired exponential decay: weight = e^(-λ * scene_gap)
+DECAY_LAMBDA = 0.1  # Decay rate: after ~7 scenes, weight drops to ~50%
+DECAY_MIN_WEIGHT = 0.2  # Minimum weight before memory is prunable
+DECAY_CHECK_INTERVAL = 5  # Run decay check every N scenes
+MAX_DECAYED_ENTRIES = 3  # Max decayed (low-weight) entries to keep per tier
+
+
+def _calculate_decay_weight(entry_scene: int, current_scene: int, importance: str = "normal") -> float:
+    """Calculate memory weight based on scene distance (Ebbinghaus-inspired).
+
+    借鉴 Letta 的遗忘曲线概念。记忆权重随场景距离指数衰减：
+    - normal 记忆：标准衰减 λ=0.1
+    - critical 记忆：永不衰减（权重恒为 1.0）
+    - 衰减公式：weight = e^(-λ * scene_gap)
+
+    Args:
+        entry_scene: The scene when the memory was created.
+        current_scene: The current scene number.
+        importance: Memory importance ("normal" or "critical").
+
+    Returns:
+        Float weight between 0.0 and 1.0.
+    """
+    # Critical memories never decay
+    if importance == "critical":
+        return 1.0
+
+    scene_gap = max(0, current_scene - entry_scene)
+    if scene_gap == 0:
+        return 1.0
+
+    import math
+    weight = math.exp(-DECAY_LAMBDA * scene_gap)
+    return max(weight, DECAY_MIN_WEIGHT)
+
+
+def _apply_decay_weights(actor_name: str, tool_context: ToolContext) -> dict:
+    """Apply decay weights to working memory entries and prune heavily decayed ones.
+
+    借鉴 Letta 的遗忘曲线概念。在 pre_reasoning_hook 中调用：
+    1. 计算每条 working_memory 的衰减权重
+    2. 权重低于阈值的标记为 decayed
+    3. 清理超过保留数量的 decayed 条目
+
+    不会删除 critical_memories（永不衰减）。
+
+    Args:
+        actor_name: The actor whose memory to decay-check.
+        tool_context: Tool context for state access.
+
+    Returns:
+        dict with decay status.
+    """
+    state = _get_state(tool_context)
+    actors = state.get("actors", {})
+
+    if actor_name not in actors:
+        return {"status": "error", "applied": False}
+
+    actor_data = actors[actor_name]
+    working = actor_data.get("working_memory", [])
+    current_scene = state.get("current_scene", 0)
+
+    if not working:
+        return {"status": "success", "applied": False, "pruned": 0}
+
+    # Check if decay check is needed (interval-based)
+    last_decay_scene = actor_data.get("_last_decay_scene", 0)
+    if current_scene - last_decay_scene < DECAY_CHECK_INTERVAL:
+        return {"status": "success", "applied": False, "pruned": 0}
+
+    # Calculate weights and categorize
+    kept = []
+    decayed_count = 0
+    for entry in working:
+        importance = entry.get("importance", "normal")
+        weight = _calculate_decay_weight(entry.get("scene", 0), current_scene, importance)
+
+        # Store weight for context_builder to use
+        entry["decay_weight"] = round(weight, 3)
+
+        if weight <= DECAY_MIN_WEIGHT and importance != "critical":
+            decayed_count += 1
+        else:
+            kept.append(entry)
+
+    # Keep at most MAX_DECAYED_ENTRIES decayed items (oldest ones get pruned)
+    decayed_entries = [e for e in kept if e.get("decay_weight", 1.0) <= 0.3]
+    fresh_entries = [e for e in kept if e.get("decay_weight", 1.0) > 0.3]
+
+    if len(decayed_entries) > MAX_DECAYED_ENTRIES:
+        # Sort by decay_weight ascending (most decayed first to prune)
+        decayed_entries.sort(key=lambda e: e.get("decay_weight", 0))
+        pruned_count = len(decayed_entries) - MAX_DECAYED_ENTRIES
+        decayed_entries = decayed_entries[-MAX_DECAYED_ENTRIES:]  # Keep the least-decayed
+    else:
+        pruned_count = 0
+
+    # Rebuild working_memory: fresh first, then retained decayed
+    actor_data["working_memory"] = fresh_entries + decayed_entries
+    actor_data["_last_decay_scene"] = current_scene
+
+    actors[actor_name] = actor_data
+    state["actors"] = actors
+    _set_state(state, tool_context)
+
+    return {
+        "status": "success",
+        "applied": True,
+        "pruned": pruned_count,
+        "decayed_flagged": decayed_count,
+        "total_kept": len(actor_data["working_memory"]),
+    }
+
+
+def get_memory_with_decay(
+    actor_name: str,
+    tool_context: ToolContext,
+) -> dict:
+    """Get actor's memory state with decay weights applied.
+
+    返回演员当前记忆状态，包含衰减权重信息。供调试和展示使用。
+
+    Args:
+        actor_name: The actor's name.
+        tool_context: Tool context for state access.
+
+    Returns:
+        dict with memory state and decay info.
+    """
+    state = _get_state(tool_context)
+    actors = state.get("actors", {})
+
+    if actor_name not in actors:
+        return {"status": "error", "message": f"演员「{actor_name}」不存在。"}
+
+    actor_data = actors[actor_name]
+    current_scene = state.get("current_scene", 0)
+
+    # Calculate weights for all tiers
+    working = actor_data.get("working_memory", [])
+    weighted_working = []
+    for e in working:
+        w = _calculate_decay_weight(e.get("scene", 0), current_scene, e.get("importance", "normal"))
+        weighted_working.append({
+            "entry": e.get("entry", "")[:80],
+            "scene": e.get("scene", 0),
+            "importance": e.get("importance", "normal"),
+            "decay_weight": round(w, 3),
+        })
+
+    summaries = actor_data.get("scene_summaries", [])
+    weighted_summaries = []
+    for s in summaries:
+        # Scene summaries have lower decay rate
+        w = _calculate_decay_weight(0, 0, "normal")  # Summaries don't decay as fast
+        weighted_summaries.append({
+            "scenes_covered": s.get("scenes_covered", ""),
+            "weight": 1.0,  # Summaries are already compressed, keep full weight
+        })
+
+    return {
+        "status": "success",
+        "actor_name": actor_name,
+        "current_scene": current_scene,
+        "working_memory": weighted_working,
+        "scene_summaries_count": len(summaries),
+        "critical_count": len(actor_data.get("critical_memories", [])),
+        "memory_blocks": list(actor_data.get("memory_blocks", {}).keys()),
+    }
 
 
 # Phase 2: Re-export for backward compatibility

@@ -311,6 +311,18 @@ def advance_time_logic(
         },
     )
 
+    # Coerce types from LLM tool calls (may arrive as strings)
+    if day is not None:
+        try:
+            day = int(day)
+        except (ValueError, TypeError):
+            return {
+                "status": "error",
+                "message": f"无效的天数: {day}，必须为整数",
+            }
+    if flashback is not None:
+        flashback = bool(flashback)
+
     # If day or period missing, try parsing from time_description
     if day is None or period is None:
         parsed = parse_time_description(time_description)

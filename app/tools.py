@@ -50,10 +50,9 @@ from .conflict_engine import (
 from .context_builder import (
     _extract_scene_transition,
     build_actor_context,
-)
-from .memory_manager import resolve_coreferences
     build_director_context,
 )
+from .memory_manager import resolve_coreferences
 from .dynamic_storm import (
     STORM_INTERVAL,
     check_keyword_overlap,
@@ -64,8 +63,15 @@ from .dynamic_storm import (
 )
 from .memory_manager import (
     add_working_memory,
+    actor_self_add_fact,
+    actor_self_mark_memory,
+    actor_self_update_block,
     detect_importance,
+    get_memory_blocks,
+    get_memory_with_decay,
+    init_memory_blocks,
     mark_critical_memory,
+    update_memory_block,
 )
 from .semantic_retriever import backfill_tags, retrieve_relevant_scenes
 from .state_manager import (
@@ -296,6 +302,45 @@ def create_actor(
     }
 
 
+def _build_coref_annotations(scene_ctx) -> str:
+    """Build coreference annotation section for actor prompts.
+
+    Generates a human-readable list of current pronoun→entity mappings
+    from SceneContext, so the actor knows exactly what each pronoun refers to.
+
+    Returns:
+        Formatted annotation string, or empty string if no mappings exist.
+    """
+    if not scene_ctx.pronoun_map and not scene_ctx.speaker_refs:
+        return ""
+
+    lines = ["【指代消解参考（导演标注）】"]
+    lines.append("以下是当前场景中代词与实体的对应关系，请据此理解他人话语中的代词：")
+
+    # Global pronoun map
+    if scene_ctx.pronoun_map:
+        for pronoun, entity in scene_ctx.pronoun_map.items():
+            desc = scene_ctx.entities.get(entity, {}).get("description", "")
+            if desc:
+                lines.append(f"  · 「{pronoun}」→ {entity}（{desc}）")
+            else:
+                lines.append(f"  · 「{pronoun}」→ {entity}")
+
+    # Per-speaker overrides
+    for speaker, refs in scene_ctx.speaker_refs.items():
+        for pronoun, entity in refs.items():
+            # Skip if same as global mapping
+            if scene_ctx.pronoun_map.get(pronoun) == entity:
+                continue
+            desc = scene_ctx.entities.get(entity, {}).get("description", "")
+            if desc:
+                lines.append(f"  · 当{speaker}说「{pronoun}」→ {entity}（{desc}）")
+            else:
+                lines.append(f"  · 当{speaker}说「{pronoun}」→ {entity}")
+
+    return "\n".join(lines)
+
+
 async def actor_speak(
     actor_name: str,
     situation: str,
@@ -329,12 +374,26 @@ async def actor_speak(
             "status": "error",
             "message": f"Actor '{actor_name}' A2A service not found. Was it created with create_actor?",
         }
+    # 0. Pre-reasoning hook: merge pending compression, check limits, semantic recall
+    # (inspired by ReMe's pre_reasoning_hook — ensures memory is fresh before reasoning)
+    from .memory_manager import pre_reasoning_hook
+    hook_result = pre_reasoning_hook(actor_name, tool_context)
+
     # 1. Build memory context using new 3-tier system (replaces flat memory_str)
     memory_context = build_actor_context(actor_name, tool_context)
 
     # 1.5 Coreference resolution: expand ambiguous pronouns in situation
-    # (e.g., "他逃不掉的" → "他（她的退婚未婚夫）逃不掉的")
-    resolved_situation = resolve_coreferences(situation, speaker_name="", listener_name=actor_name)
+    # Uses SceneContext (dynamic) to resolve "他/她/它" → explicit entity names
+    # speaker_name left empty here because `situation` is the director's prompt
+    # to the actor, not another actor's raw dialogue. The director is the speaker.
+    resolved_situation = resolve_coreferences(
+        situation, speaker_name="", listener_name=actor_name,
+        tool_context=tool_context,
+    )
+
+    # 1.6 Extract & register any entity mentions from the situation text
+    from .memory_manager import extract_and_register_entities
+    extract_and_register_entities(situation, speaker_name="", tool_context=tool_context)
 
     # 2. Add current situation to working memory with importance detection
     is_critical, critical_reason = detect_importance(resolved_situation)
@@ -347,7 +406,7 @@ async def actor_speak(
         tool_context=tool_context,
     )
 
-    # 3. Build enhanced prompt with layered context
+    # 3. Build enhanced prompt with layered context + coreference-aware situation package
     role_label = actor_data.get("role", "")
     personality = actor_data.get("personality", "")
     emotion_label = actor_data.get("emotions", "neutral")
@@ -357,17 +416,24 @@ async def actor_speak(
         "anxious": "焦虑", "hopeful": "充满希望",
     }.get(emotion_label, emotion_label)
 
+    # Build the coreference annotation section for the prompt
+    from .state_manager import get_scene_context
+    scene_ctx = get_scene_context(tool_context)
+    coref_annotations = _build_coref_annotations(scene_ctx)
+
     prompt = (
         f"【角色锚点】你是{actor_name}，{role_label}。{personality}\n\n"
         f"【当前情绪】{emotion_cn}\n\n"
         f"【当前情境】{resolved_situation}\n\n"
+        f"{coref_annotations}\n\n"
         f"{memory_context}\n\n"
         f"请以「{actor_name}」的身份回应上述情境。"
         f"保持角色一致性，不要跳出角色。"
         f"如有内心独白，用（内心：...）格式。\n\n"
-        f"【重要：代词消解】当情境中其他角色使用"他/她/它"等代词时，"
-        f"你必须根据上下文判断其指代对象，切勿默认将代词理解为指代你自己。"
-        f"例如：如果某人说"他逃了"，而该人正在追的是另一个人，那么"他"指的是那个人，不是你。"
+        f"【重要：代词消解规则】\n"
+        f"1. 情境中若出现「他（实体名）」这样的括号标注，括号内即为该代词的真实指代\n"
+        f"2. 绝对不要将别人话语中的「他/她」默认理解为指代你自己，除非括号标注明确写了你的名字\n"
+        f"3. 如果代词没有括号标注且你无法确定指代对象，按角色性格自然回应（困惑、追问、或忽略）"
     )
 
     # Call the actor A2A service directly via async — no event loop hack needed
@@ -404,6 +470,10 @@ async def actor_speak(
             tool_context=tool_context,
         )
 
+        # Coreference: extract entity mentions from actor's dialogue and update SceneContext
+        # so that subsequent actors can resolve pronouns correctly
+        extract_and_register_entities(actor_dialogue, speaker_name=actor_name, tool_context=tool_context)
+
     # Auto-log the dialogue to conversation record
     if not actor_dialogue.startswith("[ERROR:"):
         add_dialogue(actor_name=actor_name, dialogue=actor_dialogue, tool_context=tool_context)
@@ -439,7 +509,8 @@ async def actor_speak(
         "personality": actor_data.get("personality", ""),
         "emotions": emotion_label,
         "emotions_cn": emotion_cn,
-        "memories": memory_context,  # Updated: 3-tier context instead of flat memory_str
+        "memories": memory_context,
+        "pre_reasoning": hook_result,
         "situation": situation,
         "dialogue": actor_dialogue,
         "formatted_dialogue": formatted_dialogue,
@@ -2369,3 +2440,112 @@ def repair_contradiction(
             "message": "✅ 矛盾已标记修复",
         }
     return result
+
+
+# ============================================================================
+# Memory Enhancement Tools (Phase 12 — Letta-inspired features)
+# ============================================================================
+
+
+def update_actor_block(
+    actor_name: str,
+    block_label: str,
+    block_value: str,
+    tool_context: ToolContext,
+) -> dict:
+    """Update a structured memory block for an actor (Letta-inspired Memory Blocks).
+
+    更新演员的结构化记忆块。每个块代表角色的一个认知维度，
+    如 persona（自我认知）、relationship（关系认知）、worldview（世界观）、goal（目标）。
+    记忆块具有最高优先级，永远不会被截断或压缩。
+
+    借鉴 Letta 的 memory_blocks 概念——角色对"我是谁"和"我如何看待他人"
+    的认知应该独立于碎片化的工作记忆，作为结构化块存在。
+
+    Args:
+        actor_name: The actor whose block to update.
+        block_label: Block label — "persona", "relationship", "worldview", "goal", or custom.
+        block_value: The new value for the block (max 500 chars).
+
+    Returns:
+        dict with update status.
+    """
+    return update_memory_block(actor_name, block_label, block_value, tool_context)
+
+
+def show_actor_blocks(
+    actor_name: str,
+    tool_context: ToolContext,
+) -> dict:
+    """Show all memory blocks for an actor.
+
+    展示演员的所有结构化记忆块。每个块包含标签、值、更新场景号。
+
+    Args:
+        actor_name: The actor whose blocks to show.
+
+    Returns:
+        dict with blocks data.
+    """
+    return get_memory_blocks(actor_name, tool_context)
+
+
+def actor_self_report(
+    actor_name: str,
+    content: str,
+    action_type: str,
+    tool_context: ToolContext,
+) -> dict:
+    """Allow an actor to self-edit their memory (Letta-inspired agent self-edit).
+
+    借鉴 Letta 的 Agent 自主记忆编辑概念。让演员主动管理自己的记忆：
+    - "add_fact": 演员主动记录一个重要事实
+    - "mark_memory": 演员主动标记一段经历为关键记忆
+    - "update_block": 演员主动更新自己的认知块
+
+    这让角色不再只是被动接受导演注入的记忆，而是可以像真实的人一样
+    主动决定"这件事很重要，我要记住"或"我对这个人的看法改变了"。
+
+    Args:
+        actor_name: The actor performing the self-edit.
+        content: The content to record (fact text, memory text, or block value).
+        action_type: Type of self-edit — "add_fact", "mark_memory", or "update_block".
+        tool_context: Tool context for state access.
+
+    Returns:
+        dict with self-edit result.
+    """
+    if action_type == "add_fact":
+        return actor_self_add_fact(actor_name, content, "event", tool_context)
+    elif action_type == "mark_memory":
+        # Default to "重大转折" when actor self-marks
+        return actor_self_mark_memory(actor_name, content, "重大转折", tool_context)
+    elif action_type == "update_block":
+        # Default to updating "goal" block when actor self-edits
+        return actor_self_update_block(actor_name, "goal", content, tool_context)
+    else:
+        return {
+            "status": "error",
+            "message": f"无效的 action_type: {action_type}。可用值：add_fact, mark_memory, update_block",
+        }
+
+
+def show_memory_decay(
+    actor_name: str,
+    tool_context: ToolContext,
+) -> dict:
+    """Show actor's memory state with decay weights (Letta-inspired forgetting curve).
+
+    展示演员的记忆衰减状态。借鉴 Letta 的遗忘曲线概念：
+    - 每条记忆有一个衰减权重（0.0~1.0），随场景距离指数衰减
+    - 权重低于 50% 的记忆标记为"模糊"
+    - 权重低于 20% 的记忆可能被清理
+    - 关键记忆永不衰减（权重恒为 1.0）
+
+    Args:
+        actor_name: The actor whose memory decay to inspect.
+
+    Returns:
+        dict with memory decay information.
+    """
+    return get_memory_with_decay(actor_name, tool_context)

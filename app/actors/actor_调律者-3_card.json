@@ -1,0 +1,26 @@
+{
+  "name": "actor_调律者-3",
+  "description": "演员 调律者-3，角色：反派/镜像",
+  "url": "http://localhost:9008/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_调律者-3",
+      "name": "扮演调律者-3",
+      "description": "以调律者-3的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

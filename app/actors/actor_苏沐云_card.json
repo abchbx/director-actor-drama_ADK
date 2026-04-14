@@ -1,0 +1,26 @@
+{
+  "name": "actor_苏沐云",
+  "description": "演员 苏沐云，角色：宗门长辈/事实上的对立面",
+  "url": "http://localhost:9091/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_苏沐云",
+      "name": "扮演苏沐云",
+      "description": "以苏沐云的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

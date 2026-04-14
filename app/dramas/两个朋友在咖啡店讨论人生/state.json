@@ -1,0 +1,330 @@
+{
+  "theme": "两个朋友在咖啡店讨论人生",
+  "status": "acting",
+  "current_scene": 15,
+  "scenes": [
+    {
+      "scene_number": 1,
+      "title": "第1场",
+      "description": "场景1描述",
+      "content": "场景1对话",
+      "updated_at": "2026-04-14T11:11:11.111441",
+      "time_label": "第一天"
+    },
+    {
+      "scene_number": 2,
+      "title": "第2场",
+      "description": "场景2描述",
+      "content": "场景2对话",
+      "updated_at": "2026-04-14T11:11:16.104648",
+      "time_label": "第一天"
+    },
+    {
+      "scene_number": 3,
+      "title": "第3场",
+      "description": "场景3描述",
+      "content": "场景3对话",
+      "updated_at": "2026-04-14T11:11:23.815879",
+      "time_label": "第一天"
+    },
+    {
+      "scene_number": 4,
+      "title": "第4场",
+      "description": "场景4描述",
+      "content": "场景4对话",
+      "updated_at": "2026-04-14T11:11:23.816494",
+      "time_label": "第一天"
+    },
+    {
+      "scene_number": 5,
+      "title": "第5场",
+      "description": "场景5描述",
+      "content": "场景5对话",
+      "updated_at": "2026-04-14T11:11:23.816869",
+      "time_label": "第一天"
+    },
+    {
+      "scene_number": 6,
+      "title": "第6场",
+      "description": "场景6描述",
+      "content": "场景6对话",
+      "updated_at": "2026-04-14T11:11:23.817257",
+      "time_label": "第一天"
+    },
+    {
+      "scene_number": 7,
+      "title": "第7场",
+      "description": "场景7描述",
+      "content": "场景7对话",
+      "updated_at": "2026-04-14T11:11:23.817590",
+      "time_label": "第一天"
+    },
+    {
+      "scene_number": 8,
+      "title": "第8场",
+      "description": "场景8描述",
+      "content": "场景8对话",
+      "updated_at": "2026-04-14T11:11:23.817951",
+      "time_label": "第一天"
+    },
+    {
+      "scene_number": 9,
+      "title": "第9场",
+      "description": "场景9描述",
+      "content": "场景9对话",
+      "updated_at": "2026-04-14T11:11:39.833996",
+      "time_label": "第二天上午"
+    },
+    {
+      "scene_number": 10,
+      "title": "第10场",
+      "description": "场景10描述",
+      "content": "场景10对话",
+      "updated_at": "2026-04-14T11:11:39.834484",
+      "time_label": "第二天上午"
+    },
+    {
+      "scene_number": 11,
+      "title": "第11场",
+      "description": "场景11描述",
+      "content": "场景11对话",
+      "updated_at": "2026-04-14T11:11:39.834896",
+      "time_label": "第二天上午"
+    },
+    {
+      "scene_number": 12,
+      "title": "第12场",
+      "description": "场景12描述",
+      "content": "场景12对话",
+      "updated_at": "2026-04-14T11:11:39.835350",
+      "time_label": "第二天上午"
+    },
+    {
+      "scene_number": 13,
+      "title": "第13场",
+      "description": "场景13描述",
+      "content": "场景13对话",
+      "updated_at": "2026-04-14T11:11:39.835695",
+      "time_label": "第二天上午"
+    },
+    {
+      "scene_number": 14,
+      "title": "第14场",
+      "description": "场景14描述",
+      "content": "场景14对话",
+      "updated_at": "2026-04-14T11:11:39.836063",
+      "time_label": "第二天上午"
+    },
+    {
+      "scene_number": 15,
+      "title": "第15场",
+      "description": "场景15描述",
+      "content": "场景15对话",
+      "updated_at": "2026-04-14T11:11:39.836413",
+      "time_label": "第二天上午"
+    }
+  ],
+  "actors": {
+    "小明": {
+      "role": "咖啡店常客",
+      "personality": "活泼开朗，喜欢聊天",
+      "background": "附近公司白领",
+      "knowledge_scope": "日常话题",
+      "memory": [],
+      "working_memory": [
+        {
+          "entry": "我说：嘿！你来啦！今天想喝点什么？我基本上每天都来这儿报到，咖啡师都认识我了。你是新面孔吧？",
+          "importance": "normal",
+          "scene": 1
+        },
+        {
+          "entry": "面对情境: 第2场情境",
+          "importance": "normal",
+          "scene": 2
+        },
+        {
+          "entry": "我说：嗨，你刚才点的那杯咖啡怎么样？美式还是拿铁？\n\n（内心：这人看起来挺面善的，应该挺好聊的）",
+          "importance": "normal",
+          "scene": 2
+        },
+        {
+          "entry": "面对情境: 第3场情境",
+          "importance": "normal",
+          "scene": 3
+        },
+        {
+          "entry": "我说：嘿，今天过得怎么样？看你样子是刚下班吧？\n\n（内心：这人感觉挺随和的，正好聊聊天打发时间）\n\n对了，你平时都喝什么咖啡？我一般点拿铁，不过最近想换个口味试试。你要是常来可以给我推荐推荐！",
+          "importance": "normal",
+          "scene": 3
+        }
+      ],
+      "scene_summaries": [],
+      "arc_summary": {
+        "structured": {
+          "theme": "",
+          "key_characters": [],
+          "unresolved": [],
+          "resolved": []
+        },
+        "narrative": ""
+      },
+      "critical_memories": [],
+      "emotions": "neutral",
+      "arc_progress": {
+        "arc_type": "",
+        "arc_stage": "",
+        "progress": 0,
+        "related_threads": []
+      },
+      "created_at": "2026-04-14T11:11:02.827122",
+      "port": 9004,
+      "_pending_compression": {
+        "working_to_scene": null,
+        "scene_to_arc": null,
+        "pending_entries": [
+          {
+            "entry": "面对情境: 第1场情境",
+            "importance": "normal",
+            "scene": 1
+          }
+        ],
+        "result": null
+      },
+      "memory_blocks": {
+        "persona": {
+          "label": "persona",
+          "value": "性格：活泼开朗，喜欢聊天\n背景：附近公司白领",
+          "updated_scene": 0,
+          "source": "auto_init"
+        },
+        "relationship": {
+          "label": "relationship",
+          "value": "我了解的范围：日常话题",
+          "updated_scene": 0,
+          "source": "auto_init"
+        }
+      },
+      "crash_count": 0
+    },
+    "小红": {
+      "role": "咖啡店店员",
+      "personality": "温柔安静，善于倾听",
+      "background": "大学生兼职",
+      "knowledge_scope": "咖啡知识",
+      "memory": [],
+      "working_memory": [],
+      "scene_summaries": [],
+      "arc_summary": {
+        "structured": {
+          "theme": "",
+          "key_characters": [],
+          "unresolved": [],
+          "resolved": []
+        },
+        "narrative": ""
+      },
+      "critical_memories": [],
+      "emotions": "neutral",
+      "arc_progress": {
+        "arc_type": "",
+        "arc_stage": "",
+        "progress": 0,
+        "related_threads": []
+      },
+      "created_at": "2026-04-14T11:11:04.828130",
+      "port": 9014
+    }
+  },
+  "narration_log": [],
+  "remaining_auto_scenes": 0,
+  "steer_direction": null,
+  "storm": {
+    "last_review": {},
+    "perspectives": []
+  },
+  "conflict_engine": {
+    "tension_score": 0,
+    "is_boring": false,
+    "tension_history": [],
+    "active_conflicts": [],
+    "used_conflict_types": [],
+    "last_inject_scene": 0,
+    "consecutive_low_tension": 0,
+    "resolved_conflicts": []
+  },
+  "plot_threads": [],
+  "dynamic_storm": {
+    "scenes_since_last_storm": 7,
+    "trigger_history": [
+      {
+        "scene": 8,
+        "trigger_type": "manual",
+        "focus_area": "角色关系",
+        "perspectives_found": 0
+      }
+    ],
+    "discovered_perspectives": []
+  },
+  "established_facts": [],
+  "coherence_checks": {
+    "last_check_scene": 0,
+    "last_result": null,
+    "check_history": [],
+    "total_contradictions": 0
+  },
+  "timeline": {
+    "current_time": "第二天上午",
+    "days_elapsed": 2,
+    "current_period": "上午",
+    "time_periods": [
+      {
+        "label": "第二天上午",
+        "day": 2,
+        "period": "上午",
+        "scene_range": [
+          8,
+          8
+        ],
+        "flashback": false
+      }
+    ],
+    "last_jump_check": {
+      "status": "success",
+      "jumps": [],
+      "max_gap": 0
+    }
+  },
+  "created_at": "2026-04-14T11:11:00.813254",
+  "updated_at": "2026-04-14T11:11:39.837140",
+  "conversation_log": [
+    {
+      "speaker": "[系统]",
+      "content": "戏剧「两个朋友在咖啡店讨论人生」已创建，数据保存路径: /workspace/director-actor-drama/app/dramas/两个朋友在咖啡店讨论人生",
+      "type": "system",
+      "scene": 0,
+      "timestamp": "2026-04-14T11:11:00.826376"
+    },
+    {
+      "speaker": "小明",
+      "content": "嘿！你来啦！今天想喝点什么？我基本上每天都来这儿报到，咖啡师都认识我了。你是新面孔吧？",
+      "type": "dialogue",
+      "scene": 1,
+      "timestamp": "2026-04-14T11:11:11.111173"
+    },
+    {
+      "speaker": "小明",
+      "content": "嗨，你刚才点的那杯咖啡怎么样？美式还是拿铁？\n\n（内心：这人看起来挺面善的，应该挺好聊的）",
+      "type": "dialogue",
+      "scene": 2,
+      "timestamp": "2026-04-14T11:11:16.104365"
+    },
+    {
+      "speaker": "小明",
+      "content": "嘿，今天过得怎么样？看你样子是刚下班吧？\n\n（内心：这人感觉挺随和的，正好聊聊天打发时间）\n\n对了，你平时都喝什么咖啡？我一般点拿铁，不过最近想换个口味试试。你要是常来可以给我推荐推荐！",
+      "type": "dialogue",
+      "scene": 3,
+      "timestamp": "2026-04-14T11:11:23.815609"
+    }
+  ],
+  "scene_context": {}
+}

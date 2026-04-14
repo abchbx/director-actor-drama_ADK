@@ -1,0 +1,24 @@
+{
+  "theme": "旧格式戏剧",
+  "status": "acting",
+  "current_scene": 5,
+  "scenes": [],
+  "actors": {
+    "朱元璋": {
+      "role": "皇帝",
+      "personality": "威严果断",
+      "background": "大明开国皇帝",
+      "knowledge_scope": "天下大事",
+      "memory": [],
+      "working_memory": [],
+      "scene_summaries": [],
+      "arc_summary": {
+        "structured": {},
+        "narrative": ""
+      },
+      "critical_memories": [],
+      "emotions": "angry"
+    }
+  },
+  "narration_log": []
+}

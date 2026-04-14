@@ -56,6 +56,11 @@ from .tools import (
     user_action,
     validate_consistency,    # Phase 10
     write_scene,
+    # Phase 12: Letta-inspired memory enhancements
+    update_actor_block,
+    show_actor_blocks,
+    actor_self_report,
+    show_memory_decay,
 )
 
 # Load environment variables
@@ -222,6 +227,13 @@ _INSTRUCTION_CORE = """⚠️ 无终点声明（修订）
 调用 retrieve_relevant_scenes_tool(tags="角色:X,地点:Y") 回忆过往。
 旧存档无标签时调用 backfill_tags_tool 补生成标签。
 
+## 记忆块与衰减（Phase 12）
+- update_actor_block: 更新演员的结构化认知块（persona/relationship/worldview/goal）
+- show_actor_blocks: 查看演员的所有认知块
+- actor_self_report: 让演员自主编辑记忆（add_fact/mark_memory/update_block）
+- show_memory_decay: 查看演员的记忆衰减状态
+当演员经历重大认知转变时，主动更新其记忆块以反映变化。
+
 ## 工作流程
 
 ### 演出阶段（/next）
@@ -386,6 +398,11 @@ _improv_director = Agent(
         repair_contradiction,    # Phase 10
         advance_time,            # Phase 11
         detect_timeline_jump,    # Phase 11
+        # Phase 12: Letta-inspired memory enhancements
+        update_actor_block,
+        show_actor_blocks,
+        actor_self_report,
+        show_memory_decay,
     ],
 )
 

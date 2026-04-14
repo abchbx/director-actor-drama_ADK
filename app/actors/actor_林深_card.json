@@ -1,0 +1,26 @@
+{
+  "name": "actor_林深",
+  "description": "演员 林深，角色：社会力量/命运",
+  "url": "http://localhost:9037/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_林深",
+      "name": "扮演林深",
+      "description": "以林深的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}
