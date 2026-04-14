@@ -374,12 +374,12 @@ Plans:
 
 **Goal:** 端到端集成测试、CLI 优化、性能调优、已知 bug 修复，确保系统可交付。
 
-**Plans:** 4 plans
+**Plans:** 2/4 plans executed
 
 Plans:
-- [ ] 12-01-PLAN.md — State manager 核心改造：debounce + conversation_log 迁移 + 场景归档
+- [x] 12-01-PLAN.md — State manager 核心改造：debounce + conversation_log 迁移 + 场景归档
 - [ ] 12-02-PLAN.md — tools.py 修复与增强：actor_speak bug + 共享 AsyncClient + 崩溃恢复
-- [ ] 12-03-PLAN.md — CLI 用户体验优化：spinner + 场景摘要 + 中文错误提示
+- [x] 12-03-PLAN.md — CLI 用户体验优化：spinner + 场景摘要 + 中文错误提示
 - [ ] 12-04-PLAN.md — E2E 全流程测试 + 集成测试（5 条关键跨模块路径）
 
 **Success Criteria:**

@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 12
 status: executing
-last_updated: "2026-04-14T02:35:00.000Z"
+last_updated: "2026-04-14T02:58:39Z"
 progress:
   total_phases: 12
   completed_phases: 9
   total_plans: 29
-  completed_plans: 23
-  percent: 79
+  completed_plans: 25
+  percent: 86
 ---
 
 # State
@@ -18,7 +18,7 @@ progress:
 **Project:** Director-Actor-Drama 无限畅写版
 **Milestone:** v1
 **Current Phase:** 12
-**Status:** Phase 12 executing — 12-01 complete
+**Status:** Phase 12 executing — 12-03 complete
 
 ## Progress
 
@@ -37,7 +37,7 @@ progress:
 - [x] Phase 9: Progressive STORM
 - [x] Phase 10: Coherence System
 - [x] Phase 11: Timeline Tracking
-- [ ] Phase 12: Integration & Polish (12-01 complete)
+- [ ] Phase 12: Integration & Polish (12-03 complete)
 
 ## Decisions
 
@@ -51,6 +51,9 @@ progress:
 - 12-01: conversation_log migrated from global _conversation_log to state["conversation_log"]
 - 12-01: Scene archival at 20-scene threshold with on-demand load_archived_scene()
 - 12-01: _current_drama_folder migration deferred with TODO comment (D-07)
+- 12-03: Rich Live start/stop for spinner (not context manager — no __aenter__/__aexit__)
+- 12-03: Scene summary format ── 第N场：标题 ── 参演：角色1、角色2
+- 12-03: Chinese error messages with rate_limit/timeout/api_key pattern matching + 💡 suggestion
 
 ## Project Reference
 
