@@ -3,9 +3,11 @@
 Manages active WS connections, event broadcasting, and replay buffer.
 D-13: Uses set[WebSocket] for connection pool management.
 D-08: Global shared deque(maxlen=100) as replay buffer.
+D-14: Application-level heartbeat with 15s ping, 30s timeout.
 """
 
 import asyncio
+import time
 from collections import deque
 from datetime import datetime
 
@@ -23,27 +25,76 @@ class ConnectionManager:
     def __init__(self):
         self.active_connections: set[WebSocket] = set()  # D-13
         self.replay_buffer: deque[dict] = deque(maxlen=100)  # D-08
+        self._last_pong: dict[WebSocket, float] = {}  # websocket → timestamp
+        self.HEARTBEAT_INTERVAL = 15  # D-14: 15s ping interval
+        self.HEARTBEAT_TIMEOUT = 30   # D-14: 30s pong timeout
 
-    async def connect(self, websocket: WebSocket):
+    async def connect(self, websocket: WebSocket) -> bool:
         """Accept WS connection, add to pool, send replay buffer (D-09).
 
         T-14-01: Reject connection if MAX_CONNECTIONS exceeded.
+        Returns True if connection accepted, False if rejected.
         """
         if len(self.active_connections) >= MAX_CONNECTIONS:
             await websocket.close(code=1013, reason="Max connections reached")
-            return
+            return False
         await websocket.accept()
         self.active_connections.add(websocket)
+        self._last_pong[websocket] = time.monotonic()  # Initialize pong timestamp
         # D-09: Send replay buffer on connect
         if self.replay_buffer:
             await websocket.send_json({
                 "type": "replay",
                 "events": list(self.replay_buffer),
             })
+        return True
 
     def disconnect(self, websocket: WebSocket):
         """Remove WS connection from pool."""
         self.active_connections.discard(websocket)
+        self._last_pong.pop(websocket, None)
+
+    def record_pong(self, websocket: WebSocket):
+        """Record pong response from client for heartbeat tracking (D-14)."""
+        self._last_pong[websocket] = time.monotonic()
+
+    def is_pong_expired(self, websocket: WebSocket) -> bool:
+        """Check if client's last pong exceeds heartbeat timeout (D-14)."""
+        last = self._last_pong.get(websocket)
+        if last is None:
+            return True
+        return (time.monotonic() - last) > self.HEARTBEAT_TIMEOUT
+
+    async def heartbeat(self, websocket: WebSocket):
+        """Application-level heartbeat loop (D-14).
+
+        Sends ping every 15s, checks for 30s pong timeout.
+        On timeout, closes the connection and removes from pool.
+
+        This runs as an asyncio.Task alongside the receive loop.
+        """
+        try:
+            while True:
+                await asyncio.sleep(self.HEARTBEAT_INTERVAL)
+                # Check timeout before sending ping
+                if self.is_pong_expired(websocket):
+                    # D-14: 30s timeout — close connection
+                    try:
+                        await websocket.close(code=1000, reason="Heartbeat timeout")
+                    except Exception:
+                        pass
+                    self.disconnect(websocket)
+                    break
+                # Send application-level ping
+                try:
+                    await websocket.send_json({"type": "ping"})
+                except Exception:
+                    # Connection already broken
+                    self.disconnect(websocket)
+                    break
+        except asyncio.CancelledError:
+            # Task cancelled — normal disconnect, just exit
+            pass
 
     async def broadcast(self, event: dict):
         """Broadcast event to all connections and append to replay buffer.

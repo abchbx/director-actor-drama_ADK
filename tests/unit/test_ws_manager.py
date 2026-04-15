@@ -1,5 +1,8 @@
 """Tests for WebSocket ConnectionManager and endpoint."""
 
+import asyncio
+import time
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -425,3 +428,128 @@ class TestWebSocketEndpoint:
             assert data["type"] == "replay"
             assert len(data["events"]) == 1
             assert data["events"][0]["type"] == "scene_start"
+
+
+class TestHeartbeatTracking:
+    """Test heartbeat and pong recording in ConnectionManager (D-14)."""
+
+    def test_record_pong_stores_timestamp(self):
+        """record_pong stores timestamp for a websocket connection."""
+        manager = ConnectionManager()
+        ws = MagicMock()
+        before = time.monotonic()
+        manager.record_pong(ws)
+        after = time.monotonic()
+        assert ws in manager._last_pong
+        assert before <= manager._last_pong[ws] <= after
+
+    def test_is_pong_expired_returns_false_after_record_pong(self):
+        """is_pong_expired returns False immediately after record_pong."""
+        manager = ConnectionManager()
+        ws = MagicMock()
+        manager.record_pong(ws)
+        assert manager.is_pong_expired(ws) is False
+
+    def test_is_pong_expired_returns_true_after_timeout(self):
+        """is_pong_expired returns True when last_pong is older than timeout."""
+        manager = ConnectionManager()
+        ws = MagicMock()
+        # Set last pong to well before the timeout
+        manager._last_pong[ws] = time.monotonic() - manager.HEARTBEAT_TIMEOUT - 1
+        assert manager.is_pong_expired(ws) is True
+
+    def test_is_pong_expired_returns_true_for_unknown_websocket(self):
+        """is_pong_expired returns True for websocket not in _last_pong."""
+        manager = ConnectionManager()
+        ws = MagicMock()
+        assert manager.is_pong_expired(ws) is True
+
+    def test_disconnect_removes_pong_entry(self):
+        """disconnect() cleans up _last_pong entry (D-13)."""
+        manager = ConnectionManager()
+        ws = MagicMock()
+        manager.active_connections.add(ws)
+        manager._last_pong[ws] = time.monotonic()
+        manager.disconnect(ws)
+        assert ws not in manager._last_pong
+
+    @pytest.mark.asyncio
+    async def test_connect_initializes_pong_timestamp(self):
+        """connect() initializes _last_pong for new connections."""
+        manager = ConnectionManager()
+        ws = AsyncMock()
+        ws.accept = AsyncMock()
+        ws.send_json = AsyncMock()
+        await manager.connect(ws)
+        assert ws in manager._last_pong
+        assert isinstance(manager._last_pong[ws], float)
+
+    @pytest.mark.asyncio
+    async def test_heartbeat_sends_ping_and_detects_timeout(self):
+        """heartbeat() sends ping and detects timeout (D-14)."""
+        manager = ConnectionManager()
+        manager.HEARTBEAT_INTERVAL = 0.1  # Speed up for testing
+        manager.HEARTBEAT_TIMEOUT = 0.2
+        ws = AsyncMock()
+        ws.send_json = AsyncMock()
+        ws.close = AsyncMock()
+        manager.active_connections.add(ws)
+        # Set last pong to old timestamp to trigger timeout
+        manager._last_pong[ws] = time.monotonic() - 1.0
+
+        # Run heartbeat in background
+        task = asyncio.create_task(manager.heartbeat(ws))
+        # Wait for timeout to trigger
+        await asyncio.sleep(0.3)
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+        # Connection should have been closed and removed
+        ws.close.assert_called()
+        assert ws not in manager.active_connections
+
+    @pytest.mark.asyncio
+    async def test_heartbeat_can_be_cancelled(self):
+        """heartbeat task can be cancelled without errors (normal disconnect)."""
+        manager = ConnectionManager()
+        manager.HEARTBEAT_INTERVAL = 10  # Long interval for test
+        ws = AsyncMock()
+        ws.send_json = AsyncMock()
+        manager.active_connections.add(ws)
+        manager._last_pong[ws] = time.monotonic()
+
+        task = asyncio.create_task(manager.heartbeat(ws))
+        await asyncio.sleep(0.05)
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+        # Should not raise — CancelledError is handled gracefully
+        # WS should still be in active_connections since no timeout occurred
+        assert ws in manager.active_connections
+
+    @pytest.mark.asyncio
+    async def test_heartbeat_removes_broken_connection(self):
+        """heartbeat() removes connection when send_json fails."""
+        manager = ConnectionManager()
+        manager.HEARTBEAT_INTERVAL = 0.1
+        ws = AsyncMock()
+        ws.send_json = AsyncMock(side_effect=Exception("Connection broken"))
+        manager.active_connections.add(ws)
+        manager._last_pong[ws] = time.monotonic()
+
+        task = asyncio.create_task(manager.heartbeat(ws))
+        await asyncio.sleep(0.2)
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+        # Connection should have been removed
+        assert ws not in manager.active_connections
