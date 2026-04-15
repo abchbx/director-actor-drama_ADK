@@ -4,14 +4,14 @@ milestone: v2.0
 milestone_name: Android 移动端
 current_phase: 13
 status: executing
-last_updated: "2026-04-15T10:31:49Z"
-last_activity: 2026-04-15 -- Completed 13-01-PLAN.md
+last_updated: "2026-04-15T11:26:34.225Z"
+last_activity: 2026-04-15
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 4
-  completed_plans: 1
-  percent: 25
+  completed_plans: 3
+  percent: 75
 ---
 
 # State
@@ -19,21 +19,21 @@ progress:
 **Project:** Director-Actor-Drama 无限畅写版
 **Milestone:** v2.0 Android 移动端
 **Current Phase:** 13
-**Status:** Executing Phase 13
+**Status:** Ready to execute
 
 ## Current Position
 
 Phase: 13 (API Foundation) — EXECUTING
-Plan: 2 of 4
-Status: Completed 13-01-PLAN.md
-Last activity: 2026-04-15 -- Completed 13-01-PLAN.md
+Plan: 3 of 4
+Status: Ready to execute
+Last activity: 2026-04-15
 
 ## Progress
 
 - [x] v1.0 milestone complete (12 phases, 29 plans, 517 tests)
 - [x] v2.0 requirements defined (32 requirements)
 - [x] v2.0 roadmap created (6 phases, ~18 plans)
-- [ ] Phase 13: API Foundation — 1/4 plans complete
+- [ ] Phase 13: API Foundation — 3/4 plans complete
 - [ ] Phase 14: WebSocket Layer
 - [ ] Phase 15: Authentication
 - [ ] Phase 16: Android Foundation
@@ -55,6 +55,9 @@ Last activity: 2026-04-15 -- Completed 13-01-PLAN.md
 - 12-02: Shared AsyncClient uses lazy singleton
 - 12-02: Passive crash detection
 - 12-02: MAX_CRASH_COUNT=3
+- [Phase 13]: 13-03: _current_drama_folder global removed entirely — ValueError replaces silent fallback
+- [Phase 13]: 13-03: _require_active_drama helper centralizes 404 guard for query endpoints
+- [Phase 13]: 13-03: Query endpoints call state_manager directly (D-05) without Runner
 
 ### v2.0 Decisions
 
@@ -76,7 +79,7 @@ Last activity: 2026-04-15 -- Completed 13-01-PLAN.md
 | Risk | Phase | Mitigation |
 |------|-------|------------|
 | Event Loop 冲突 (P0) | 13 | FastAPI + ADK Runner 共享事件循环，避免嵌套 asyncio.run() |
-| 全局状态迁移 (P0) | 13 | _current_drama_folder → session-scoped context |
+| 全局状态迁移 (P0) | 13 | ~~_current_drama_folder → session-scoped context~~ DONE (13-03) |
 | CLI 互斥 (P0) | 13 | Lock file 或进程检测，CLI 和 API 不可同时运行 |
 | 状态同步 (P1) | 13-14 | WebSocket 推送前 flush-on-push |
 | WebSocket 长 LLM 调用 (P1) | 14 | 心跳 + 进度推送 + 请求去重 |

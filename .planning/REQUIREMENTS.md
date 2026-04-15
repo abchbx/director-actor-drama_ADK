@@ -10,7 +10,7 @@ Requirements for C/S architecture: FastAPI API Server + Android (Kotlin/Jetpack 
 ### API Foundation
 
 - [x] **API-01**: FastAPI application wraps existing DramaRouter without modifying 12 core modules
-- [ ] **API-02**: 14 REST endpoints map all CLI commands (start, next, action, speak, cast, status, save, load, export, end, list, storm, auto_advance, steer). Note: `/quit` is a program exit command handled by process lifecycle, not a REST endpoint; `/storm` (trigger_storm) maps to `POST /api/v1/drama/storm` instead.
+- [x] **API-02**: 14 REST endpoints map all CLI commands (start, next, action, speak, cast, status, save, load, export, end, list, storm, auto_advance, steer). Note: `/quit` is a program exit command handled by process lifecycle, not a REST endpoint; `/storm` (trigger_storm) maps to `POST /api/v1/drama/storm` instead.
 - [x] **API-03**: Pydantic v2 models define request/response schemas for all endpoints
 - [x] **API-04**: API versioning via URL prefix `/api/v1/`
 - [x] **API-05**: CORS middleware allows Android app origin
@@ -32,7 +32,7 @@ Requirements for C/S architecture: FastAPI API Server + Android (Kotlin/Jetpack 
 
 ### State Migration
 
-- [ ] **STATE-01**: `_current_drama_folder` global variable migrated to session-scoped context
+- [x] **STATE-01**: `_current_drama_folder` global variable migrated to session-scoped context
 - [ ] **STATE-02**: Debounce flush-on-push: state is force-saved before WebSocket push events
 - [ ] **STATE-03**: API server supports one active drama session at a time (single-user mode preserved)
 
