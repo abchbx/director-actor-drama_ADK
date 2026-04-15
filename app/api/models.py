@@ -1,7 +1,10 @@
 """Pydantic v2 request/response models for the Drama API.
 
-Defines all 14 endpoint request/response schemas with field validation.
+Defines all 14 endpoint request/response schemas with field validation,
+plus WebSocket event models for real-time scene push.
 """
+
+from datetime import datetime
 
 from pydantic import BaseModel, Field
 
@@ -130,3 +133,29 @@ class ErrorResponse(BaseModel):
     """Error response."""
 
     detail: str
+
+
+# ============================================================================
+# WebSocket event models (Phase 14)
+# ============================================================================
+
+
+class WsEvent(BaseModel):
+    """WebSocket event message for real-time scene push (WS-02)."""
+
+    type: str = Field(..., description="Event type (one of 18 business types)")
+    timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
+    data: dict = Field(default_factory=dict, description="Event payload")
+
+
+class ReplayMessage(BaseModel):
+    """Replay buffer message sent on WS connection (D-09)."""
+
+    type: str = "replay"
+    events: list[dict] = Field(default_factory=list)
+
+
+class HeartbeatMessage(BaseModel):
+    """Application-level heartbeat (D-14)."""
+
+    type: str = "ping"

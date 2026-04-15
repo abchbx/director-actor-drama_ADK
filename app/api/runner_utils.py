@@ -3,12 +3,14 @@
 Iterates over ADK Runner event streams and extracts structured results:
 - final_response: The director's final text response
 - tool_results: Structured results from tool calls (function_response)
+- event_callback: Optional async callback for each event (Phase 14 WebSocket)
 """
 
 import asyncio
-from typing import Any
+from typing import Any, Awaitable, Callable
 
 from fastapi import HTTPException
+from google.adk.events import Event
 from google.adk.runners import Runner
 from google.genai import types
 
@@ -19,6 +21,7 @@ async def run_command_and_collect(
     user_id: str,
     session_id: str,
     timeout: float = 120.0,
+    event_callback: Callable[[Event], Awaitable[None]] | None = None,
 ) -> dict[str, Any]:
     """Run a command through the ADK Runner and collect structured results.
 
@@ -32,6 +35,9 @@ async def run_command_and_collect(
         user_id: User ID for the session.
         session_id: Session ID for the session.
         timeout: Maximum seconds to wait before raising 504.
+        event_callback: Optional async callback invoked for each Runner event.
+            When provided (WS scenario), receives every event for real-time push.
+            When None (REST scenario), behavior unchanged.
 
     Returns:
         Dict with "final_response" (str) and "tool_results" (list[dict]).
@@ -53,6 +59,14 @@ async def run_command_and_collect(
             session_id=session_id,
             new_message=content,
         ):
+            # D-01: Event callback for WS real-time push
+            # REST path: callback=None, behavior unchanged
+            if event_callback:
+                try:
+                    await event_callback(event)
+                except Exception:
+                    pass  # Callback failure must NOT block Runner execution
+
             if event.is_final_response():
                 if event.content and event.content.parts:
                     for part in event.content.parts:

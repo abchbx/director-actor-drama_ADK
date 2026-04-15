@@ -56,7 +56,7 @@ Plans:
 
 **Goal:** WebSocket 端点实时推送场景事件，EventBridge 观察 ADK Runner 事件流，100-event replay buffer 支持断线重连
 **Requirements:** WS-01, WS-02, WS-03, WS-04, WS-05
-**Plans:** ~3 plans
+**Plans:** 3 plans
 **Depends on:** Phase 13
 **Success Criteria:**
 1. 客户端连接 `ws://host:8000/api/v1/ws` 后实时接收场景生成事件（旁白/对白/场景完成）
@@ -66,9 +66,9 @@ Plans:
 5. 心跳机制（15s ping/pong）维持连接活跃，超时断连自动清理
 
 Plans:
-- [ ] 14-01-PLAN.md — EventBridge + WebSocket endpoint + event type definitions
-- [ ] 14-02-PLAN.md — 18 event type emission + progress push during LLM chain
-- [ ] 14-03-PLAN.md — Replay buffer + heartbeat + lifecycle management + reconnect handshake
+- [ ] 14-01-PLAN.md — EventBridge callback hook + WS endpoint + WsEvent models + event_mapper + ConnectionManager
+- [ ] 14-02-PLAN.md — 18 event type emission wiring + event_callback in commands.py + flush-before-push
+- [ ] 14-03-PLAN.md — Replay buffer + heartbeat (15s/30s) + lifecycle management + reconnect handshake + connection limit
 
 ### Phase 15: Authentication
 
@@ -177,7 +177,7 @@ Phase 16 (Android Foundation) ──── Phase 17 (Android Interaction) ──
 | 11. Timeline Tracking | v1.0 | 2/2 | Complete | 2026-04-14 |
 | 12. Integration & Polish | v1.0 | 4/4 | Complete | 2026-04-14 |
 | 13. API Foundation | v2.0 | 4/4 | Complete    | 2026-04-15 |
-| 14. WebSocket Layer | v2.0 | 0/~3 | Pending | — |
+| 14. WebSocket Layer | v2.0 | 0/3 | Planning | — |
 | 15. Authentication | v2.0 | 0/~2 | Pending | — |
 | 16. Android Foundation | v2.0 | 0/~3 | Pending | — |
 | 17. Android Interaction | v2.0 | 0/~3 | Pending | — |

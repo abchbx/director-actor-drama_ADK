@@ -16,6 +16,8 @@ from app.actor_service import stop_all_actor_services
 from app.agent import root_agent
 from app.api.lock import acquire_lock, release_lock
 from app.api.routers import commands, queries
+from app.api.routers import websocket as ws_router
+from app.api.ws_manager import ConnectionManager
 from app.state_manager import flush_state_sync
 
 # Constants matching CLI session configuration
@@ -50,7 +52,18 @@ async def lifespan(app: FastAPI):
     app.state.flush_before_push = True
     app.state.flush_state_sync = flush_state_sync
 
+    # Phase 14: Initialize ConnectionManager for WebSocket
+    manager = ConnectionManager()
+    app.state.connection_manager = manager
+
     yield
+
+    # Phase 14: Close all active WS connections
+    for ws in list(manager.active_connections):
+        try:
+            await ws.close()
+        except Exception:
+            pass
 
     # Shutdown: flush state, release lock, and stop actor services
     flush_state_sync()  # Ensure final state is written
@@ -82,5 +95,6 @@ def create_app() -> FastAPI:
     # Mount routers with API versioning prefix (API-04)
     app.include_router(commands.router, prefix="/api/v1")
     app.include_router(queries.router, prefix="/api/v1")
+    app.include_router(ws_router.router, prefix="/api/v1")
 
     return app
