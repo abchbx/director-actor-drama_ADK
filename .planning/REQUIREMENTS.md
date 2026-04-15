@@ -9,11 +9,11 @@ Requirements for C/S architecture: FastAPI API Server + Android (Kotlin/Jetpack 
 
 ### API Foundation
 
-- [ ] **API-01**: FastAPI application wraps existing DramaRouter without modifying 12 core modules
+- [x] **API-01**: FastAPI application wraps existing DramaRouter without modifying 12 core modules
 - [ ] **API-02**: 14 REST endpoints map all CLI commands (start, next, action, speak, cast, status, save, load, export, end, list, storm, auto_advance, steer). Note: `/quit` is a program exit command handled by process lifecycle, not a REST endpoint; `/storm` (trigger_storm) maps to `POST /api/v1/drama/storm` instead.
-- [ ] **API-03**: Pydantic v2 models define request/response schemas for all endpoints
-- [ ] **API-04**: API versioning via URL prefix `/api/v1/`
-- [ ] **API-05**: CORS middleware allows Android app origin
+- [x] **API-03**: Pydantic v2 models define request/response schemas for all endpoints
+- [x] **API-04**: API versioning via URL prefix `/api/v1/`
+- [x] **API-05**: CORS middleware allows Android app origin
 
 ### WebSocket Real-time Push
 
@@ -97,11 +97,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| API-01 | 13 | Mapped |
+| API-01 | 13 | ✅ Done (13-01) |
 | API-02 | 13 | Mapped |
-| API-03 | 13 | Mapped |
-| API-04 | 13 | Mapped |
-| API-05 | 13 | Mapped |
+| API-03 | 13 | ✅ Done (13-01) |
+| API-04 | 13 | ✅ Done (13-01) |
+| API-05 | 13 | ✅ Done (13-01) |
 | WS-01 | 14 | Mapped |
 | WS-02 | 14 | Mapped |
 | WS-03 | 14 | Mapped |

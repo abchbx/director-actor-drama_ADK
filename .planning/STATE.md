@@ -2,38 +2,38 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Android 移动端
-current_phase: 13 (API Foundation) — ready to plan
+current_phase: 13
 status: executing
-last_updated: "2026-04-15T10:05:19.198Z"
-last_activity: 2026-04-15 -- Phase 13 planning complete
+last_updated: "2026-04-15T10:31:49Z"
+last_activity: 2026-04-15 -- Completed 13-01-PLAN.md
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 4
-  completed_plans: 0
-  percent: 0
+  completed_plans: 1
+  percent: 25
 ---
 
 # State
 
 **Project:** Director-Actor-Drama 无限畅写版
 **Milestone:** v2.0 Android 移动端
-**Current Phase:** 13 (API Foundation) — ready to plan
-**Status:** Ready to execute
+**Current Phase:** 13
+**Status:** Executing Phase 13
 
 ## Current Position
 
-Phase: 13 — API Foundation
-Plan: —
-Status: Ready to execute
-Last activity: 2026-04-15 -- Phase 13 planning complete
+Phase: 13 (API Foundation) — EXECUTING
+Plan: 2 of 4
+Status: Completed 13-01-PLAN.md
+Last activity: 2026-04-15 -- Completed 13-01-PLAN.md
 
 ## Progress
 
 - [x] v1.0 milestone complete (12 phases, 29 plans, 517 tests)
 - [x] v2.0 requirements defined (32 requirements)
 - [x] v2.0 roadmap created (6 phases, ~18 plans)
-- [ ] Phase 13: API Foundation — ready to plan
+- [ ] Phase 13: API Foundation — 1/4 plans complete
 - [ ] Phase 14: WebSocket Layer
 - [ ] Phase 15: Authentication
 - [ ] Phase 16: Android Foundation
@@ -67,6 +67,9 @@ Last activity: 2026-04-15 -- Phase 13 planning complete
 - 100-event replay buffer 支持断线重连
 - CLI 保持独立入口（不改为 API 客户端），但 API 和 CLI 互斥运行
 - WebSocket 心跳 15s interval，30s 超时断连
+- 13-01: CORS allow_origins=["*"] dev mode; production restricts in Phase 15+
+- 13-01: ToolContextAdapter wraps session.state for state_manager compat
+- 13-01: Endpoint stubs return structured Pydantic models (not bare dicts)
 
 ## Key Risks (from PITFALLS.md)
 
