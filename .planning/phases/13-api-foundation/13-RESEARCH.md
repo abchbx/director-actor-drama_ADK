@@ -587,22 +587,13 @@ def release_lock():
 | A4 | `asyncio.Lock` 足以确保 Runner 单并发访问，不需要更复杂的排队机制 | Pitfall 6 | 如果需要请求排队+超时，需要 asyncio.Queue 或类似机制 |
 | A5 | FastAPI transitive dependency (via google-adk) is stable enough to use directly without pinning | Standard Stack | 如果 google-adk 升级导致 FastAPI 版本不兼容，需要显式 pin |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **ToolContext Adapter Design**
-   - What we know: state_manager functions accessed by API (save_progress, load_progress, get_current_state, get_all_actors, get_drama_folder, export_script, export_conversations, list_dramas) all accept `tool_context=None` parameter. Some use `tool_context.state["drama"]`.
-   - What's unclear: Whether any of these functions access ToolContext attributes beyond `.state` (e.g., `.session`, `.invocation_id`). Need to verify by reading each function implementation.
-   - Recommendation: Grep all called state_manager functions for `tool_context.` access patterns before implementing adapter.
+1. **ToolContext Adapter Design** — RESOLVED: Plan 01 implements `ToolContextAdapter(state=session.state)` as a lightweight adapter. Verified by grepping state_manager functions: all accessed functions only use `tool_context.state["drama"]`, no other ToolContext attributes needed. The adapter wraps `session.state` dict to satisfy the `tool_context` parameter contract.
 
-2. **`/speak` Endpoint Semantics**
-   - What we know: API-02 lists "speak" as one of 14 endpoints. The tool `actor_speak(actor_name, situation, tool_context)` calls A2A services.
-   - What's unclear: Should `/speak` be a direct actor communication endpoint (bypass director), or does it go through the director agent? Direct actor speak is not a CLI command.
-   - Recommendation: `/speak` 应该是一个直接向指定演员发送消息的端点，绕过 Director。这在 Android 端用于 Actor 面板交互。请求体需要 `actor_name` + `situation`。
+2. **`/speak` Endpoint Semantics** — RESOLVED: Plan 02 routes `/speak` through the Director (Runner path) via DramaRouter, not directly to actor. This is the safer design because: (a) DramaRouter already handles `/speak` command routing, (b) Director can add narration/context around actor speech, (c) maintaining consistency with CLI behavior. Request body: `actor_name` + `situation`, sent as `/speak {actor_name} {situation}` to Runner.
 
-3. **CORS Origin List**
-   - What we know: API-05 requires CORS for Android app. Claude's discretion on specific origins.
-   - What's unclear: Android app 的 origin 是什么？在开发阶段可能是 `http://localhost:*` 或 `*`。
-   - Recommendation: 开发阶段用 `allow_origins=["*"]`，生产阶段限制为 Android app 实际 origin（通常是 `capacitor://localhost` 或自定义 scheme）。
+3. **CORS Origin List** — RESOLVED: Development phase uses `allow_origins=["*"]` for maximum flexibility. Production phase will restrict to Android app actual origins (e.g., `capacitor://localhost`, custom scheme). CORS configuration is in `app/api/app.py` and can be updated without code changes via environment variables in Phase 15 (Authentication).
 
 ## Environment Availability
 
