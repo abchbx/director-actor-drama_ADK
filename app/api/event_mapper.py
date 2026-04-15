@@ -73,8 +73,16 @@ def _extract_response_data(event_type: str, response: dict) -> dict:
 
 
 def _extract_tension(response: dict) -> int | None:
-    """Extract tension score from response if present (D-06)."""
-    return response.get("tension_score") or response.get("tension")
+    """Extract tension score from response if present (D-06).
+
+    Returns None only when neither 'tension_score' nor 'tension' key exists.
+    A value of 0 is valid and should be emitted as a tension_update.
+    """
+    if "tension_score" in response:
+        return response["tension_score"]
+    if "tension" in response:
+        return response["tension"]
+    return None
 
 
 def map_runner_event(event: Event) -> list[dict]:

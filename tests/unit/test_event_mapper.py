@@ -166,6 +166,25 @@ class TestMapRunnerEvent:
         assert len(tension_events) == 1
         assert tension_events[0]["data"]["tension_score"] == 5
 
+    def test_function_response_with_tension_zero_emits_tension_update(self):
+        """tension_score=0 is a valid value and emits tension_update."""
+        event = Event(
+            author="model",
+            content=types.Content(
+                parts=[
+                    types.Part.from_function_response(
+                        name="next_scene",
+                        response={"status": "success", "tension_score": 0},
+                    )
+                ],
+                role="model",
+            ),
+        )
+        results = map_runner_event(event)
+        tension_events = [r for r in results if r["type"] == "tension_update"]
+        assert len(tension_events) == 1
+        assert tension_events[0]["data"]["tension_score"] == 0
+
     def test_final_response_emits_end_narration(self):
         """Final response with text emits end_narration (D-06)."""
         event = Event(
@@ -784,10 +803,8 @@ class TestConditionalEvents:
         assert len(narration_events) == 1
         assert narration_events[0]["data"]["text"] == "The drama has ended beautifully."
 
-    def test_tension_update_not_emitted_for_zero_tension(self):
-        """tension_update not emitted when tension_score is 0 (falsy but valid)."""
-        # _extract_tension returns None for 0 because of the `or` pattern
-        # This is by design — 0 tension means no update needed
+    def test_tension_update_emitted_for_zero_tension(self):
+        """tension_update IS emitted when tension_score is 0 (valid value)."""
         event = Event(
             author="model",
             content=types.Content(
@@ -802,8 +819,8 @@ class TestConditionalEvents:
         )
         results = map_runner_event(event)
         tension_events = [r for r in results if r["type"] == "tension_update"]
-        # tension_score=0 is falsy, so _extract_tension returns None
-        assert len(tension_events) == 0
+        assert len(tension_events) == 1
+        assert tension_events[0]["data"]["tension_score"] == 0
 
 
 class TestStartDramaMultiEvent:
