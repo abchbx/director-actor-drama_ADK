@@ -37,7 +37,7 @@
 
 **Goal:** FastAPI 应用包裹现有 DramaRouter，14 个 REST 端点映射所有 CLI 命令，Pydantic v2 模型定义请求/响应契约，CORS + URL 版本前缀 + 全局状态迁移
 **Requirements:** API-01, API-02, API-03, API-04, API-05, STATE-01, STATE-02, STATE-03
-**Plans:** 3/4 plans executed
+**Plans:** 4/4 plans complete
 **Depends on:** —
 **Success Criteria:**
 1. `POST /api/v1/drama/start` 返回 drama_id + theme + status，不修改 12 个核心模块
@@ -50,7 +50,7 @@ Plans:
 - [x] 13-01-PLAN.md — FastAPI app skeleton + CORS + versioning + Pydantic models
 - [x] 13-02-PLAN.md — REST endpoints (command-style: start/next/action/speak/steer/auto/end/storm)
 - [x] 13-03-PLAN.md — REST endpoints (query-style: status/cast/save/load/list/export) + state migration
-- [ ] 13-04-PLAN.md — Debounce flush-on-push + single-session enforcement + integration tests
+- [x] 13-04-PLAN.md — Debounce flush-on-push + single-session enforcement + integration tests
 
 ### Phase 14: WebSocket Layer
 
@@ -176,7 +176,7 @@ Phase 16 (Android Foundation) ──── Phase 17 (Android Interaction) ──
 | 10. Coherence System | v1.0 | 2/2 | Complete | 2026-04-13 |
 | 11. Timeline Tracking | v1.0 | 2/2 | Complete | 2026-04-14 |
 | 12. Integration & Polish | v1.0 | 4/4 | Complete | 2026-04-14 |
-| 13. API Foundation | v2.0 | 3/4 | In Progress|  |
+| 13. API Foundation | v2.0 | 4/4 | Complete   | 2026-04-15 |
 | 14. WebSocket Layer | v2.0 | 0/~3 | Pending | — |
 | 15. Authentication | v2.0 | 0/~2 | Pending | — |
 | 16. Android Foundation | v2.0 | 0/~3 | Pending | — |

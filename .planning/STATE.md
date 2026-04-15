@@ -4,14 +4,14 @@ milestone: v2.0
 milestone_name: Android 移动端
 current_phase: 13
 status: executing
-last_updated: "2026-04-15T11:26:34.225Z"
+last_updated: "2026-04-15T11:40:57.091Z"
 last_activity: 2026-04-15
 progress:
   total_phases: 6
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 4
-  completed_plans: 3
-  percent: 75
+  completed_plans: 4
+  percent: 100
 ---
 
 # State
@@ -23,9 +23,9 @@ progress:
 
 ## Current Position
 
-Phase: 13 (API Foundation) — EXECUTING
-Plan: 3 of 4
-Status: Ready to execute
+Phase: 13 (API Foundation) — COMPLETE
+Plan: 4 of 4 (all done)
+Status: Phase complete
 Last activity: 2026-04-15
 
 ## Progress
@@ -33,7 +33,7 @@ Last activity: 2026-04-15
 - [x] v1.0 milestone complete (12 phases, 29 plans, 517 tests)
 - [x] v2.0 requirements defined (32 requirements)
 - [x] v2.0 roadmap created (6 phases, ~18 plans)
-- [ ] Phase 13: API Foundation — 3/4 plans complete
+- [x] Phase 13: API Foundation — 4/4 plans complete ✅
 - [ ] Phase 14: WebSocket Layer
 - [ ] Phase 15: Authentication
 - [ ] Phase 16: Android Foundation
@@ -58,6 +58,8 @@ Last activity: 2026-04-15
 - [Phase 13]: 13-03: _current_drama_folder global removed entirely — ValueError replaces silent fallback
 - [Phase 13]: 13-03: _require_active_drama helper centralizes 404 guard for query endpoints
 - [Phase 13]: 13-03: Query endpoints call state_manager directly (D-05) without Runner
+- [Phase 13]: Lock file at app/.api.lock uses PID for liveness detection; CLI and API mutually exclusive (D-07/STATE-03)
+- [Phase 13]: flush-on-push hook: app.state.flush_state_sync reference for Phase 14 WebSocket (STATE-02)
 
 ### v2.0 Decisions
 
@@ -80,8 +82,8 @@ Last activity: 2026-04-15
 |------|-------|------------|
 | Event Loop 冲突 (P0) | 13 | FastAPI + ADK Runner 共享事件循环，避免嵌套 asyncio.run() |
 | 全局状态迁移 (P0) | 13 | ~~_current_drama_folder → session-scoped context~~ DONE (13-03) |
-| CLI 互斥 (P0) | 13 | Lock file 或进程检测，CLI 和 API 不可同时运行 |
-| 状态同步 (P1) | 13-14 | WebSocket 推送前 flush-on-push |
+| CLI 互斥 (P0) | 13 | ~~Lock file 或进程检测~~ DONE (13-04: lock file + stale PID detection) |
+| 状态同步 (P1) | 13-14 | ~~WebSocket 推送前 flush-on-push~~ Hook ready (13-04); WebSocket wiring in 14 |
 | WebSocket 长 LLM 调用 (P1) | 14 | 心跳 + 进度推送 + 请求去重 |
 | Android 网络切换 (P2) | 17-18 | 自动重连 + 指数退避 + Foreground Service |
 

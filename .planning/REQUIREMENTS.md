@@ -33,8 +33,8 @@ Requirements for C/S architecture: FastAPI API Server + Android (Kotlin/Jetpack 
 ### State Migration
 
 - [x] **STATE-01**: `_current_drama_folder` global variable migrated to session-scoped context
-- [ ] **STATE-02**: Debounce flush-on-push: state is force-saved before WebSocket push events
-- [ ] **STATE-03**: API server supports one active drama session at a time (single-user mode preserved)
+- [x] **STATE-02**: Debounce flush-on-push: state is force-saved before WebSocket push events
+- [x] **STATE-03**: API server supports one active drama session at a time (single-user mode preserved)
 
 ### Android App — Core
 
