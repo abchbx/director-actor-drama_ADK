@@ -93,6 +93,21 @@ class TestMapRunnerEvent:
         assert "status" in event_types
         assert len(results) == 3  # typing + scene_start + status
 
+    def test_next_scene_function_call_emits_typing_and_scene_start(self):
+        """next_scene function_call emits typing + scene_start."""
+        event = Event(
+            author="model",
+            content=types.Content(
+                parts=[types.Part.from_function_call(name="next_scene", args={})],
+                role="model",
+            ),
+        )
+        results = map_runner_event(event)
+        event_types = [r["type"] for r in results]
+        assert "typing" in event_types
+        assert "scene_start" in event_types
+        assert len(results) == 2  # typing + scene_start
+
     def test_function_response_with_error_emits_error_event(self):
         """function_response with status='error' emits error event (D-06)."""
         event = Event(
@@ -185,6 +200,9 @@ class TestMapRunnerEvent:
         assert "typing" in event_types
         assert "actor_created" in event_types
         assert "cast_update" in event_types
+        # Verify actor_name is extracted for actor_created
+        actor_created_events = [r for r in results if r["type"] == "actor_created"]
+        assert actor_created_events[0]["data"]["actor_name"] == "Alice"
 
     def test_non_mapped_function_call_emits_only_typing(self):
         """Unknown function_call emits only typing, no mapped events."""
@@ -222,3 +240,151 @@ class TestMapRunnerEvent:
         assert len(scene_end_events) == 1
         assert scene_end_events[0]["data"]["scene_number"] == 3
         assert scene_end_events[0]["data"]["scene_title"] == "The Confrontation"
+
+    def test_next_scene_response_with_tension_emits_tension_and_scene_start(self):
+        """next_scene response with tension emits both tension_update and scene_start."""
+        event = Event(
+            author="model",
+            content=types.Content(
+                parts=[
+                    types.Part.from_function_response(
+                        name="next_scene",
+                        response={"status": "success", "tension_score": 8},
+                    )
+                ],
+                role="model",
+            ),
+        )
+        results = map_runner_event(event)
+        event_types = [r["type"] for r in results]
+        assert "tension_update" in event_types
+        assert "scene_start" in event_types
+
+    def test_update_emotion_response_emits_actor_status(self):
+        """update_emotion response emits actor_status with emotion data."""
+        event = Event(
+            author="model",
+            content=types.Content(
+                parts=[
+                    types.Part.from_function_response(
+                        name="update_emotion",
+                        response={"status": "success", "actor_name": "Bob", "emotion": "angry"},
+                    )
+                ],
+                role="model",
+            ),
+        )
+        results = map_runner_event(event)
+        status_events = [r for r in results if r["type"] == "actor_status"]
+        assert len(status_events) == 1
+        assert status_events[0]["data"]["actor_name"] == "Bob"
+        assert status_events[0]["data"]["emotion"] == "angry"
+
+    def test_save_drama_response_emits_save_confirm(self):
+        """save_drama response emits save_confirm with message."""
+        event = Event(
+            author="model",
+            content=types.Content(
+                parts=[
+                    types.Part.from_function_response(
+                        name="save_drama",
+                        response={"status": "success", "message": "Saved!"},
+                    )
+                ],
+                role="model",
+            ),
+        )
+        results = map_runner_event(event)
+        confirm_events = [r for r in results if r["type"] == "save_confirm"]
+        assert len(confirm_events) == 1
+        assert confirm_events[0]["data"]["message"] == "Saved!"
+
+    def test_load_drama_response_emits_load_confirm(self):
+        """load_drama response emits load_confirm with message and theme."""
+        event = Event(
+            author="model",
+            content=types.Content(
+                parts=[
+                    types.Part.from_function_response(
+                        name="load_drama",
+                        response={"status": "success", "message": "Loaded!", "theme": "mystery"},
+                    )
+                ],
+                role="model",
+            ),
+        )
+        results = map_runner_event(event)
+        confirm_events = [r for r in results if r["type"] == "load_confirm"]
+        assert len(confirm_events) == 1
+        assert confirm_events[0]["data"]["message"] == "Loaded!"
+        assert confirm_events[0]["data"]["theme"] == "mystery"
+
+    def test_export_drama_response_emits_progress(self):
+        """export_drama response emits progress with message and export_path."""
+        event = Event(
+            author="model",
+            content=types.Content(
+                parts=[
+                    types.Part.from_function_response(
+                        name="export_drama",
+                        response={"status": "success", "message": "Exported!", "export_path": "/tmp/drama.md"},
+                    )
+                ],
+                role="model",
+            ),
+        )
+        results = map_runner_event(event)
+        progress_events = [r for r in results if r["type"] == "progress"]
+        assert len(progress_events) == 1
+        assert progress_events[0]["data"]["message"] == "Exported!"
+        assert progress_events[0]["data"]["export_path"] == "/tmp/drama.md"
+
+    def test_end_drama_response_emits_end_narration(self):
+        """end_drama function_response emits end_narration with formatted_narration."""
+        event = Event(
+            author="model",
+            content=types.Content(
+                parts=[
+                    types.Part.from_function_response(
+                        name="end_drama",
+                        response={"status": "success", "formatted_narration": "Thus it ends."},
+                    )
+                ],
+                role="model",
+            ),
+        )
+        results = map_runner_event(event)
+        narration_events = [r for r in results if r["type"] == "end_narration"]
+        assert len(narration_events) == 1
+        assert narration_events[0]["data"]["text"] == "Thus it ends."
+
+    def test_multiple_events_from_one_function_call(self):
+        """One function_call can produce multiple events (D-07: one-to-many)."""
+        event = Event(
+            author="model",
+            content=types.Content(
+                parts=[types.Part.from_function_call(name="start_drama", args={"theme": "test"})],
+                role="model",
+            ),
+        )
+        results = map_runner_event(event)
+        # start_drama → typing + scene_start + status = 3 events
+        assert len(results) == 3
+
+    def test_no_tension_update_when_not_present(self):
+        """No tension_update event when tension fields are absent."""
+        event = Event(
+            author="model",
+            content=types.Content(
+                parts=[
+                    types.Part.from_function_response(
+                        name="next_scene",
+                        response={"status": "success"},
+                    )
+                ],
+                role="model",
+            ),
+        )
+        results = map_runner_event(event)
+        tension_events = [r for r in results if r["type"] == "tension_update"]
+        assert len(tension_events) == 0
