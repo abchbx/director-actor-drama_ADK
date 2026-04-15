@@ -388,3 +388,538 @@ class TestMapRunnerEvent:
         results = map_runner_event(event)
         tension_events = [r for r in results if r["type"] == "tension_update"]
         assert len(tension_events) == 0
+
+
+class TestAll18EventTypes:
+    """Verify all 18 business event types can be produced by map_runner_event."""
+
+    ALL_18_EVENT_TYPES = {
+        "scene_start",
+        "narration",
+        "dialogue",
+        "scene_end",
+        "tension_update",
+        "actor_created",
+        "actor_status",
+        "storm_discover",
+        "storm_research",
+        "storm_outline",
+        "error",
+        "typing",
+        "status",
+        "cast_update",
+        "progress",
+        "save_confirm",
+        "load_confirm",
+        "end_narration",
+    }
+
+    def test_all_18_event_types_producible(self):
+        """All 18 event types can be produced by map_runner_event."""
+        produced_types: set[str] = set()
+
+        # --- function_call events (produces typing + mapped events) ---
+        fc_test_cases = {
+            "start_drama": {"theme": "test"},
+            "next_scene": {},
+            "director_narrate": {"narration": "test"},
+            "actor_speak": {"actor_name": "Alice", "situation": "test"},
+            "write_scene": {},
+            "update_emotion": {"actor_name": "Bob", "emotion": "angry"},
+            "create_actor": {"actor_name": "Charlie"},
+            "storm_discover_perspectives": {"theme": "test"},
+            "storm_research_perspective": {"perspective_name": "test"},
+            "storm_synthesize_outline": {"theme": "test"},
+            "save_drama": {"save_name": "test"},
+            "load_drama": {"save_name": "test"},
+            "export_drama": {},
+            "end_drama": {},
+        }
+
+        for tool_name, args in fc_test_cases.items():
+            event = Event(
+                author="model",
+                content=types.Content(
+                    parts=[types.Part.from_function_call(name=tool_name, args=args)],
+                    role="model",
+                ),
+            )
+            results = map_runner_event(event)
+            for r in results:
+                produced_types.add(r["type"])
+
+        # --- function_response events (conditional + mapped) ---
+        fr_test_cases = [
+            # next_scene with tension → tension_update + scene_start
+            ("next_scene", {"status": "success", "tension_score": 7}),
+            # write_scene with tension → tension_update + scene_end
+            ("write_scene", {"status": "success", "tension": 5, "scene_number": 1, "scene_title": "T"}),
+            # error event
+            ("next_scene", {"status": "error", "message": "fail"}),
+            # end_drama response → end_narration
+            ("end_drama", {"status": "success", "formatted_narration": "The end."}),
+            # update_emotion response → actor_status
+            ("update_emotion", {"status": "success", "actor_name": "Bob", "emotion": "sad"}),
+            # save_drama response → save_confirm
+            ("save_drama", {"status": "success", "message": "Saved"}),
+            # load_drama response → load_confirm
+            ("load_drama", {"status": "success", "message": "Loaded", "theme": "test"}),
+            # export_drama response → progress
+            ("export_drama", {"status": "success", "message": "Done", "export_path": "/tmp/d.md"}),
+            # create_actor response → actor_created + cast_update
+            ("create_actor", {"status": "success", "actor_name": "Alice"}),
+            # director_narrate response → narration
+            ("director_narrate", {"status": "success"}),
+            # actor_speak response → dialogue
+            ("actor_speak", {"status": "success"}),
+            # start_drama response → scene_start + status
+            ("start_drama", {"status": "success"}),
+            # storm_discover_perspectives response → storm_discover
+            ("storm_discover_perspectives", {"status": "success"}),
+            # storm_research_perspective response → storm_research
+            ("storm_research_perspective", {"status": "success"}),
+            # storm_synthesize_outline response → storm_outline
+            ("storm_synthesize_outline", {"status": "success"}),
+        ]
+
+        for tool_name, response in fr_test_cases:
+            event = Event(
+                author="model",
+                content=types.Content(
+                    parts=[
+                        types.Part.from_function_response(
+                            name=tool_name,
+                            response=response,
+                        )
+                    ],
+                    role="model",
+                ),
+            )
+            results = map_runner_event(event)
+            for r in results:
+                produced_types.add(r["type"])
+
+        # --- final_response → end_narration from text ---
+        event = Event(
+            author="model",
+            turn_complete=True,
+            content=types.Content(
+                parts=[types.Part.from_text(text="The drama concludes.")],
+                role="model",
+            ),
+        )
+        results = map_runner_event(event)
+        for r in results:
+            produced_types.add(r["type"])
+
+        # Verify all 18 types are produced
+        missing = self.ALL_18_EVENT_TYPES - produced_types
+        assert not missing, f"Missing event types: {missing}. Produced: {produced_types}"
+
+    def test_exactly_18_event_types_defined(self):
+        """TOOL_EVENT_MAP values + conditional types = exactly 18 unique event types."""
+        # Get types from TOOL_EVENT_MAP
+        map_types: set[str] = set()
+        for event_types in TOOL_EVENT_MAP.values():
+            map_types.update(event_types)
+
+        # Add conditional types that are not in TOOL_EVENT_MAP
+        conditional_types = {"typing", "error", "tension_update", "end_narration"}
+        all_types = map_types | conditional_types
+
+        assert len(all_types) == 18, f"Expected 18 event types, got {len(all_types)}: {all_types}"
+
+
+class TestDirectorNarrateMapping:
+    """Test director_narrate → narration event mapping."""
+
+    def test_director_narrate_function_call_emits_typing_and_narration(self):
+        """director_narrate function_call emits typing + narration."""
+        event = Event(
+            author="model",
+            content=types.Content(
+                parts=[types.Part.from_function_call(name="director_narrate", args={"narration": "dark night"})],
+                role="model",
+            ),
+        )
+        results = map_runner_event(event)
+        event_types = [r["type"] for r in results]
+        assert "typing" in event_types
+        assert "narration" in event_types
+
+    def test_director_narrate_response_emits_narration(self):
+        """director_narrate function_response emits narration."""
+        event = Event(
+            author="model",
+            content=types.Content(
+                parts=[
+                    types.Part.from_function_response(
+                        name="director_narrate",
+                        response={"status": "success"},
+                    )
+                ],
+                role="model",
+            ),
+        )
+        results = map_runner_event(event)
+        narration_events = [r for r in results if r["type"] == "narration"]
+        assert len(narration_events) == 1
+
+
+class TestActorSpeakMapping:
+    """Test actor_speak → dialogue event mapping."""
+
+    def test_actor_speak_function_call_emits_typing_and_dialogue(self):
+        """actor_speak function_call emits typing + dialogue with actor_name."""
+        event = Event(
+            author="model",
+            content=types.Content(
+                parts=[
+                    types.Part.from_function_call(
+                        name="actor_speak",
+                        args={"actor_name": "Hamlet", "situation": "contemplating"},
+                    )
+                ],
+                role="model",
+            ),
+        )
+        results = map_runner_event(event)
+        event_types = [r["type"] for r in results]
+        assert "typing" in event_types
+        assert "dialogue" in event_types
+        dialogue_events = [r for r in results if r["type"] == "dialogue"]
+        assert dialogue_events[0]["data"]["actor_name"] == "Hamlet"
+
+    def test_actor_speak_response_emits_dialogue(self):
+        """actor_speak function_response emits dialogue."""
+        event = Event(
+            author="model",
+            content=types.Content(
+                parts=[
+                    types.Part.from_function_response(
+                        name="actor_speak",
+                        response={"status": "success"},
+                    )
+                ],
+                role="model",
+            ),
+        )
+        results = map_runner_event(event)
+        dialogue_events = [r for r in results if r["type"] == "dialogue"]
+        assert len(dialogue_events) == 1
+
+
+class TestStormMappings:
+    """Test STORM tool → storm_* event mappings."""
+
+    def test_storm_discover_function_call_emits_typing_and_storm_discover(self):
+        """storm_discover_perspectives function_call emits typing + storm_discover."""
+        event = Event(
+            author="model",
+            content=types.Content(
+                parts=[types.Part.from_function_call(name="storm_discover_perspectives", args={"theme": "test"})],
+                role="model",
+            ),
+        )
+        results = map_runner_event(event)
+        event_types = [r["type"] for r in results]
+        assert "typing" in event_types
+        assert "storm_discover" in event_types
+
+    def test_storm_research_function_call_emits_typing_and_storm_research(self):
+        """storm_research_perspective function_call emits typing + storm_research."""
+        event = Event(
+            author="model",
+            content=types.Content(
+                parts=[types.Part.from_function_call(name="storm_research_perspective", args={"perspective_name": "test"})],
+                role="model",
+            ),
+        )
+        results = map_runner_event(event)
+        event_types = [r["type"] for r in results]
+        assert "typing" in event_types
+        assert "storm_research" in event_types
+
+    def test_storm_synthesize_function_call_emits_typing_and_storm_outline(self):
+        """storm_synthesize_outline function_call emits typing + storm_outline."""
+        event = Event(
+            author="model",
+            content=types.Content(
+                parts=[types.Part.from_function_call(name="storm_synthesize_outline", args={"theme": "test"})],
+                role="model",
+            ),
+        )
+        results = map_runner_event(event)
+        event_types = [r["type"] for r in results]
+        assert "typing" in event_types
+        assert "storm_outline" in event_types
+
+    def test_storm_discover_response_emits_storm_discover(self):
+        """storm_discover_perspectives response emits storm_discover."""
+        event = Event(
+            author="model",
+            content=types.Content(
+                parts=[
+                    types.Part.from_function_response(
+                        name="storm_discover_perspectives",
+                        response={"status": "success"},
+                    )
+                ],
+                role="model",
+            ),
+        )
+        results = map_runner_event(event)
+        discover_events = [r for r in results if r["type"] == "storm_discover"]
+        assert len(discover_events) == 1
+
+    def test_storm_research_response_emits_storm_research(self):
+        """storm_research_perspective response emits storm_research."""
+        event = Event(
+            author="model",
+            content=types.Content(
+                parts=[
+                    types.Part.from_function_response(
+                        name="storm_research_perspective",
+                        response={"status": "success"},
+                    )
+                ],
+                role="model",
+            ),
+        )
+        results = map_runner_event(event)
+        research_events = [r for r in results if r["type"] == "storm_research"]
+        assert len(research_events) == 1
+
+    def test_storm_synthesize_response_emits_storm_outline(self):
+        """storm_synthesize_outline response emits storm_outline."""
+        event = Event(
+            author="model",
+            content=types.Content(
+                parts=[
+                    types.Part.from_function_response(
+                        name="storm_synthesize_outline",
+                        response={"status": "success"},
+                    )
+                ],
+                role="model",
+            ),
+        )
+        results = map_runner_event(event)
+        outline_events = [r for r in results if r["type"] == "storm_outline"]
+        assert len(outline_events) == 1
+
+
+class TestConditionalEvents:
+    """Test conditional event detection: tension_update, cast_update, error, end_narration."""
+
+    def test_write_scene_with_tension_emits_tension_update(self):
+        """write_scene response with tension emits tension_update + scene_end."""
+        event = Event(
+            author="model",
+            content=types.Content(
+                parts=[
+                    types.Part.from_function_response(
+                        name="write_scene",
+                        response={"status": "success", "tension_score": 6, "scene_number": 2, "scene_title": "Test"},
+                    )
+                ],
+                role="model",
+            ),
+        )
+        results = map_runner_event(event)
+        event_types = [r["type"] for r in results]
+        assert "tension_update" in event_types
+        assert "scene_end" in event_types
+
+    def test_create_actor_response_emits_cast_update_alongside_actor_created(self):
+        """create_actor response emits both actor_created + cast_update (D-06)."""
+        event = Event(
+            author="model",
+            content=types.Content(
+                parts=[
+                    types.Part.from_function_response(
+                        name="create_actor",
+                        response={"status": "success", "actor_name": "Alice"},
+                    )
+                ],
+                role="model",
+            ),
+        )
+        results = map_runner_event(event)
+        event_types = [r["type"] for r in results]
+        assert "actor_created" in event_types
+        assert "cast_update" in event_types
+
+    def test_error_event_from_any_function_response(self):
+        """Any function_response with status='error' emits error event (D-06)."""
+        for tool_name in ["start_drama", "next_scene", "director_narrate"]:
+            event = Event(
+                author="model",
+                content=types.Content(
+                    parts=[
+                        types.Part.from_function_response(
+                            name=tool_name,
+                            response={"status": "error", "message": "fail"},
+                        )
+                    ],
+                    role="model",
+                ),
+            )
+            results = map_runner_event(event)
+            error_events = [r for r in results if r["type"] == "error"]
+            assert len(error_events) == 1, f"Expected error event for {tool_name}"
+
+    def test_end_narration_from_final_response_text(self):
+        """final_response with text produces end_narration (D-06)."""
+        event = Event(
+            author="model",
+            turn_complete=True,
+            content=types.Content(
+                parts=[types.Part.from_text(text="The drama has ended beautifully.")],
+                role="model",
+            ),
+        )
+        results = map_runner_event(event)
+        narration_events = [r for r in results if r["type"] == "end_narration"]
+        assert len(narration_events) == 1
+        assert narration_events[0]["data"]["text"] == "The drama has ended beautifully."
+
+    def test_tension_update_not_emitted_for_zero_tension(self):
+        """tension_update not emitted when tension_score is 0 (falsy but valid)."""
+        # _extract_tension returns None for 0 because of the `or` pattern
+        # This is by design — 0 tension means no update needed
+        event = Event(
+            author="model",
+            content=types.Content(
+                parts=[
+                    types.Part.from_function_response(
+                        name="next_scene",
+                        response={"status": "success", "tension_score": 0},
+                    )
+                ],
+                role="model",
+            ),
+        )
+        results = map_runner_event(event)
+        tension_events = [r for r in results if r["type"] == "tension_update"]
+        # tension_score=0 is falsy, so _extract_tension returns None
+        assert len(tension_events) == 0
+
+
+class TestStartDramaMultiEvent:
+    """Test start_drama one-to-many mapping (D-07)."""
+
+    def test_start_drama_function_call_produces_typing_scene_start_status(self):
+        """start_drama function_call → typing + scene_start + status (D-07)."""
+        event = Event(
+            author="model",
+            content=types.Content(
+                parts=[types.Part.from_function_call(name="start_drama", args={"theme": "test"})],
+                role="model",
+            ),
+        )
+        results = map_runner_event(event)
+        event_types = [r["type"] for r in results]
+        assert "typing" in event_types
+        assert "scene_start" in event_types
+        assert "status" in event_types
+        assert len(results) == 3
+
+    def test_start_drama_response_produces_scene_start_status(self):
+        """start_drama function_response → scene_start + status."""
+        event = Event(
+            author="model",
+            content=types.Content(
+                parts=[
+                    types.Part.from_function_response(
+                        name="start_drama",
+                        response={"status": "success"},
+                    )
+                ],
+                role="model",
+            ),
+        )
+        results = map_runner_event(event)
+        event_types = [r["type"] for r in results]
+        assert "scene_start" in event_types
+        assert "status" in event_types
+
+
+class TestEdgeCases:
+    """Test edge cases for map_runner_event."""
+
+    def test_event_with_empty_content_returns_empty_list(self):
+        """Event with empty content returns []."""
+        event = Event(author="model")
+        assert map_runner_event(event) == []
+
+    def test_function_response_with_none_response_dict(self):
+        """function_response with None response dict handles gracefully."""
+        event = Event(
+            author="model",
+            content=types.Content(
+                parts=[
+                    types.Part.from_function_response(
+                        name="next_scene",
+                        response=None,
+                    )
+                ],
+                role="model",
+            ),
+        )
+        results = map_runner_event(event)
+        # Should not crash — response defaults to {}
+        assert isinstance(results, list)
+
+    def test_unknown_tool_function_call_emits_only_typing(self):
+        """function_call with unknown tool name produces only typing event."""
+        event = Event(
+            author="model",
+            content=types.Content(
+                parts=[types.Part.from_function_call(name="nonexistent_tool", args={})],
+                role="model",
+            ),
+        )
+        results = map_runner_event(event)
+        assert len(results) == 1
+        assert results[0]["type"] == "typing"
+
+    def test_event_with_both_function_call_and_response(self):
+        """Event with both function_call and function_response produces events from both."""
+        event = Event(
+            author="model",
+            content=types.Content(
+                parts=[
+                    types.Part.from_function_call(name="next_scene", args={}),
+                    types.Part.from_function_response(
+                        name="next_scene",
+                        response={"status": "success", "tension_score": 5},
+                    ),
+                ],
+                role="model",
+            ),
+        )
+        results = map_runner_event(event)
+        event_types = [r["type"] for r in results]
+        # From function_call: typing + scene_start
+        # From function_response: tension_update + scene_start
+        assert "typing" in event_types
+        assert "scene_start" in event_types
+        assert "tension_update" in event_types
+        # Two scene_start events (one from call, one from response)
+        scene_start_count = sum(1 for t in event_types if t == "scene_start")
+        assert scene_start_count == 2
+
+    def test_final_response_without_text_emits_no_end_narration(self):
+        """Final response without text does not emit end_narration."""
+        event = Event(
+            author="model",
+            turn_complete=True,
+            content=types.Content(
+                parts=[types.Part.from_text(text="")],
+                role="model",
+            ),
+        )
+        results = map_runner_event(event)
+        end_narration_events = [r for r in results if r["type"] == "end_narration"]
+        assert len(end_narration_events) == 0
