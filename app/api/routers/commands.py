@@ -9,7 +9,7 @@ Each endpoint:
 5. Returns structured CommandResponse
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.api.deps import get_runner, get_runner_lock, get_tool_context
 from app.api.models import (
@@ -36,9 +36,23 @@ def _require_active_drama(tool_context):
         raise HTTPException(status_code=404, detail="No active drama session")
 
 
+def _get_event_callback(request: Request):
+    """Get event_callback from ConnectionManager if WS clients are connected.
+
+    D-12: REST and WS coexist — event_callback is None when no WS clients.
+    D-02: EventBridge is a callback function created by ConnectionManager.
+    """
+    manager = getattr(request.app.state, "connection_manager", None)
+    if manager and manager.active_connections:
+        flush_fn = getattr(request.app.state, "flush_state_sync", None)
+        return manager.create_broadcast_callback(flush_fn=flush_fn)
+    return None
+
+
 @router.post("/drama/start", response_model=CommandResponse)
 async def start_drama(
-    request: StartDramaRequest,
+    body: StartDramaRequest,
+    req: Request,
     runner=Depends(get_runner),
     lock=Depends(get_runner_lock),
     tool_context=Depends(get_tool_context),
@@ -57,13 +71,15 @@ async def start_drama(
             flush_state_sync()
 
         result = await run_command_and_collect(
-            runner, f"/start {request.theme}", USER_ID, SESSION_ID
+            runner, f"/start {body.theme}", USER_ID, SESSION_ID,
+            event_callback=_get_event_callback(req),
         )
         return CommandResponse(**result)
 
 
 @router.post("/drama/next", response_model=CommandResponse)
 async def next_scene(
+    req: Request,
     runner=Depends(get_runner),
     lock=Depends(get_runner_lock),
     tool_context=Depends(get_tool_context),
@@ -72,14 +88,16 @@ async def next_scene(
     async with lock:
         _require_active_drama(tool_context)
         result = await run_command_and_collect(
-            runner, "/next", USER_ID, SESSION_ID
+            runner, "/next", USER_ID, SESSION_ID,
+            event_callback=_get_event_callback(req),
         )
         return CommandResponse(**result)
 
 
 @router.post("/drama/action", response_model=CommandResponse)
 async def user_action(
-    request: ActionRequest,
+    body: ActionRequest,
+    req: Request,
     runner=Depends(get_runner),
     lock=Depends(get_runner_lock),
     tool_context=Depends(get_tool_context),
@@ -88,14 +106,16 @@ async def user_action(
     async with lock:
         _require_active_drama(tool_context)
         result = await run_command_and_collect(
-            runner, f"/action {request.description}", USER_ID, SESSION_ID
+            runner, f"/action {body.description}", USER_ID, SESSION_ID,
+            event_callback=_get_event_callback(req),
         )
         return CommandResponse(**result)
 
 
 @router.post("/drama/speak", response_model=CommandResponse)
 async def actor_speak(
-    request: SpeakRequest,
+    body: SpeakRequest,
+    req: Request,
     runner=Depends(get_runner),
     lock=Depends(get_runner_lock),
     tool_context=Depends(get_tool_context),
@@ -105,16 +125,18 @@ async def actor_speak(
         _require_active_drama(tool_context)
         result = await run_command_and_collect(
             runner,
-            f"/speak {request.actor_name} {request.situation}",
+            f"/speak {body.actor_name} {body.situation}",
             USER_ID,
             SESSION_ID,
+            event_callback=_get_event_callback(req),
         )
         return CommandResponse(**result)
 
 
 @router.post("/drama/steer", response_model=CommandResponse)
 async def steer_drama(
-    request: SteerRequest,
+    body: SteerRequest,
+    req: Request,
     runner=Depends(get_runner),
     lock=Depends(get_runner_lock),
     tool_context=Depends(get_tool_context),
@@ -123,14 +145,16 @@ async def steer_drama(
     async with lock:
         _require_active_drama(tool_context)
         result = await run_command_and_collect(
-            runner, f"/steer {request.direction}", USER_ID, SESSION_ID
+            runner, f"/steer {body.direction}", USER_ID, SESSION_ID,
+            event_callback=_get_event_callback(req),
         )
         return CommandResponse(**result)
 
 
 @router.post("/drama/auto", response_model=CommandResponse)
 async def auto_advance(
-    request: AutoRequest,
+    body: AutoRequest,
+    req: Request,
     runner=Depends(get_runner),
     lock=Depends(get_runner_lock),
     tool_context=Depends(get_tool_context),
@@ -139,13 +163,15 @@ async def auto_advance(
     async with lock:
         _require_active_drama(tool_context)
         result = await run_command_and_collect(
-            runner, f"/auto {request.num_scenes}", USER_ID, SESSION_ID
+            runner, f"/auto {body.num_scenes}", USER_ID, SESSION_ID,
+            event_callback=_get_event_callback(req),
         )
         return CommandResponse(**result)
 
 
 @router.post("/drama/end", response_model=CommandResponse)
 async def end_drama(
+    req: Request,
     runner=Depends(get_runner),
     lock=Depends(get_runner_lock),
     tool_context=Depends(get_tool_context),
@@ -154,14 +180,16 @@ async def end_drama(
     async with lock:
         _require_active_drama(tool_context)
         result = await run_command_and_collect(
-            runner, "/end", USER_ID, SESSION_ID
+            runner, "/end", USER_ID, SESSION_ID,
+            event_callback=_get_event_callback(req),
         )
         return CommandResponse(**result)
 
 
 @router.post("/drama/storm", response_model=CommandResponse)
 async def trigger_storm(
-    request: StormRequest,
+    body: StormRequest,
+    req: Request,
     runner=Depends(get_runner),
     lock=Depends(get_runner_lock),
     tool_context=Depends(get_tool_context),
@@ -169,6 +197,9 @@ async def trigger_storm(
     """Trigger a STORM perspective discovery."""
     async with lock:
         _require_active_drama(tool_context)
-        msg = f"/storm {request.focus}" if request.focus else "/storm"
-        result = await run_command_and_collect(runner, msg, USER_ID, SESSION_ID)
+        msg = f"/storm {body.focus}" if body.focus else "/storm"
+        result = await run_command_and_collect(
+            runner, msg, USER_ID, SESSION_ID,
+            event_callback=_get_event_callback(req),
+        )
         return CommandResponse(**result)
