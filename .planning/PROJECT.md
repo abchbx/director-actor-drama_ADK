@@ -12,8 +12,9 @@
 
 **Shipped:** v1.0 — 2026-04-14
 **Phases:** 12 phases, 29 plans, all complete
-**Tests:** 517 passed (unit + integration + E2E)
+**Tests:** 577 passed (unit + integration + E2E)
 **LOC:** ~9,560 lines Python (app/)
+**Phase 13:** API Foundation complete — 2026-04-15 (14 REST endpoints, FastAPI, lock file, state migration)
 
 ## Requirements
 
@@ -43,15 +44,35 @@
 
 ### Active
 
-<!-- 待 v1.1+ 规划 -->
+- [ ] FastAPI API Server — REST + WebSocket 双协议，为前端客户端提供统一接口
+- [ ] WebSocket 实时推送 — 场景生成、旁白、演员对白实时推送到客户端
+- [ ] 简单 Token 认证 — 局域网/单用户场景，App 首连获取 token
+- [ ] Android App (Kotlin + Jetpack Compose) — Material Design 3 风格的戏剧交互客户端
+- [ ] 场景浏览与交互 — 查看场景历史、注入事件、推进剧情、角色对话
+- [ ] 剧本管理 — 创建/保存/加载/导出剧本
+- [ ] 演员状态面板 — 查看演员列表、A2A 服务状态、记忆摘要
 
 ### Out of Scope
 
 - 多用户协作 — 当前架构为单用户设计，A2A 隔离不支持多用户会话共享
 - 语音/视频输出 — 仅文本交互，多模态需要额外基础设施
 - 自定义 LLM 模型选择 UI — 使用系统默认模型配置
-- Web UI — 当前仅 CLI 交互
 - 向量数据库集成 — v1 使用 3 层 JSON 记忆，ChromaDB/FAISS 作为未来升级路径
+- 离线模式 — 后端是唯一计算源（LLM + A2A），离线无意义
+- iOS 客户端 — 本里程碑聚焦 Android
+- 多用户认证系统 — 简单 Token 足够，不做 OAuth/注册系统
+- 推送通知 — 场景推送通过 WebSocket 实时完成，无需 FCM
+
+## Current Milestone: v2.0 Android 移动端
+
+**Goal:** 为 director-actor-drama 添加 C/S 架构支持，Python 后端提供 API Server，Android App 作为纯 UI 客户端
+
+**Target features:**
+- FastAPI REST + WebSocket API Server
+- Kotlin + Jetpack Compose Android App (Material Design 3)
+- 混合通信：REST 发命令，WebSocket 接收场景实时推送
+- 简单 Token 认证（局域网/单用户）
+- 纯在线模式
 
 ## Context
 
@@ -89,7 +110,28 @@
 | Debounce 状态保存 | 频繁 IO 浪费资源 | ✓ Good — 5 秒防抖 |
 | 共享 AsyncClient | 连接泄漏风险 | ✓ Good — 懒单例 + 自动重建 |
 | 被动崩溃检测 | 主动轮询浪费资源 | ✓ Good — 连接错误触发重启 |
+| C/S 架构 (FastAPI + Android) | Python 后端不可替代(google-adk, a2a-sdk)，移动端仅做 UI | — Pending |
+| REST + WebSocket 混合通信 | REST 适合命令式操作，WebSocket 适合 LLM 长等待推送 | — Pending |
+| 简单 Token 认证 | 单用户/局域网场景，无需 OAuth 复杂度 | — Pending |
+| 纯在线模式 | 后端是唯一计算源，离线无意义 | — Pending |
+
+## Evolution
+
+This document evolves at phase transitions and milestone boundaries.
+
+**After each phase transition** (via `/gsd-transition`):
+1. Requirements invalidated? → Move to Out of Scope with reason
+2. Requirements validated? → Move to Validated with phase reference
+3. New requirements emerged? → Add to Active
+4. Decisions to log? → Add to Key Decisions
+5. "What This Is" still accurate? → Update if drifted
+
+**After each milestone** (via `/gsd-complete-milestone`):
+1. Full review of all sections
+2. Core Value check — still the right priority?
+3. Audit Out of Scope — reasons still valid?
+4. Update Context with current state
 
 ---
 
-*Last updated: 2026-04-14 after v1.0 milestone completion*
+*Last updated: 2026-04-14 after v2.0 milestone start*
