@@ -10,7 +10,10 @@ from fastapi import Depends, Request
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 
-from app.api.app import APP_NAME, SESSION_ID, USER_ID
+# Session constants — defined locally to avoid circular import with app.py
+APP_NAME = "app"
+USER_ID = "drama_user"
+SESSION_ID = "drama_session"
 
 
 class ToolContextAdapter:

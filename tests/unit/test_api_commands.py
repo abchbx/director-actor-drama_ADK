@@ -8,14 +8,14 @@ Tests the 8 command endpoints that route through the ADK Runner:
 """
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
 from app.api import create_app
-from app.api.deps import ToolContextAdapter
+from app.api.deps import ToolContextAdapter, get_tool_context
 
 
 # ---------------------------------------------------------------------------
@@ -48,47 +48,57 @@ def _make_empty_tool_context():
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture
-def mock_runner():
-    """Create a mock ADK Runner."""
-    return MagicMock()
-
-
-@pytest.fixture
-def mock_lock():
-    """Create a mock asyncio.Lock that actually context-manages."""
-    lock = asyncio.Lock()
-    return lock
-
-
-@pytest.fixture
-def mock_session_service():
-    """Create a mock InMemorySessionService."""
-    return MagicMock()
-
-
 @pytest_asyncio.fixture
-async def api_client_with_deps(mock_runner, mock_lock, mock_session_service):
-    """Create an API client with all deps mocked at the app.state level."""
+async def api_client_with_deps():
+    """Create an API client with all deps overridden via FastAPI dependency_overrides."""
     app = create_app()
-
-    # Override lifespan to inject our mocks into app.state
-    # We patch the dependency functions instead of the lifespan
+    mock_runner = MagicMock()
+    mock_lock = asyncio.Lock()
     mock_tc = _make_mock_tool_context()
+    mock_collect = AsyncMock(return_value=MOCK_RESULT)
 
-    with (
-        patch("app.api.deps.get_runner", return_value=mock_runner),
-        patch("app.api.deps.get_session_service", return_value=mock_session_service),
-        patch("app.api.deps.get_runner_lock", return_value=mock_lock),
-        patch("app.api.deps.get_tool_context", return_value=mock_tc),
-        patch(
-            "app.api.runner_utils.run_command_and_collect",
-            new=AsyncMock(return_value=MOCK_RESULT),
-        ),
+    # Override FastAPI dependencies
+    from app.api.deps import get_runner, get_runner_lock, get_tool_context as _get_tc
+
+    app.dependency_overrides[get_runner] = lambda: mock_runner
+    app.dependency_overrides[get_runner_lock] = lambda: mock_lock
+    app.dependency_overrides[_get_tc] = lambda: mock_tc
+
+    # Patch run_command_and_collect where it's imported in commands.py
+    with patch(
+        "app.api.routers.commands.run_command_and_collect",
+        new=AsyncMock(return_value=MOCK_RESULT),
     ):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             yield client, mock_tc
+
+    app.dependency_overrides.clear()
+
+
+@pytest_asyncio.fixture
+async def api_client_empty_drama():
+    """Create an API client with empty drama state (no active drama)."""
+    app = create_app()
+    mock_runner = MagicMock()
+    mock_lock = asyncio.Lock()
+    empty_tc = _make_empty_tool_context()
+
+    from app.api.deps import get_runner, get_runner_lock, get_tool_context as _get_tc
+
+    app.dependency_overrides[get_runner] = lambda: mock_runner
+    app.dependency_overrides[get_runner_lock] = lambda: mock_lock
+    app.dependency_overrides[_get_tc] = lambda: empty_tc
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        yield client
+
+    app.dependency_overrides.clear()
+
+
+# We need `patch` from unittest.mock at module level for the fixture above
+from unittest.mock import patch
 
 
 # ---------------------------------------------------------------------------
@@ -103,13 +113,9 @@ class TestStartDrama:
     async def test_start_drama_endpoint(self, api_client_with_deps):
         """POST /api/v1/drama/start with theme returns CommandResponse."""
         client, _ = api_client_with_deps
-        with patch(
-            "app.api.runner_utils.run_command_and_collect",
-            new=AsyncMock(return_value=MOCK_RESULT),
-        ):
-            response = await client.post(
-                "/api/v1/drama/start", json={"theme": "测试"}
-            )
+        response = await client.post(
+            "/api/v1/drama/start", json={"theme": "测试"}
+        )
         assert response.status_code == 200
         data = response.json()
         assert "final_response" in data
@@ -124,11 +130,7 @@ class TestNextScene:
     async def test_next_scene_endpoint(self, api_client_with_deps):
         """POST /api/v1/drama/next returns CommandResponse with status."""
         client, _ = api_client_with_deps
-        with patch(
-            "app.api.runner_utils.run_command_and_collect",
-            new=AsyncMock(return_value=MOCK_RESULT),
-        ):
-            response = await client.post("/api/v1/drama/next")
+        response = await client.post("/api/v1/drama/next")
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
@@ -141,13 +143,9 @@ class TestAction:
     async def test_action_endpoint(self, api_client_with_deps):
         """POST /api/v1/drama/action with description returns CommandResponse."""
         client, _ = api_client_with_deps
-        with patch(
-            "app.api.runner_utils.run_command_and_collect",
-            new=AsyncMock(return_value=MOCK_RESULT),
-        ):
-            response = await client.post(
-                "/api/v1/drama/action", json={"description": "test action"}
-            )
+        response = await client.post(
+            "/api/v1/drama/action", json={"description": "test action"}
+        )
         assert response.status_code == 200
         data = response.json()
         assert data["final_response"] == "Director response"
@@ -160,14 +158,10 @@ class TestSpeak:
     async def test_speak_endpoint(self, api_client_with_deps):
         """POST /api/v1/drama/speak with actor_name and situation returns CommandResponse."""
         client, _ = api_client_with_deps
-        with patch(
-            "app.api.runner_utils.run_command_and_collect",
-            new=AsyncMock(return_value=MOCK_RESULT),
-        ):
-            response = await client.post(
-                "/api/v1/drama/speak",
-                json={"actor_name": "朱棣", "situation": "沉思"},
-            )
+        response = await client.post(
+            "/api/v1/drama/speak",
+            json={"actor_name": "朱棣", "situation": "沉思"},
+        )
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
@@ -180,13 +174,9 @@ class TestSteer:
     async def test_steer_endpoint(self, api_client_with_deps):
         """POST /api/v1/drama/steer with direction returns CommandResponse."""
         client, _ = api_client_with_deps
-        with patch(
-            "app.api.runner_utils.run_command_and_collect",
-            new=AsyncMock(return_value=MOCK_RESULT),
-        ):
-            response = await client.post(
-                "/api/v1/drama/steer", json={"direction": "冲突升级"}
-            )
+        response = await client.post(
+            "/api/v1/drama/steer", json={"direction": "冲突升级"}
+        )
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
@@ -199,11 +189,7 @@ class TestAuto:
     async def test_auto_endpoint_default(self, api_client_with_deps):
         """POST /api/v1/drama/auto with {} defaults to 3 scenes, returns CommandResponse."""
         client, _ = api_client_with_deps
-        with patch(
-            "app.api.runner_utils.run_command_and_collect",
-            new=AsyncMock(return_value=MOCK_RESULT),
-        ):
-            response = await client.post("/api/v1/drama/auto", json={})
+        response = await client.post("/api/v1/drama/auto", json={})
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
@@ -216,11 +202,7 @@ class TestEnd:
     async def test_end_endpoint(self, api_client_with_deps):
         """POST /api/v1/drama/end returns CommandResponse."""
         client, _ = api_client_with_deps
-        with patch(
-            "app.api.runner_utils.run_command_and_collect",
-            new=AsyncMock(return_value=MOCK_RESULT),
-        ):
-            response = await client.post("/api/v1/drama/end")
+        response = await client.post("/api/v1/drama/end")
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
@@ -233,11 +215,7 @@ class TestStorm:
     async def test_storm_endpoint_no_focus(self, api_client_with_deps):
         """POST /api/v1/drama/storm with {} returns CommandResponse."""
         client, _ = api_client_with_deps
-        with patch(
-            "app.api.runner_utils.run_command_and_collect",
-            new=AsyncMock(return_value=MOCK_RESULT),
-        ):
-            response = await client.post("/api/v1/drama/storm", json={})
+        response = await client.post("/api/v1/drama/storm", json={})
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
@@ -252,20 +230,10 @@ class TestNoActiveDrama:
     """Endpoints without active drama return 404 (except /start)."""
 
     @pytest.mark.asyncio
-    async def test_no_active_drama_returns_404(self, mock_runner, mock_lock, mock_session_service):
+    async def test_no_active_drama_returns_404(self, api_client_empty_drama):
         """POST /api/v1/drama/next without active drama returns 404."""
-        app = create_app()
-        empty_tc = _make_empty_tool_context()
-
-        with (
-            patch("app.api.deps.get_runner", return_value=mock_runner),
-            patch("app.api.deps.get_session_service", return_value=mock_session_service),
-            patch("app.api.deps.get_runner_lock", return_value=mock_lock),
-            patch("app.api.deps.get_tool_context", return_value=empty_tc),
-        ):
-            transport = ASGITransport(app=app)
-            async with AsyncClient(transport=transport, base_url="http://test") as client:
-                response = await client.post("/api/v1/drama/next")
+        client = api_client_empty_drama
+        response = await client.post("/api/v1/drama/next")
         assert response.status_code == 404
         assert "No active drama session" in response.json()["detail"]
 
@@ -274,30 +242,33 @@ class TestTimeout:
     """Timeout scenario returns 504."""
 
     @pytest.mark.asyncio
-    async def test_timeout_returns_504(self, mock_runner, mock_lock, mock_session_service):
+    async def test_timeout_returns_504(self):
         """POST /api/v1/drama/next when Runner times out returns 504."""
         from fastapi import HTTPException
 
         app = create_app()
+        mock_runner = MagicMock()
+        mock_lock = asyncio.Lock()
         mock_tc = _make_mock_tool_context()
+
+        from app.api.deps import get_runner, get_runner_lock, get_tool_context as _get_tc
+
+        app.dependency_overrides[get_runner] = lambda: mock_runner
+        app.dependency_overrides[get_runner_lock] = lambda: mock_lock
+        app.dependency_overrides[_get_tc] = lambda: mock_tc
 
         async def timeout_side_effect(*args, **kwargs):
             raise HTTPException(status_code=504, detail="Command execution timed out")
 
-        with (
-            patch("app.api.deps.get_runner", return_value=mock_runner),
-            patch("app.api.deps.get_session_service", return_value=mock_session_service),
-            patch("app.api.deps.get_runner_lock", return_value=mock_lock),
-            patch("app.api.deps.get_tool_context", return_value=mock_tc),
-            patch(
-                "app.api.runner_utils.run_command_and_collect",
-                new=AsyncMock(side_effect=timeout_side_effect),
-            ),
+        with patch(
+            "app.api.routers.commands.run_command_and_collect",
+            new=AsyncMock(side_effect=timeout_side_effect),
         ):
             transport = ASGITransport(app=app)
             async with AsyncClient(transport=transport, base_url="http://test") as client:
                 response = await client.post("/api/v1/drama/next")
         assert response.status_code == 504
+        app.dependency_overrides.clear()
 
 
 # ---------------------------------------------------------------------------
@@ -309,22 +280,26 @@ class TestStartAutoSave:
     """POST /api/v1/drama/start auto-saves existing drama before starting new one."""
 
     @pytest.mark.asyncio
-    async def test_start_auto_saves_existing(self, mock_runner, mock_lock, mock_session_service):
+    async def test_start_auto_saves_existing(self):
         """save_progress + flush_state_sync called when drama already exists before /start."""
         app = create_app()
+        mock_runner = MagicMock()
+        mock_lock = asyncio.Lock()
         mock_tc = _make_mock_tool_context(theme="existing drama")
 
+        from app.api.deps import get_runner, get_runner_lock, get_tool_context as _get_tc
+
+        app.dependency_overrides[get_runner] = lambda: mock_runner
+        app.dependency_overrides[get_runner_lock] = lambda: mock_lock
+        app.dependency_overrides[_get_tc] = lambda: mock_tc
+
         with (
-            patch("app.api.deps.get_runner", return_value=mock_runner),
-            patch("app.api.deps.get_session_service", return_value=mock_session_service),
-            patch("app.api.deps.get_runner_lock", return_value=mock_lock),
-            patch("app.api.deps.get_tool_context", return_value=mock_tc),
             patch(
-                "app.api.runner_utils.run_command_and_collect",
+                "app.api.routers.commands.run_command_and_collect",
                 new=AsyncMock(return_value=MOCK_RESULT),
             ),
-            patch("app.api.routers.commands.save_progress") as mock_save,
-            patch("app.api.routers.commands.flush_state_sync") as mock_flush,
+            patch("app.state_manager.save_progress") as mock_save,
+            patch("app.state_manager.flush_state_sync") as mock_flush,
         ):
             transport = ASGITransport(app=app)
             async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -334,3 +309,4 @@ class TestStartAutoSave:
         assert response.status_code == 200
         mock_save.assert_called_once()
         mock_flush.assert_called_once()
+        app.dependency_overrides.clear()
