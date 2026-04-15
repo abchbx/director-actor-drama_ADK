@@ -14,6 +14,7 @@ from google.adk.sessions import InMemorySessionService
 
 from app.actor_service import stop_all_actor_services
 from app.agent import root_agent
+from app.api.lock import acquire_lock, release_lock
 from app.api.routers import commands, queries
 from app.state_manager import flush_state_sync
 
@@ -26,7 +27,10 @@ SESSION_ID = "drama_session"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage Runner lifecycle: create on startup, cleanup on shutdown."""
-    # Startup: create session service, session, and runner
+    # Startup: acquire lock file (D-07/STATE-03)
+    acquire_lock()
+
+    # Create session service, session, and runner
     session_service = InMemorySessionService()
     await session_service.create_session(
         app_name=APP_NAME, user_id=USER_ID, session_id=SESSION_ID
@@ -42,10 +46,15 @@ async def lifespan(app: FastAPI):
     app.state.session_service = session_service
     app.state.runner_lock = asyncio.Lock()
 
+    # STATE-02: flush-on-push hook for Phase 14 WebSocket
+    app.state.flush_before_push = True
+    app.state.flush_state_sync = flush_state_sync
+
     yield
 
-    # Shutdown: flush state and stop actor services
-    flush_state_sync()
+    # Shutdown: flush state, release lock, and stop actor services
+    flush_state_sync()  # Ensure final state is written
+    release_lock()  # D-07
     stop_all_actor_services()
 
 

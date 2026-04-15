@@ -24,6 +24,7 @@ from google.genai import types
 
 from app.agent import root_agent
 from app.actor_service import stop_all_actor_services
+from app.api.lock import acquire_lock, release_lock
 
 APP_NAME = "app"
 USER_ID = "drama_user"
@@ -69,6 +70,13 @@ def print_banner():
 
 async def run_interactive():
     """Run the interactive CLI loop."""
+    # D-07: Check lock file — refuse to start if API is already running
+    try:
+        acquire_lock()
+    except RuntimeError as e:
+        print(f"\n❌ {e}")
+        return
+
     session_service = InMemorySessionService()
     await session_service.create_session(
         app_name=APP_NAME, user_id=USER_ID, session_id=SESSION_ID
@@ -102,6 +110,7 @@ async def run_interactive():
             await _send_message(runner, "/save")
             print("\n🛑 正在停止所有演员 A2A 服务...")
             stop_all_actor_services()
+            release_lock()
             print("\n👋 再见！期待下次继续你的戏剧创作！")
             break
 
@@ -263,6 +272,7 @@ def main():
         print("\n\n👋 再见！")
     finally:
         stop_all_actor_services()
+        release_lock()  # D-07: Ensure cleanup even on exception
 
 
 if __name__ == "__main__":
