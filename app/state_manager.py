@@ -10,15 +10,12 @@ import logging
 import os
 import threading
 from datetime import datetime
-from typing import Any, Optional
+
 
 logger = logging.getLogger(__name__)
 
 # Base directory for all dramas
 DRAMAS_DIR = os.path.join(os.path.dirname(__file__), "dramas")
-# Current active drama folder (runtime state, not persisted)
-# TODO: Phase 12+ — migrate _current_drama_folder to ToolContext.state
-_current_drama_folder: Optional[str] = None
 
 # ============================================================================
 # SceneContext — 场景共享认知状态（指代消解核心）
@@ -465,10 +462,10 @@ def clear_conversation_log(tool_context=None) -> dict:
 
 
 def _get_current_theme(tool_context=None) -> str:
-    """Get the current drama theme."""
-    if tool_context is not None:
-        return tool_context.state.get("drama", {}).get("theme", "")
-    return _current_drama_folder or ""
+    """Get the current drama theme. tool_context is required (D-10)."""
+    if tool_context is None:
+        raise ValueError("tool_context is required — _current_drama_folder global removed (STATE-01)")
+    return tool_context.state.get("drama", {}).get("theme", "")
 
 
 def init_drama_state(theme: str, tool_context=None) -> dict:
@@ -482,8 +479,6 @@ def init_drama_state(theme: str, tool_context=None) -> dict:
     Returns:
         dict with initialization status.
     """
-    global _current_drama_folder
-
     # Create drama-specific directories
     dirs = _ensure_drama_dirs(theme)
 
@@ -542,8 +537,6 @@ def init_drama_state(theme: str, tool_context=None) -> dict:
 
     _set_state(state, tool_context)
     _save_state_to_file(theme, state)
-
-    _current_drama_folder = theme
 
     return {
         "status": "success",
@@ -761,9 +754,6 @@ def load_progress(save_name: str, tool_context=None) -> dict:
     state.setdefault("scene_context", {})
 
     _set_state(state, tool_context)
-
-    global _current_drama_folder
-    _current_drama_folder = save_data.get("theme", "")
 
     return {
         "status": "success",

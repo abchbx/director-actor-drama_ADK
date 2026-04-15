@@ -1,12 +1,12 @@
-"""Query-style endpoint stubs for the Drama API.
+"""Query-style endpoints for the Drama API.
 
 These endpoints read drama state directly without going through the ADK Runner.
-All endpoints are stubs that return {"message": "not implemented"} until
-wired up in subsequent plans.
+They call state_manager functions directly (D-05) for fast, predictable responses.
 """
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.api.deps import get_tool_context
 from app.api.models import (
     CastResponse,
     DramaListResponse,
@@ -17,41 +17,66 @@ from app.api.models import (
     SaveLoadResponse,
     SaveRequest,
 )
+from app.state_manager import (
+    export_script,
+    get_all_actors,
+    get_current_state,
+    list_dramas,
+    load_progress,
+    save_progress,
+)
 
 router = APIRouter(tags=["queries"])
 
 
+def _require_active_drama(tool_context):
+    """Raise 404 if no active drama session exists."""
+    if not tool_context.state.get("drama", {}).get("theme"):
+        raise HTTPException(status_code=404, detail="No active drama session")
+
+
 @router.get("/drama/status", response_model=DramaStatusResponse)
-async def get_status():
+async def get_status(tool_context=Depends(get_tool_context)):
     """Get the current drama status."""
-    return DramaStatusResponse()
+    _require_active_drama(tool_context)
+    result = get_current_state(tool_context)
+    return DramaStatusResponse(**result)
 
 
 @router.get("/drama/cast", response_model=CastResponse)
-async def get_cast():
+async def get_cast(tool_context=Depends(get_tool_context)):
     """Get the list of actors in the current drama."""
-    return CastResponse()
+    _require_active_drama(tool_context)
+    result = get_all_actors(tool_context)
+    return CastResponse(**result)
 
 
 @router.post("/drama/save", response_model=SaveLoadResponse)
-async def save_drama(request: SaveRequest):
+async def save_drama(request: SaveRequest, tool_context=Depends(get_tool_context)):
     """Save the current drama progress."""
-    return SaveLoadResponse(message="not implemented")
+    _require_active_drama(tool_context)
+    result = save_progress(request.save_name, tool_context)
+    # D-04: tool business errors → 200 + status: error
+    return SaveLoadResponse(**result)
 
 
 @router.post("/drama/load", response_model=SaveLoadResponse)
-async def load_drama(request: LoadRequest):
+async def load_drama(request: LoadRequest, tool_context=Depends(get_tool_context)):
     """Load a previously saved drama."""
-    return SaveLoadResponse(message="not implemented")
+    result = load_progress(request.save_name, tool_context)
+    return SaveLoadResponse(**result)
 
 
 @router.get("/drama/list", response_model=DramaListResponse)
-async def list_dramas():
+async def list_all_dramas():
     """List all saved dramas."""
-    return DramaListResponse()
+    result = list_dramas()
+    return DramaListResponse(**result)
 
 
 @router.post("/drama/export", response_model=ExportResponse)
-async def export_drama(request: ExportRequest):
+async def export_drama(request: ExportRequest, tool_context=Depends(get_tool_context)):
     """Export the drama script."""
-    return ExportResponse(message="not implemented")
+    _require_active_drama(tool_context)
+    result = export_script(tool_context)
+    return ExportResponse(**result)

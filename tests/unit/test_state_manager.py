@@ -469,3 +469,77 @@ class TestSceneArchival:
 
         result = load_archived_scene("test", 999)
         assert result is None
+
+
+# ============================================================================
+# Task 1 Part A (13-03): State Migration Tests — _current_drama_folder removal
+# ============================================================================
+
+
+class TestCurrentDramaFolderRemoval:
+    """Tests for _current_drama_folder global variable removal (STATE-01/D-09/D-10/D-11)."""
+
+    def test_no_global_drama_folder(self):
+        """_current_drama_folder should not exist as module attribute."""
+        import app.state_manager as sm
+        assert not hasattr(sm, "_current_drama_folder")
+
+    def test_get_current_theme_requires_tool_context(self):
+        """_get_current_theme(None) should raise ValueError."""
+        from app.state_manager import _get_current_theme
+        with pytest.raises(ValueError, match="tool_context is required"):
+            _get_current_theme(None)
+
+    def test_get_current_theme_with_tool_context(self):
+        """_get_current_theme(mock_tool_context) should return theme."""
+        from app.state_manager import _get_current_theme
+        tc = MagicMock()
+        tc.state = {"drama": {"theme": "测试戏剧"}}
+        result = _get_current_theme(tc)
+        assert result == "测试戏剧"
+
+    @patch("app.state_manager._save_state_to_file")
+    def test_init_drama_state_no_global_assignment(self, mock_save):
+        """After init_drama_state, no _current_drama_folder attribute on module."""
+        import app.state_manager as sm
+        from app.state_manager import init_drama_state
+
+        tc = MagicMock()
+        tc.state = {"drama": {}}
+
+        init_drama_state("测试新剧", tc)
+
+        assert not hasattr(sm, "_current_drama_folder")
+
+    @patch("app.state_manager._save_state_to_file")
+    def test_load_progress_no_global_assignment(self, mock_save):
+        """After load_progress, no _current_drama_folder attribute on module."""
+        import app.state_manager as sm
+        from app.state_manager import load_progress
+
+        with patch("app.state_manager._get_state_file") as mock_get_file, \
+             patch("app.state_manager._get_drama_folder") as mock_get_folder, \
+             patch("app.state_manager._ensure_drama_dirs") as mock_ensure_dirs, \
+             tempfile.TemporaryDirectory() as tmpdir:
+
+            state_file = os.path.join(tmpdir, "state.json")
+            save_data = {
+                "theme": "测试戏剧",
+                "current_scene": 1,
+                "status": "acting",
+                "scenes": [],
+                "actors": {},
+            }
+            with open(state_file, "w") as f:
+                json.dump(save_data, f)
+
+            mock_get_file.return_value = state_file
+            mock_get_folder.return_value = tmpdir
+            mock_ensure_dirs.return_value = {"root": tmpdir}
+
+            tc = MagicMock()
+            tc.state = {"drama": {}}
+
+            load_progress("测试戏剧", tc)
+
+            assert not hasattr(sm, "_current_drama_folder")
