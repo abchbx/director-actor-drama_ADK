@@ -1,66 +1,86 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-current_phase: 12
-status: complete
-last_updated: "2026-04-14T04:00:00.000Z"
+milestone: v2.0
+milestone_name: Android 移动端
+current_phase: 13 (API Foundation) — ready to plan
+status: executing
+last_updated: "2026-04-15T10:05:19.198Z"
+last_activity: 2026-04-15 -- Phase 13 planning complete
 progress:
-  total_phases: 12
-  completed_phases: 12
-  total_plans: 29
-  completed_plans: 29
-  percent: 100
+  total_phases: 6
+  completed_phases: 0
+  total_plans: 4
+  completed_plans: 0
+  percent: 0
 ---
 
 # State
 
 **Project:** Director-Actor-Drama 无限畅写版
-**Milestone:** v1.0 (shipped)
-**Current Phase:** —
-**Status:** v1.0 milestone complete
+**Milestone:** v2.0 Android 移动端
+**Current Phase:** 13 (API Foundation) — ready to plan
+**Status:** Ready to execute
+
+## Current Position
+
+Phase: 13 — API Foundation
+Plan: —
+Status: Ready to execute
+Last activity: 2026-04-15 -- Phase 13 planning complete
 
 ## Progress
 
-- [x] Codebase mapped
-- [x] Research completed
-- [x] Requirements defined
-- [x] Roadmap created
-- [x] Phase 1: Memory Foundation
-- [x] Phase 2: Context Builder
-- [x] Phase 3: Semantic Retrieval
-- [x] Phase 4: Infinite Loop Engine
-- [x] Phase 5: Mixed Autonomy Mode
-- [x] Phase 6: Tension Scoring & Conflict Engine
-- [x] Phase 7: Arc Tracking
-- [x] Phase 8: Dynamic STORM
-- [x] Phase 9: Progressive STORM
-- [x] Phase 10: Coherence System
-- [x] Phase 11: Timeline Tracking
-- [x] Phase 12: Integration & Polish
+- [x] v1.0 milestone complete (12 phases, 29 plans, 517 tests)
+- [x] v2.0 requirements defined (32 requirements)
+- [x] v2.0 roadmap created (6 phases, ~18 plans)
+- [ ] Phase 13: API Foundation — ready to plan
+- [ ] Phase 14: WebSocket Layer
+- [ ] Phase 15: Authentication
+- [ ] Phase 16: Android Foundation
+- [ ] Phase 17: Android Interaction
+- [ ] Phase 18: Android Features
 
 ## Decisions
 
+### v1.0 Decisions (archived)
+
 - 11-01: Hybrid time representation — descriptive current_time + structured time_periods list
-- 11-06: Director manual advance_time() — no LLM auto-infer, same pattern as add_fact
-- 11-11: Graduated jump detection severity — normal/minor/significant based on day gap
+- 11-06: Director manual advance_time() — no LLM auto-infer
+- 11-11: Graduated jump detection severity — normal/minor/significant
 - 11-16: Timeline validation integrated into validate_consistency()
-- 11-02: time_context added post-creation in Tool layer (logic function unchanged, same as repair_contradiction pattern)
-- 11-02: advance_time uses *, for keyword-only tool_context (consistent with add_fact)
-- 12-01: 5-second debounce via threading.Timer for _set_state()
-- 12-01: conversation_log migrated from global _conversation_log to state["conversation_log"]
-- 12-01: Scene archival at 20-scene threshold with on-demand load_archived_scene()
-- 12-01: _current_drama_folder migration deferred with TODO comment (D-07)
-- 12-02: Error detection uses explicit [ERROR:xxx] prefix markers instead of fragile Chinese string matching
-- 12-02: Shared AsyncClient uses lazy singleton with is_closed check for auto-rebuild
-- 12-02: Crash recovery uses passive detection (connection error triggers restart) not polling
-- 12-02: MAX_CRASH_COUNT=3 limits infinite restart loops (T-12-04 mitigation)
-- 12-03: Rich Live start/stop for spinner (not context manager — no __aenter__/__aexit__)
-- 12-03: Scene summary format ── 第N场：标题 ── 参演：角色1、角色2
-- 12-03: Chinese error messages with rate_limit/timeout/api_key pattern matching + 💡 suggestion
+- 12-01: 5-second debounce via threading.Timer
+- 12-01: conversation_log migrated to state["conversation_log"]
+- 12-01: Scene archival at 20-scene threshold
+- 12-02: Error detection uses [ERROR:xxx] prefix markers
+- 12-02: Shared AsyncClient uses lazy singleton
+- 12-02: Passive crash detection
+- 12-02: MAX_CRASH_COUNT=3
+
+### v2.0 Decisions
+
+- C/S 架构: FastAPI (Python) + Kotlin/Jetpack Compose (Android)
+- 通信协议: REST (命令) + WebSocket (推送)
+- 认证: 简单 Token（局域网/单用户）
+- 离线: 纯在线，不支持离线
+- REST 命令走 ADK Runner，只读查询直接读 state（Approach C: Hybrid）
+- EventBridge 零侵入观察 ADK Runner 事件流
+- 100-event replay buffer 支持断线重连
+- CLI 保持独立入口（不改为 API 客户端），但 API 和 CLI 互斥运行
+- WebSocket 心跳 15s interval，30s 超时断连
+
+## Key Risks (from PITFALLS.md)
+
+| Risk | Phase | Mitigation |
+|------|-------|------------|
+| Event Loop 冲突 (P0) | 13 | FastAPI + ADK Runner 共享事件循环，避免嵌套 asyncio.run() |
+| 全局状态迁移 (P0) | 13 | _current_drama_folder → session-scoped context |
+| CLI 互斥 (P0) | 13 | Lock file 或进程检测，CLI 和 API 不可同时运行 |
+| 状态同步 (P1) | 13-14 | WebSocket 推送前 flush-on-push |
+| WebSocket 长 LLM 调用 (P1) | 14 | 心跳 + 进度推送 + 请求去重 |
+| Android 网络切换 (P2) | 17-18 | 自动重连 + 指数退避 + Foreground Service |
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-11)
+See: .planning/PROJECT.md (updated 2026-04-14)
 **Core value:** 无限畅写，逻辑不断
-**Current focus:** Planning next milestone
+**Current focus:** Phase 13 — API Foundation
