@@ -28,6 +28,7 @@ class ConnectionManager:
         self._last_pong: dict[WebSocket, float] = {}  # websocket → timestamp
         self.HEARTBEAT_INTERVAL = 15  # D-14: 15s ping interval
         self.HEARTBEAT_TIMEOUT = 30   # D-14: 30s pong timeout
+        self.MAX_CONNECTIONS = 10     # Connection limit for DoS prevention
 
     async def connect(self, websocket: WebSocket) -> bool:
         """Accept WS connection, add to pool, send replay buffer (D-09).
@@ -35,7 +36,7 @@ class ConnectionManager:
         T-14-01: Reject connection if MAX_CONNECTIONS exceeded.
         Returns True if connection accepted, False if rejected.
         """
-        if len(self.active_connections) >= MAX_CONNECTIONS:
+        if len(self.active_connections) >= self.MAX_CONNECTIONS:
             await websocket.close(code=1013, reason="Max connections reached")
             return False
         await websocket.accept()
@@ -110,6 +111,7 @@ class ConnectionManager:
                 disconnected.add(connection)
         for conn in disconnected:
             self.active_connections.discard(conn)
+            self._last_pong.pop(conn, None)
 
     def create_broadcast_callback(self, flush_fn=None):
         """Create an event_callback for run_command_and_collect (D-02).
