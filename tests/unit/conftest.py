@@ -1,7 +1,12 @@
 """Shared test fixtures for memory_manager unit tests."""
 
 import pytest
+import pytest_asyncio
 from unittest.mock import MagicMock
+
+from httpx import ASGITransport, AsyncClient
+
+from app.api import create_app
 
 
 @pytest.fixture
@@ -152,3 +157,22 @@ def mock_tool_context_old_format():
         }
     }
     return tc
+
+
+# ============================================================================
+# API test fixtures
+# ============================================================================
+
+
+@pytest.fixture
+def api_app():
+    """Create a FastAPI app instance for testing."""
+    return create_app()
+
+
+@pytest_asyncio.fixture
+async def api_client(api_app):
+    """Create an async HTTP test client for the API."""
+    transport = ASGITransport(app=api_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        yield client
