@@ -5,10 +5,14 @@ Covers:
 - Lifespan: API_TOKEN → app.state.api_token, auth_enabled flag, WARNING log
 - GET /api/v1/auth/verify endpoint: valid/bypass/invalid scenarios
 - Endpoint protection: all 14 REST endpoints require auth when enabled
+- Full auth integration flow (REST + WebSocket)
+- Token format compatibility
+- Auth logging verification
 """
 
 import asyncio
 import os
+import secrets
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -396,4 +400,197 @@ class TestEndpointProtection:
                         resp = await client.post(path, json=body)
                     assert resp.status_code != 401, (
                         f"{method} {path} should not return 401 in dev mode, got {resp.status_code}"
+                    )
+
+
+# ---------------------------------------------------------------------------
+# Test 5: Full auth integration flow (REST + WebSocket)
+# ---------------------------------------------------------------------------
+
+
+class TestAuthIntegration:
+    """Integration tests verifying the full auth flow across REST + WebSocket."""
+
+    @pytest.mark.asyncio
+    async def test_full_auth_flow_with_token(self):
+        """Full flow: auth enabled → verify + drama endpoints with/without token."""
+        from app.api.deps import get_runner, get_runner_lock, get_tool_context as _get_tc
+
+        app = create_app()
+        app.state.auth_enabled = True
+        app.state.api_token = "test-integration-token"
+
+        # Mock deps so endpoints can execute without real Runner/Session
+        mock_runner = MagicMock()
+        mock_lock = asyncio.Lock()
+        mock_tc = _make_mock_tool_context()
+        app.dependency_overrides[get_runner] = lambda: mock_runner
+        app.dependency_overrides[get_runner_lock] = lambda: mock_lock
+        app.dependency_overrides[_get_tc] = lambda: mock_tc
+
+        transport = ASGITransport(app=app)
+        headers = {"Authorization": "Bearer test-integration-token"}
+
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            # 1. Auth verify with valid token → 200, {valid: true, mode: "token"}
+            resp = await client.get("/api/v1/auth/verify", headers=headers)
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["valid"] is True
+            assert data["mode"] == "token"
+
+            # 2. Drama status with valid token → 200 or 404 (no drama), NOT 401
+            with patch(
+                "app.api.routers.commands.run_command_and_collect",
+                new=AsyncMock(return_value=MOCK_RESULT),
+            ):
+                resp = await client.get("/api/v1/drama/status", headers=headers)
+                assert resp.status_code != 401
+
+            # 3. Drama status without token → 401
+            resp = await client.get("/api/v1/drama/status")
+            assert resp.status_code == 401
+
+            # 4. Drama status with wrong token → 401
+            resp = await client.get(
+                "/api/v1/drama/status",
+                headers={"Authorization": "Bearer wrong-token"},
+            )
+            assert resp.status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_full_auth_flow_dev_mode(self):
+        """Full flow: auth disabled → verify + drama endpoints without token."""
+        from app.api.deps import get_runner, get_runner_lock, get_tool_context as _get_tc
+
+        app = create_app()
+        app.state.auth_enabled = False
+        app.state.api_token = None
+
+        mock_runner = MagicMock()
+        mock_lock = asyncio.Lock()
+        mock_tc = _make_mock_tool_context()
+        app.dependency_overrides[get_runner] = lambda: mock_runner
+        app.dependency_overrides[get_runner_lock] = lambda: mock_lock
+        app.dependency_overrides[_get_tc] = lambda: mock_tc
+
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            # 1. Auth verify without token → 200, {valid: true, mode: "bypass"}
+            resp = await client.get("/api/v1/auth/verify")
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["valid"] is True
+            assert data["mode"] == "bypass"
+
+            # 2. Drama status without token → NOT 401
+            resp = await client.get("/api/v1/drama/status")
+            assert resp.status_code != 401
+
+    @pytest.mark.asyncio
+    async def test_token_format_compatibility(self):
+        """secrets.token_urlsafe(32) works as Bearer token and WS ?token=."""
+        from fastapi.testclient import TestClient
+
+        generated_token = secrets.token_urlsafe(32)
+
+        # Set as API_TOKEN on app.state
+        app = create_app()
+        app.state.api_token = generated_token
+        app.state.auth_enabled = True
+        from app.api.ws_manager import ConnectionManager
+
+        if not hasattr(app.state, "connection_manager"):
+            app.state.connection_manager = ConnectionManager()
+
+        # 1. Bearer token works on REST endpoints
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.get(
+                "/api/v1/auth/verify",
+                headers={"Authorization": f"Bearer {generated_token}"},
+            )
+            assert resp.status_code == 200
+            assert resp.json()["valid"] is True
+
+        # 2. WS ?token= works with same token value
+        client = TestClient(app)
+        with client.websocket_connect(f"/api/v1/ws?token={generated_token}") as ws:
+            pass  # Successfully connected
+
+    def test_15_endpoints_total_count(self):
+        """Total endpoint count: 14 drama REST + 1 auth/verify = 15 under /api/v1/."""
+        app = create_app()
+        routes = [
+            route
+            for route in app.routes
+            if hasattr(route, "path")
+            and route.path.startswith("/api/v1/")
+            and not route.path.startswith("/api/v1/ws")  # WS is not a REST endpoint
+        ]
+        # 8 command + 6 query + 1 auth/verify = 15
+        assert len(routes) == 15, f"Expected 15 REST endpoints, found {len(routes)}"
+
+    @pytest.mark.asyncio
+    async def test_auth_success_logged(self):
+        """With auth enabled and valid token, logger.debug called with 'Auth succeeded'."""
+        from app.api.deps import get_runner, get_runner_lock, get_tool_context as _get_tc
+        from app.api.deps import require_auth as deps_require_auth
+
+        app = create_app()
+        app.state.auth_enabled = True
+        app.state.api_token = "test-integration-token"
+
+        transport = ASGITransport(app=app)
+        headers = {"Authorization": "Bearer test-integration-token"}
+
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            with patch("app.api.deps.logger") as mock_logger:
+                resp = await client.get("/api/v1/auth/verify", headers=headers)
+                assert resp.status_code == 200
+                # Verify debug log was called with success message
+                debug_calls = [
+                    str(call) for call in mock_logger.debug.call_args_list
+                ]
+                assert any("Auth succeeded" in call for call in debug_calls), (
+                    f"Expected 'Auth succeeded' in debug logs, got: {debug_calls}"
+                )
+
+    @pytest.mark.asyncio
+    async def test_auth_failure_logged(self):
+        """With auth enabled and invalid token, logger.warning called with 'Auth failed'."""
+        app = create_app()
+        app.state.auth_enabled = True
+        app.state.api_token = "test-integration-token"
+
+        transport = ASGITransport(app=app)
+        headers = {"Authorization": "Bearer wrong-token"}
+
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            with patch("app.api.deps.logger") as mock_logger:
+                resp = await client.get("/api/v1/auth/verify", headers=headers)
+                assert resp.status_code == 401
+                # Verify warning log was called with failure message
+                warning_calls = [
+                    str(call) for call in mock_logger.warning.call_args_list
+                ]
+                assert any("Auth failed" in call for call in warning_calls), (
+                    f"Expected 'Auth failed' in warning logs, got: {warning_calls}"
+                )
+
+    @pytest.mark.asyncio
+    async def test_dev_mode_startup_warning(self):
+        """When API_TOKEN is empty, logger.warning called with 'AUTH DISABLED'."""
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("API_TOKEN", None)
+            app = create_app()
+            from app.api.app import lifespan
+
+            with patch("app.api.app.logger") as mock_logger:
+                async with lifespan(app):
+                    warning_calls = [
+                        str(call) for call in mock_logger.warning.call_args_list
+                    ]
+                    assert any("AUTH DISABLED" in call for call in warning_calls), (
+                        f"Expected 'AUTH DISABLED' in warning logs, got: {warning_calls}"
                     )
