@@ -126,7 +126,7 @@ Plans:
 
 **Goal:** 演员面板，戏剧状态概览，剧本导出，Typing 指示器，富文本渲染，WebSocket 自动重连
 **Requirements:** APP-07, APP-08, APP-09, APP-10, APP-11, APP-15
-**Plans:** ~3 plans
+**Plans:** 3 plans
 **Depends on:** Phase 17
 **Success Criteria:**
 1. 演员面板显示角色列表（卡片：名字/身份/情绪/A2A 服务状态/记忆摘要）
@@ -137,9 +137,9 @@ Plans:
 6. WebSocket 断线自动重连（指数退避 1s→30s），网络切换后恢复连接
 
 Plans:
-- [ ] 18-01-PLAN.md — Actor panel + drama status overview
-- [ ] 18-02-PLAN.md — Typing indicator + rich scene display + export
-- [ ] 18-03-PLAN.md — WebSocket auto-reconnect + network resilience + end-to-end polish
+- [ ] 18-01-PLAN.md — Actor panel + drama status overview (APP-07, APP-08)
+- [ ] 18-02-PLAN.md — Typing indicator + rich scene display + export (APP-09, APP-10, APP-11)
+- [ ] 18-03-PLAN.md — WebSocket auto-reconnect + network resilience + end-to-end polish (APP-15)
 
 ---
 
