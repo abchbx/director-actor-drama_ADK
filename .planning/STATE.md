@@ -4,11 +4,11 @@ milestone: v2.0
 milestone_name: Android 移动端
 current_phase: 17
 status: executing
-last_updated: "2026-04-16T07:30:58Z"
+last_updated: "2026-04-16T07:47:40Z"
 last_activity: 2026-04-16
 progress:
   total_phases: 6
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 15
   completed_plans: 15
   percent: 100
@@ -19,13 +19,13 @@ progress:
 **Project:** Director-Actor-Drama 无限畅写版
 **Milestone:** v2.0 Android 移动端
 **Current Phase:** 17
-**Status:** Executing Plan 17-03
+**Status:** Plan 17-03 complete (Phase 17 finished)
 
 ## Current Position
 
-Phase: 17 (android-interaction) — EXECUTING
-Plan: 17-03 (next)
-Status: Plan 17-02 complete
+Phase: 17 (android-interaction) — COMPLETE
+Plan: 17-03 (last)
+Status: All 3 plans in Phase 17 complete
 Last activity: 2026-04-16
 
 ## Progress
@@ -37,7 +37,7 @@ Last activity: 2026-04-16
 - [x] Phase 14: WebSocket Layer — 3/3 plans complete ✅
 - [x] Phase 15: Authentication — 2/2 plans complete ✅
 - [x] Phase 16: Android Foundation — 3/3 plans complete ✅
-- [ ] Phase 17: Android Interaction
+- [x] Phase 17: Android Interaction — 3/3 plans complete ✅
 - [ ] Phase 18: Android Features
 
 ## Decisions
@@ -86,6 +86,9 @@ Last activity: 2026-04-16
 - 17-02: narration event only marks typing=false; actual text rendered from end_narration event (per event_mapper.py)
 - 17-02: Replay messages (type=replay) silently ignored in handleWsEvent to prevent bubble duplication (Pitfall 6)
 - 17-02: FREE_TEXT command type routes to userAction() — treating unstructured input as /action
+- 17-03: T-17-08 mitigation: scene_number path param validated 1-999 range in GET /drama/scenes/{n}
+- 17-03: get_scene_summaries() handles both in-memory and archived scenes transparently
+- 17-03: History scene view replaces main bubbles; returnToCurrentScene() reconnects WS
 
 ## Key Risks (from PITFALLS.md)
 

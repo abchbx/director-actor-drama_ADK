@@ -107,7 +107,7 @@ Plans:
 
 **Goal:** 戏剧 CRUD 交互主界面，命令输入栏，场景历史浏览，保存/加载确认
 **Requirements:** APP-02, APP-03, APP-04, APP-05, APP-06, APP-12
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans executed ✅
 **Depends on:** Phase 16, Phase 13, Phase 14
 **Success Criteria:**
 1. 创建戏剧屏幕接受主题输入，触发 STORM discovery，完成后跳转主屏幕
@@ -120,7 +120,7 @@ Plans:
 Plans:
 - [x] 17-01-PLAN.md — DramaCreateScreen + DramaListScreen + DramaItemDto/Repository + 后端 DELETE /drama/{folder}
 - [x] 17-02-PLAN.md — DramaDetailScreen + WS 事件驱动气泡渲染 + 命令输入栏 + Typing 指示器
-- [ ] 17-03-PLAN.md — 场景历史 BottomSheet + 后端 GET /drama/scenes + 保存/加载确认
+- [x] 17-03-PLAN.md — 场景历史 BottomSheet + 后端 GET /drama/scenes + 保存/加载确认
 
 ### Phase 18: Android Features
 

@@ -43,7 +43,7 @@ Requirements for C/S architecture: FastAPI API Server + Android (Kotlin/Jetpack 
 - [ ] **APP-03**: Drama list screen shows all saved dramas with load/resume/delete actions
 - [x] **APP-04**: Main drama screen displays current scene with real-time WebSocket updates
 - [x] **APP-05**: Command input bar supports /next, /action, /speak, /end commands
-- [ ] **APP-06**: Scene history scrollable list with timeline navigation
+- [x] **APP-06**: Scene history scrollable list with timeline navigation
 
 ### Android App — Features
 
@@ -52,7 +52,7 @@ Requirements for C/S architecture: FastAPI API Server + Android (Kotlin/Jetpack 
 - [ ] **APP-09**: Script export to local file (Markdown format)
 - [ ] **APP-10**: Typing indicator displays during LLM generation (10-30s waits)
 - [ ] **APP-11**: Rich scene display with character name highlights and emotion tags
-- [ ] **APP-12**: Save/load drama with confirmation feedback
+- [x] **APP-12**: Save/load drama with confirmation feedback
 
 ### Android App — Infrastructure
 
