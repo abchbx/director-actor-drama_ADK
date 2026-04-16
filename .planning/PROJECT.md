@@ -15,6 +15,8 @@
 **Tests:** 577 passed (unit + integration + E2E)
 **LOC:** ~9,560 lines Python (app/)
 **Phase 13:** API Foundation complete — 2026-04-15 (14 REST endpoints, FastAPI, lock file, state migration)
+**Phase 14:** WebSocket Layer complete — 2026-04-15 (18 event types, EventBridge, replay buffer, heartbeat)
+**Phase 15:** Authentication complete — 2026-04-16 (Bearer token auth, dev mode bypass, WS token validation)
 
 ## Requirements
 
@@ -46,7 +48,7 @@
 
 - [ ] FastAPI API Server — REST + WebSocket 双协议，为前端客户端提供统一接口
 - [ ] WebSocket 实时推送 — 场景生成、旁白、演员对白实时推送到客户端
-- [ ] 简单 Token 认证 — 局域网/单用户场景，App 首连获取 token
+- ✓ 简单 Token 认证 — 局域网/单用户场景，Bearer token + dev mode bypass — Phase 15
 - [ ] Android App (Kotlin + Jetpack Compose) — Material Design 3 风格的戏剧交互客户端
 - [ ] 场景浏览与交互 — 查看场景历史、注入事件、推进剧情、角色对话
 - [ ] 剧本管理 — 创建/保存/加载/导出剧本
