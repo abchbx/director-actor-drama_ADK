@@ -20,8 +20,8 @@ Requirements for C/S architecture: FastAPI API Server + Android (Kotlin/Jetpack 
 - [ ] **WS-01**: WebSocket endpoint at `/api/v1/ws` receives real-time scene events
 - [ ] **WS-02**: 18 event types: scene_start, narration, dialogue, scene_end, tension_update, actor_created, actor_status, storm_discover, storm_research, storm_outline, error, typing, status, cast_update, progress, save_confirm, load_confirm, end_narration
 - [ ] **WS-03**: EventBridge observes ADK Runner event stream without modifying tool code
-- [ ] **WS-04**: 100-event replay buffer for reconnected clients to catch up
-- [ ] **WS-05**: WebSocket connection lifecycle management (connect, heartbeat, disconnect, reconnect)
+- [x] **WS-04**: 100-event replay buffer for reconnected clients to catch up
+- [x] **WS-05**: WebSocket connection lifecycle management (connect, heartbeat, disconnect, reconnect)
 
 ### Authentication
 

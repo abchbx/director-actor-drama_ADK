@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Android 移动端
 current_phase: 14
-status: planning
-last_updated: "2026-04-15T11:54:52.354Z"
+status: executing
+last_updated: "2026-04-15T14:27:56.921Z"
 last_activity: 2026-04-15
 progress:
   total_phases: 6
-  completed_phases: 1
-  total_plans: 4
-  completed_plans: 4
+  completed_phases: 2
+  total_plans: 7
+  completed_plans: 7
   percent: 100
 ---
 
@@ -19,12 +19,12 @@ progress:
 **Project:** Director-Actor-Drama 无限畅写版
 **Milestone:** v2.0 Android 移动端
 **Current Phase:** 14
-**Status:** Context gathered
+**Status:** Ready to execute
 
 ## Current Position
 
-Phase: 14 (WebSocket Layer) — Planned
-Plan: 3 plans created (14-01, 14-02, 14-03)
+Phase: 14 (websocket-layer) — EXECUTING
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-04-15
 
@@ -34,7 +34,7 @@ Last activity: 2026-04-15
 - [x] v2.0 requirements defined (32 requirements)
 - [x] v2.0 roadmap created (6 phases, ~18 plans)
 - [x] Phase 13: API Foundation — 4/4 plans complete ✅
-- [ ] Phase 14: WebSocket Layer
+- [ ] Phase 14: WebSocket Layer (2/3 plans complete)
 - [ ] Phase 15: Authentication
 - [ ] Phase 16: Android Foundation
 - [ ] Phase 17: Android Interaction
@@ -60,6 +60,8 @@ Last activity: 2026-04-15
 - [Phase 13]: 13-03: Query endpoints call state_manager directly (D-05) without Runner
 - [Phase 13]: Lock file at app/.api.lock uses PID for liveness detection; CLI and API mutually exclusive (D-07/STATE-03)
 - [Phase 13]: flush-on-push hook: app.state.flush_state_sync reference for Phase 14 WebSocket (STATE-02)
+- [Phase 14]: connect() returns bool for acceptance/rejection check
+- [Phase 14]: heartbeat runs as asyncio.Task, cancelled on disconnect, 15s ping/30s timeout
 
 ### v2.0 Decisions
 
@@ -91,4 +93,4 @@ Last activity: 2026-04-15
 
 See: .planning/PROJECT.md (updated 2026-04-14)
 **Core value:** 无限畅写，逻辑不断
-**Current focus:** Phase 14 — WebSocket Layer
+**Current focus:** Phase 14 — websocket-layer

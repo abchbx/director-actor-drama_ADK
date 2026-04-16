@@ -56,7 +56,7 @@ Plans:
 
 **Goal:** WebSocket 端点实时推送场景事件，EventBridge 观察 ADK Runner 事件流，100-event replay buffer 支持断线重连
 **Requirements:** WS-01, WS-02, WS-03, WS-04, WS-05
-**Plans:** 3 plans
+**Plans:** 3/3 plans complete
 **Depends on:** Phase 13
 **Success Criteria:**
 1. 客户端连接 `ws://host:8000/api/v1/ws` 后实时接收场景生成事件（旁白/对白/场景完成）
@@ -66,15 +66,15 @@ Plans:
 5. 心跳机制（15s ping/pong）维持连接活跃，超时断连自动清理
 
 Plans:
-- [ ] 14-01-PLAN.md — EventBridge callback hook + WS endpoint + WsEvent models + event_mapper + ConnectionManager
-- [ ] 14-02-PLAN.md — 18 event type emission wiring + event_callback in commands.py + flush-before-push
-- [ ] 14-03-PLAN.md — Replay buffer + heartbeat (15s/30s) + lifecycle management + reconnect handshake + connection limit
+- [x] 14-01-PLAN.md — EventBridge callback hook + WS endpoint + WsEvent models + event_mapper + ConnectionManager
+- [x] 14-02-PLAN.md — 18 event type emission wiring + event_callback in commands.py + flush-before-push
+- [x] 14-03-PLAN.md — Replay buffer + heartbeat (15s/30s) + lifecycle management + reconnect handshake + connection limit
 
 ### Phase 15: Authentication
 
 **Goal:** 简单 Token 认证覆盖 REST + WebSocket，局域网/单用户场景，FastAPI HTTPBearer 依赖注入
 **Requirements:** AUTH-01, AUTH-02, AUTH-03, AUTH-04
-**Plans:** ~2 plans
+**Plans:** 2 plans
 **Depends on:** Phase 13 (REST), Phase 14 (WebSocket)
 **Success Criteria:**
 1. 服务端首次启动生成 API Token（或从 .env 读取），无 Token 配置时认证禁用（dev 模式）
@@ -84,7 +84,7 @@ Plans:
 
 Plans:
 - [ ] 15-01-PLAN.md — Token generation + HTTPBearer dependency + REST auth enforcement
-- [ ] 15-02-PLAN.md — WebSocket token validation + auth bypass mode + security hardening
+- [ ] 15-02-PLAN.md — WebSocket token validation + auth bypass mode + integration tests
 
 ### Phase 16: Android Foundation
 
@@ -177,7 +177,7 @@ Phase 16 (Android Foundation) ──── Phase 17 (Android Interaction) ──
 | 11. Timeline Tracking | v1.0 | 2/2 | Complete | 2026-04-14 |
 | 12. Integration & Polish | v1.0 | 4/4 | Complete | 2026-04-14 |
 | 13. API Foundation | v2.0 | 4/4 | Complete    | 2026-04-15 |
-| 14. WebSocket Layer | v2.0 | 0/3 | Planning | — |
+| 14. WebSocket Layer | v2.0 | 3/3 | Complete   | 2026-04-15 |
 | 15. Authentication | v2.0 | 0/~2 | Pending | — |
 | 16. Android Foundation | v2.0 | 0/~3 | Pending | — |
 | 17. Android Interaction | v2.0 | 0/~3 | Pending | — |
