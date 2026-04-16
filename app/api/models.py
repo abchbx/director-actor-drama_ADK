@@ -121,6 +121,13 @@ class DramaListResponse(BaseModel):
     dramas: list[dict] = Field(default_factory=list)
 
 
+class DeleteDramaResponse(BaseModel):
+    """Response for drama delete operation."""
+
+    status: str = "success"
+    message: str = ""
+
+
 class ExportResponse(BaseModel):
     """Response for drama export."""
 

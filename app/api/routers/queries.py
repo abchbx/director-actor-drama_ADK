@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.api.deps import get_tool_context, require_auth
 from app.api.models import (
     CastResponse,
+    DeleteDramaResponse,
     DramaListResponse,
     DramaStatusResponse,
     ExportRequest,
@@ -18,6 +19,7 @@ from app.api.models import (
     SaveRequest,
 )
 from app.state_manager import (
+    delete_drama as delete_drama_fn,
     export_script,
     get_all_actors,
     get_current_state,
@@ -86,6 +88,25 @@ async def list_all_dramas(_auth: bool = Depends(require_auth)):
     """List all saved dramas."""
     result = list_dramas()
     return DramaListResponse(**result)
+
+
+@router.delete("/drama/{folder}", response_model=DeleteDramaResponse)
+async def delete_drama(
+    folder: str,
+    _auth: bool = Depends(require_auth),
+):
+    """Delete a drama by folder name."""
+    # T-17-01: Validate folder name to prevent path traversal
+    import re
+    if not re.match(r"^[a-zA-Z0-9_\-]+$", folder):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid folder name: only alphanumeric, underscore, and hyphen allowed",
+        )
+    result = delete_drama_fn(folder)
+    if result.get("status") == "error":
+        raise HTTPException(status_code=404, detail=result["message"])
+    return DeleteDramaResponse(**result)
 
 
 @router.post("/drama/export", response_model=ExportResponse)

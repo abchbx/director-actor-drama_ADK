@@ -39,6 +39,9 @@ interface DramaApiService {
     @GET("drama/list")
     suspend fun listDramas(): DramaListResponseDto
 
+    @DELETE("drama/{folder}")
+    suspend fun deleteDrama(@Path("folder") folder: String): DeleteDramaResponseDto
+
     @POST("drama/save")
     suspend fun saveDrama(@Body request: SaveRequestDto): SaveLoadResponseDto
 

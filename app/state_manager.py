@@ -8,6 +8,7 @@ import atexit
 import json
 import logging
 import os
+import shutil
 import threading
 from datetime import datetime
 
@@ -816,6 +817,22 @@ def list_dramas() -> dict:
                 )
 
     return {"status": "success", "dramas": dramas}
+
+
+def delete_drama(folder: str) -> dict:
+    """Delete a drama folder by name.
+
+    Args:
+        folder: The drama folder name to delete.
+
+    Returns:
+        dict with status and message.
+    """
+    folder_path = os.path.join(DRAMAS_DIR, folder)
+    if os.path.isdir(folder_path):
+        shutil.rmtree(folder_path)
+        return {"status": "success", "message": f"Deleted drama: {folder}"}
+    return {"status": "error", "message": f"Drama not found: {folder}"}
 
 
 # Backward compatibility alias

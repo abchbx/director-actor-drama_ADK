@@ -107,7 +107,7 @@ Plans:
 
 **Goal:** 戏剧 CRUD 交互主界面，命令输入栏，场景历史浏览，保存/加载确认
 **Requirements:** APP-02, APP-03, APP-04, APP-05, APP-06, APP-12
-**Plans:** ~3 plans
+**Plans:** 3 plans
 **Depends on:** Phase 16, Phase 13, Phase 14
 **Success Criteria:**
 1. 创建戏剧屏幕接受主题输入，触发 STORM discovery，完成后跳转主屏幕
@@ -118,9 +118,9 @@ Plans:
 6. 保存/加载操作返回确认反馈（snackbar 提示）
 
 Plans:
-- [ ] 17-01-PLAN.md — Drama list screen + create screen + load/resume/delete
-- [ ] 17-02-PLAN.md — Main drama screen + WebSocket live updates + command input bar
-- [ ] 17-03-PLAN.md — Scene history timeline + save/load confirmation + error handling
+- [ ] 17-01-PLAN.md — DramaCreateScreen + DramaListScreen + DramaItemDto/Repository + 后端 DELETE /drama/{folder}
+- [ ] 17-02-PLAN.md — DramaDetailScreen + WS 事件驱动气泡渲染 + 命令输入栏 + Typing 指示器
+- [ ] 17-03-PLAN.md — 场景历史 BottomSheet + 后端 GET /drama/scenes + 保存/加载确认
 
 ### Phase 18: Android Features
 
@@ -180,7 +180,7 @@ Phase 16 (Android Foundation) ──── Phase 17 (Android Interaction) ──
 | 14. WebSocket Layer | v2.0 | 3/3 | Complete   | 2026-04-15 |
 | 15. Authentication | v2.0 | 2/2 | Complete    | 2026-04-16 |
 | 16. Android Foundation | v2.0 | 3/3 | Complete    | 2026-04-16 |
-| 17. Android Interaction | v2.0 | 0/~3 | Pending | — |
+| 17. Android Interaction | v2.0 | 0/3 | Pending | — |
 | 18. Android Features | v2.0 | 0/~3 | Pending | — |
 
 ---
