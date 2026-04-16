@@ -1,14 +1,18 @@
 """FastAPI dependency injection for the Drama API.
 
 Provides shared dependencies that access app.state for runner,
-session service, lock, and tool context.
+session service, lock, tool context, and auth verification.
 """
 
 import asyncio
+import logging
 
-from fastapi import Depends, Request
+from fastapi import Depends, HTTPException, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
+
+logger = logging.getLogger(__name__)
 
 # Session constants — defined locally to avoid circular import with app.py
 APP_NAME = "app"
@@ -55,3 +59,42 @@ async def get_tool_context(
         app_name=APP_NAME, user_id=USER_ID, session_id=SESSION_ID
     )
     return ToolContextAdapter(state=session.state)
+
+
+# HTTPBearer scheme for Swagger UI auto-detection (AUTH-04)
+_bearer_scheme = HTTPBearer(auto_error=False)
+
+
+async def require_auth(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
+) -> bool:
+    """Validate Bearer token against app.state.api_token (AUTH-04, D-01~D-06).
+
+    - D-05: No API_TOKEN → auth disabled (dev mode), all requests pass
+    - D-06: Dev mode logs WARNING at startup + debug per-request
+    - D-12: Static token, no expiry/refresh
+    - D-16: Auth events logged to Python logger
+    - AUTH-04: FastAPI HTTPBearer dependency injection
+
+    Returns True on success. Raises HTTPException(401) on invalid token.
+    """
+    # D-05: Dev mode bypass — no API_TOKEN configured
+    auth_enabled = getattr(request.app.state, "auth_enabled", False)
+    if not auth_enabled:
+        logger.debug("Auth bypass: no API_TOKEN configured (dev mode)")
+        return True
+
+    # Auth enabled: credentials must be present
+    if credentials is None:
+        logger.warning("Auth failed: missing Authorization header")
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    # Validate token against app.state.api_token (D-03)
+    api_token = getattr(request.app.state, "api_token", None)
+    if credentials.credentials != api_token:
+        logger.warning("Auth failed: invalid token")
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    logger.debug("Auth succeeded: valid token")
+    return True

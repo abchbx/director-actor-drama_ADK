@@ -135,6 +135,13 @@ class ErrorResponse(BaseModel):
     detail: str
 
 
+class AuthVerifyResponse(BaseModel):
+    """Response for auth token verification (D-08)."""
+
+    valid: bool = Field(default=True, description="Whether the token is valid")
+    mode: str = Field(default="token", description="Auth mode: 'token' or 'bypass'")
+
+
 # ============================================================================
 # WebSocket event models (Phase 14)
 # ============================================================================

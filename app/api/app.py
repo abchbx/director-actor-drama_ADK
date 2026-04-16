@@ -5,6 +5,8 @@ providing REST API access without modifying any of the 12 core modules.
 """
 
 import asyncio
+import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -16,9 +18,12 @@ from app.actor_service import stop_all_actor_services
 from app.agent import root_agent
 from app.api.lock import acquire_lock, release_lock
 from app.api.routers import commands, queries
+from app.api.routers import auth as auth_router
 from app.api.routers import websocket as ws_router
 from app.api.ws_manager import ConnectionManager
 from app.state_manager import flush_state_sync
+
+logger = logging.getLogger(__name__)
 
 # Constants matching CLI session configuration
 APP_NAME = "app"
@@ -55,6 +60,19 @@ async def lifespan(app: FastAPI):
     # Phase 14: Initialize ConnectionManager for WebSocket
     manager = ConnectionManager()
     app.state.connection_manager = manager
+
+    # Phase 15: Read API_TOKEN from environment (D-01, D-03)
+    api_token = os.getenv("API_TOKEN", "").strip()
+    app.state.api_token = api_token if api_token else None
+    app.state.auth_enabled = bool(api_token)  # D-05: empty/missing → auth disabled
+
+    if not app.state.auth_enabled:
+        # D-06: Prominent WARNING at startup
+        logger.warning(
+            "⚠️ AUTH DISABLED: No API_TOKEN configured. All requests accepted."
+        )
+    else:
+        logger.info("Auth enabled: API_TOKEN configured (token auth mode)")
 
     yield
 
@@ -96,5 +114,6 @@ def create_app() -> FastAPI:
     app.include_router(commands.router, prefix="/api/v1")
     app.include_router(queries.router, prefix="/api/v1")
     app.include_router(ws_router.router, prefix="/api/v1")
+    app.include_router(auth_router.router, prefix="/api/v1")
 
     return app
