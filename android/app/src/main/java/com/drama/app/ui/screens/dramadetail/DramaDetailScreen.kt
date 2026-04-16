@@ -1,21 +1,101 @@
 package com.drama.app.ui.screens.dramadetail
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.drama.app.ui.screens.dramadetail.components.CommandInputBar
+import com.drama.app.ui.screens.dramadetail.components.SceneBubbleList
+import com.drama.app.ui.screens.dramadetail.components.TensionIndicator
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DramaDetailScreen(
     dramaId: String,
-    viewModel: DramaDetailViewModel = androidx.hilt.navigation.compose.hiltViewModel(),
+    viewModel: DramaDetailViewModel = hiltViewModel(),
 ) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(text = "戏剧详情: $dramaId")
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // 收集一次性事件
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is DramaDetailEvent.ShowSnackbar ->
+                    snackbarHostState.showSnackbar(event.message)
+            }
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text(uiState.theme, style = MaterialTheme.typography.titleMedium)
+                        Text("第 ${uiState.currentScene} 场", style = MaterialTheme.typography.bodySmall)
+                    }
+                },
+                actions = {
+                    // D-16: 张力指示
+                    TensionIndicator(score = uiState.tensionScore)
+                },
+            )
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        bottomBar = {
+            // D-12: 底部固定命令输入栏
+            CommandInputBar(
+                onCommand = viewModel::sendCommand,
+                isProcessing = uiState.isProcessing,
+            )
+        },
+    ) { innerPadding ->
+        Box(modifier = Modifier.padding(innerPadding)) {
+            if (uiState.bubbles.isEmpty() && !uiState.isTyping) {
+                // 空场景提示
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("等待戏剧开始...", style = MaterialTheme.typography.bodyLarge)
+                }
+            } else {
+                SceneBubbleList(
+                    bubbles = uiState.bubbles,
+                    isTyping = uiState.isTyping,
+                )
+            }
+
+            // WS 连接状态指示
+            if (!uiState.isWsConnected) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter))
+            }
+
+            // STORM 进度（创建后可能在 Detail 屏幕显示）
+            uiState.stormPhase?.let { phase ->
+                Surface(
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 128.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                ) {
+                    Text(phase, modifier = Modifier.padding(16.dp))
+                }
+            }
+        }
     }
 }
