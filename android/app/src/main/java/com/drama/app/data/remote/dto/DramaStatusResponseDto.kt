@@ -11,4 +11,12 @@ data class DramaStatusResponseDto(
     val num_actors: Int = 0,
     val actors: List<String> = emptyList(),
     val drama_folder: String = "",
+    val arc_progress: List<ArcProgressDto> = emptyList(),
+    val time_period: String = "",
+)
+
+@Serializable
+data class ArcProgressDto(
+    val name: String = "",
+    val progress: Float = 0f,
 )

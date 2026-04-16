@@ -1086,15 +1086,31 @@ def get_current_state(tool_context=None) -> dict:
     """
     state = _get_state(tool_context)
     theme = state.get("theme", "")
+    actors = state.get("actors", {})
+
+    # D-07: arc_progress from actor state
+    arc_progress = []
+    for name, info in actors.items():
+        arc = info.get("arc_progress", {})
+        arc_progress.append({"name": name, "progress": arc.get("progress", 0)})
+
+    # D-07: time_period from timeline
+    timeline = state.get("timeline", {})
+    time_period = ""
+    if timeline.get("time_periods"):
+        time_period = timeline["time_periods"][-1].get("description", "")
+
     return {
         "status": "success",
         "theme": theme,
         "drama_status": state.get("status", ""),
         "current_scene": state.get("current_scene", 0),
         "num_scenes": len(state.get("scenes", [])),
-        "num_actors": len(state.get("actors", {})),
-        "actors": list(state.get("actors", {}).keys()),
+        "num_actors": len(actors),
+        "actors": list(actors.keys()),
         "drama_folder": _get_drama_folder(theme) if theme else "",
+        "arc_progress": arc_progress,
+        "time_period": time_period,
     }
 
 

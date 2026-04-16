@@ -93,6 +93,8 @@ class DramaStatusResponse(BaseModel):
     num_actors: int = 0
     actors: list[str] = Field(default_factory=list)
     drama_folder: str = ""
+    arc_progress: list[dict] = Field(default_factory=list, description="Per-actor arc progress")
+    time_period: str = Field(default="", description="Current time period description")
 
 
 class CastResponse(BaseModel):
@@ -100,6 +102,13 @@ class CastResponse(BaseModel):
 
     status: str = "success"
     actors: dict = Field(default_factory=dict)
+
+
+class CastStatusResponse(BaseModel):
+    """Response for cast A2A process status."""
+
+    status: str = "success"
+    actors: dict = Field(default_factory=dict, description="Per-actor A2A status: {name: {pid, running, port}}")
 
 
 class SaveLoadResponse(BaseModel):

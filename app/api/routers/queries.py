@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.api.deps import get_tool_context, require_auth
 from app.api.models import (
     CastResponse,
+    CastStatusResponse,
     DeleteDramaResponse,
     DramaListResponse,
     DramaStatusResponse,
@@ -96,6 +97,18 @@ async def get_cast(
     _require_active_drama(tool_context)
     result = get_all_actors(tool_context)
     return CastResponse(**result)
+
+
+@router.get("/drama/cast/status", response_model=CastStatusResponse)
+async def get_cast_status(
+    _auth: bool = Depends(require_auth),
+    tool_context=Depends(get_tool_context),
+):
+    """Get A2A process status for each actor."""
+    _require_active_drama(tool_context)
+    from app.actor_service import list_running_actors
+    result = list_running_actors()
+    return CastStatusResponse(**result)
 
 
 @router.post("/drama/save", response_model=SaveLoadResponse)

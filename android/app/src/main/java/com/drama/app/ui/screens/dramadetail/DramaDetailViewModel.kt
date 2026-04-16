@@ -4,9 +4,11 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.drama.app.data.local.ServerPreferences
+import com.drama.app.data.remote.dto.ArcProgressDto
 import com.drama.app.data.remote.dto.SceneSummaryDto
 import com.drama.app.data.remote.dto.WsEventDto
 import com.drama.app.data.remote.ws.WebSocketManager
+import com.drama.app.domain.model.ActorInfo
 import com.drama.app.domain.model.CommandType
 import com.drama.app.domain.model.SceneBubble
 import com.drama.app.domain.repository.DramaRepository
@@ -21,9 +23,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.intOrNull
 import javax.inject.Inject
 
 data class DramaDetailUiState(
@@ -42,6 +48,12 @@ data class DramaDetailUiState(
     val showHistorySheet: Boolean = false,
     // D-23: 保存操作
     val showSaveDialog: Boolean = false,
+    // D-01~D-04: 演员面板
+    val actors: List<ActorInfo> = emptyList(),
+    val showActorDrawer: Boolean = false,
+    // D-07: 状态概览
+    val arcProgress: List<ArcProgressDto> = emptyList(),
+    val timePeriod: String = "",
 )
 
 sealed class DramaDetailEvent {
@@ -79,6 +91,8 @@ class DramaDetailViewModel @Inject constructor(
                         theme = status.theme,
                         currentScene = status.current_scene,
                         isWsConnected = true,
+                        arcProgress = status.arc_progress,
+                        timePeriod = status.time_period,
                     ) }
                 }
         }
@@ -99,14 +113,10 @@ class DramaDetailViewModel @Inject constructor(
     private fun handleWsEvent(event: WsEventDto) {
         // 处理 replay 消息（Pitfall 6）
         if (event.type == "replay") {
-            // replay 消息由 ReplayMessageDto 处理，此处忽略
             return
         }
         when (event.type) {
-            // D-15: WS 事件驱动 UI 更新
             "narration" -> {
-                // narration 事件的 data 可能不含 text，文本内容在 end_narration 中
-                // 但我们仍然监听，因为 narration 事件指示旁白开始
                 _uiState.update { it.copy(isTyping = false) }
             }
             "dialogue" -> {
@@ -133,7 +143,6 @@ class DramaDetailViewModel @Inject constructor(
                 val score = event.data["tension_score"]?.jsonPrimitive?.intOrNull ?: 0
                 _uiState.update { it.copy(tensionScore = score) }
             }
-            // D-14: Typing 指示器基础版
             "typing" -> {
                 _uiState.update { it.copy(isTyping = true) }
             }
@@ -142,12 +151,10 @@ class DramaDetailViewModel @Inject constructor(
                 _uiState.update { it.copy(isTyping = false, error = msg) }
                 viewModelScope.launch { _events.emit(DramaDetailEvent.ShowSnackbar(msg)) }
             }
-            // STORM 进度（创建后可能在 Detail 屏幕收到）
             "storm_discover" -> _uiState.update { it.copy(stormPhase = "发现新视角...") }
             "storm_research" -> _uiState.update { it.copy(stormPhase = "深入研究...") }
             "storm_outline" -> _uiState.update { it.copy(stormPhase = "综合构思大纲...") }
             "scene_start" -> _uiState.update { it.copy(stormPhase = null, isTyping = false) }
-            // D-22: 保存/加载确认
             "save_confirm" -> {
                 val msg = event.data["message"]?.jsonPrimitive?.contentOrNull ?: "已保存"
                 _uiState.update { it.copy(isTyping = false) }
@@ -216,7 +223,6 @@ class DramaDetailViewModel @Inject constructor(
 
     fun returnToCurrentScene() {
         _uiState.update { it.copy(viewingHistoryScene = null) }
-        // 重新连接 WS 以获取当前场景
         connectWebSocket()
     }
 
@@ -241,6 +247,76 @@ class DramaDetailViewModel @Inject constructor(
                     _events.emit(DramaDetailEvent.ShowSnackbar("保存失败：${e.message}"))
                 }
             _uiState.update { it.copy(showSaveDialog = false) }
+        }
+    }
+
+    // D-01~D-04: 演员面板
+    fun showActorDrawer() {
+        loadActorPanel()
+        _uiState.update { it.copy(showActorDrawer = true) }
+    }
+
+    fun hideActorDrawer() {
+        _uiState.update { it.copy(showActorDrawer = false) }
+    }
+
+    private fun loadActorPanel() {
+        viewModelScope.launch {
+            val castResult = dramaRepository.getCast()
+            val statusResult = dramaRepository.getCastStatus()
+
+            val mergedActors = mutableListOf<ActorInfo>()
+
+            castResult.onSuccess { cast ->
+                val statusMap = statusResult.getOrNull()?.actors ?: emptyMap()
+
+                for ((name, actorElement) in cast.actors) {
+                    val actorObj = (actorElement as? JsonObject)?.jsonObject ?: continue
+                    val role = actorObj["role"]?.jsonPrimitive?.contentOrNull ?: ""
+                    val personality = actorObj["personality"]?.jsonPrimitive?.contentOrNull ?: ""
+                    val background = actorObj["background"]?.jsonPrimitive?.contentOrNull ?: ""
+                    val emotions = actorObj["emotions"]?.jsonPrimitive?.contentOrNull ?: "neutral"
+                    val memorySummary = buildMemorySummary(actorObj)
+
+                    val a2aData = statusMap[name]
+                    val isRunning = (a2aData as? JsonObject)?.get("running")?.jsonPrimitive?.booleanOrNull ?: false
+                    val port = (a2aData as? JsonObject)?.get("port")?.jsonPrimitive?.intOrNull ?: 0
+
+                    mergedActors.add(
+                        ActorInfo(
+                            name = name,
+                            role = role,
+                            personality = personality,
+                            background = background,
+                            emotions = emotions,
+                            memorySummary = memorySummary,
+                            isA2ARunning = isRunning,
+                            a2aPort = port,
+                        ),
+                    )
+                }
+            }
+
+            _uiState.update { it.copy(actors = mergedActors) }
+        }
+    }
+
+    private fun buildMemorySummary(actorObj: JsonObject): String {
+        val memoryArray = actorObj["memory"]?.jsonArray ?: return ""
+        return memoryArray.mapNotNull { it.jsonPrimitive.contentOrNull }.joinToString(" ").take(500)
+    }
+
+    // D-07: refresh status for overview card
+    fun refreshStatus() {
+        viewModelScope.launch {
+            dramaRepository.getDramaStatus()
+                .onSuccess { status ->
+                    _uiState.update { it.copy(
+                        currentScene = status.current_scene,
+                        arcProgress = status.arc_progress,
+                        timePeriod = status.time_period,
+                    ) }
+                }
         }
     }
 
@@ -273,7 +349,6 @@ class DramaDetailViewModel @Inject constructor(
                 _uiState.update { it.copy(isProcessing = false, error = e.message) }
                 _events.emit(DramaDetailEvent.ShowSnackbar("命令失败：${e.message}"))
             }
-            // 成功时不立即清除 isProcessing — WS typing 事件会控制状态
         }
     }
 

@@ -36,6 +36,9 @@ interface DramaApiService {
     @GET("drama/cast")
     suspend fun getCast(): CastResponseDto
 
+    @GET("drama/cast/status")
+    suspend fun getCastStatus(): CastStatusResponseDto
+
     @GET("drama/list")
     suspend fun listDramas(): DramaListResponseDto
 

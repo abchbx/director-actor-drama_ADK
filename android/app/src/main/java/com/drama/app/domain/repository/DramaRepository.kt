@@ -1,5 +1,7 @@
 package com.drama.app.domain.repository
 
+import com.drama.app.data.remote.dto.CastResponseDto
+import com.drama.app.data.remote.dto.CastStatusResponseDto
 import com.drama.app.data.remote.dto.CommandResponseDto
 import com.drama.app.data.remote.dto.DramaStatusResponseDto
 import com.drama.app.data.remote.dto.SaveLoadResponseDto
@@ -20,4 +22,6 @@ interface DramaRepository {
     suspend fun endDrama(): Result<CommandResponseDto>
     suspend fun getScenes(): Result<ScenesResponseDto>
     suspend fun getSceneDetail(sceneNumber: Int): Result<SceneDetailDto>
+    suspend fun getCastStatus(): Result<CastStatusResponseDto>
+    suspend fun getCast(): Result<CastResponseDto>
 }
