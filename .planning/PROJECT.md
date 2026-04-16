@@ -17,6 +17,9 @@
 **Phase 13:** API Foundation complete — 2026-04-15 (14 REST endpoints, FastAPI, lock file, state migration)
 **Phase 14:** WebSocket Layer complete — 2026-04-15 (18 event types, EventBridge, replay buffer, heartbeat)
 **Phase 15:** Authentication complete — 2026-04-16 (Bearer token auth, dev mode bypass, WS token validation)
+**Phase 16:** Android Foundation complete — 2026-04-16 (MVVM + Hilt + Material 3, server connection, navigation)
+**Phase 17:** Android Interaction complete — 2026-04-16 (Drama CRUD, command bar, scene history, save/load)
+**Phase 18:** Android Features complete — 2026-04-16 (actor panel, status overview, rich display, export, WS reconnect)
 
 ## Requirements
 
@@ -46,13 +49,20 @@
 
 ### Active
 
-- [ ] FastAPI API Server — REST + WebSocket 双协议，为前端客户端提供统一接口
-- [ ] WebSocket 实时推送 — 场景生成、旁白、演员对白实时推送到客户端
+_None — v2.0 milestone complete_
+
+### Validated (v2.0)
+
+- ✓ FastAPI API Server — REST + WebSocket 双协议，14 个 REST 端点 — Phase 13
+- ✓ WebSocket 实时推送 — 18 种事件类型，EventBridge，100-event replay buffer — Phase 14
 - ✓ 简单 Token 认证 — 局域网/单用户场景，Bearer token + dev mode bypass — Phase 15
-- [ ] Android App (Kotlin + Jetpack Compose) — Material Design 3 风格的戏剧交互客户端
-- [ ] 场景浏览与交互 — 查看场景历史、注入事件、推进剧情、角色对话
-- [ ] 剧本管理 — 创建/保存/加载/导出剧本
-- [ ] 演员状态面板 — 查看演员列表、A2A 服务状态、记忆摘要
+- ✓ Android App (Kotlin + Jetpack Compose) — Material Design 3 风格戏剧交互客户端 — Phase 16-18
+- ✓ 场景浏览与交互 — 戏剧 CRUD、命令输入栏、场景历史、保存/加载确认 — Phase 17
+- ✓ 剧本管理 — 创建/保存/加载/导出剧本，Android Share Intent — Phase 17-18
+- ✓ 演员状态面板 — 演员卡片 + A2A 状态 + 记忆摘要 — Phase 18
+- ✓ 戏剧状态概览 — 场景数/张力/弧线/时间/演员数 — Phase 18
+- ✓ Typing 指示器 + 富文本渲染 — 上下文感知动画、角色名高亮、情绪标签、头像 — Phase 18
+- ✓ WebSocket 自动重连 — 指数退避 1s→30s、ConnectivityManager 回调 — Phase 18
 
 ### Out of Scope
 
@@ -65,9 +75,9 @@
 - 多用户认证系统 — 简单 Token 足够，不做 OAuth/注册系统
 - 推送通知 — 场景推送通过 WebSocket 实时完成，无需 FCM
 
-## Current Milestone: v2.0 Android 移动端
+## Current Milestone: v2.0 Android 移动端 — COMPLETE
 
-**Goal:** 为 director-actor-drama 添加 C/S 架构支持，Python 后端提供 API Server，Android App 作为纯 UI 客户端
+**Goal:** 为 director-actor-drama 添加 C/S 架构支持，Python 后端提供 API Server，Android App 作为纯 UI 客户端 — **SHIPPED 2026-04-16**
 
 **Target features:**
 - FastAPI REST + WebSocket API Server
@@ -112,10 +122,10 @@
 | Debounce 状态保存 | 频繁 IO 浪费资源 | ✓ Good — 5 秒防抖 |
 | 共享 AsyncClient | 连接泄漏风险 | ✓ Good — 懒单例 + 自动重建 |
 | 被动崩溃检测 | 主动轮询浪费资源 | ✓ Good — 连接错误触发重启 |
-| C/S 架构 (FastAPI + Android) | Python 后端不可替代(google-adk, a2a-sdk)，移动端仅做 UI | — Pending |
-| REST + WebSocket 混合通信 | REST 适合命令式操作，WebSocket 适合 LLM 长等待推送 | — Pending |
-| 简单 Token 认证 | 单用户/局域网场景，无需 OAuth 复杂度 | — Pending |
-| 纯在线模式 | 后端是唯一计算源，离线无意义 | — Pending |
+| C/S 架构 (FastAPI + Android) | Python 后端不可替代(google-adk, a2a-sdk)，移动端仅做 UI | ✓ Done — Phase 13-18 |
+| REST + WebSocket 混合通信 | REST 适合命令式操作，WebSocket 适合 LLM 长等待推送 | ✓ Done — Phase 13-14 |
+| 简单 Token 认证 | 单用户/局域网场景，无需 OAuth 复杂度 | ✓ Done — Phase 15 |
+| 纯在线模式 | 后端是唯一计算源，离线无意义 | ✓ Done — 架构决策 |
 
 ## Evolution
 
@@ -136,4 +146,4 @@ This document evolves at phase transitions and milestone boundaries.
 
 ---
 
-*Last updated: 2026-04-14 after v2.0 milestone start*
+*Last updated: 2026-04-16 after v2.0 milestone completion*
