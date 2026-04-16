@@ -109,6 +109,7 @@ celerybeat.pid
 
 # Environments
 .env
+**/.env
 .venv
 .venv*
 env/
@@ -195,7 +196,7 @@ tests/load_test/.results/*.csv
 .locust_env
 my_env.tfvars
 .saved_chats
-.env
+**/.env
 .requirements.txt
 
 # A2A Inspector
