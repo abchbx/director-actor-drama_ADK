@@ -80,4 +80,7 @@ dependencies {
 
     // DataStore (D-04) — Phase 16-02 使用
     implementation(libs.datastore.preferences)
+
+    // Security — EncryptedSharedPreferences for token storage (D-04)
+    implementation(libs.security.crypto)
 }
