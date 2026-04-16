@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -78,6 +79,7 @@ class DramaDetailViewModel @Inject constructor(
     val events: SharedFlow<DramaDetailEvent> = _events.asSharedFlow()
 
     private var wsJob: Job? = null
+    private var connectionStateJob: Job? = null
     private var bubbleCounter = 0
 
     init {
@@ -102,13 +104,24 @@ class DramaDetailViewModel @Inject constructor(
 
     fun connectWebSocket() {
         wsJob?.cancel()
+        connectionStateJob?.cancel()
         wsJob = viewModelScope.launch {
             val config = serverPreferences.serverConfig.first() ?: return@launch
+            webSocketManager.onReconnected = {
+                // D-16: Auto-refresh via GET /drama/status after reconnect
+                refreshStatus()
+            }
             webSocketManager.connect(config.ip, config.port, config.token)
                 .catch { e ->
                     _uiState.update { it.copy(isWsConnected = false, error = e.message) }
                 }
                 .collect { event -> handleWsEvent(event) }
+        }
+        // Collect connection state for UI indicator
+        connectionStateJob = viewModelScope.launch {
+            webSocketManager.connectionState.collect { connected ->
+                _uiState.update { it.copy(isWsConnected = connected) }
+            }
         }
     }
 
@@ -320,7 +333,7 @@ class DramaDetailViewModel @Inject constructor(
         return memoryArray.mapNotNull { it.jsonPrimitive.contentOrNull }.joinToString(" ").take(500)
     }
 
-    // D-07: refresh status for overview card
+    // D-07/D-16: refresh status for overview card + after WS reconnect
     fun refreshStatus() {
         viewModelScope.launch {
             dramaRepository.getDramaStatus()
@@ -329,6 +342,7 @@ class DramaDetailViewModel @Inject constructor(
                         currentScene = status.current_scene,
                         arcProgress = status.arc_progress,
                         timePeriod = status.time_period,
+                        isWsConnected = true,
                     ) }
                 }
         }
@@ -369,6 +383,8 @@ class DramaDetailViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         wsJob?.cancel()
+        connectionStateJob?.cancel()
         webSocketManager.disconnect()
+        webSocketManager.onReconnected = null
     }
 }

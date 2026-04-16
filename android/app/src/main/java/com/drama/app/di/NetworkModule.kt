@@ -1,5 +1,6 @@
 package com.drama.app.di
 
+import android.content.Context
 import com.drama.app.data.local.ServerPreferences
 import com.drama.app.data.remote.api.AuthApiService
 import com.drama.app.data.remote.api.DramaApiService
@@ -10,6 +11,7 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -92,7 +94,8 @@ object NetworkModule {
     fun provideWebSocketManager(
         okHttpClient: OkHttpClient,
         json: Json,
+        @ApplicationContext context: Context,
     ): WebSocketManager {
-        return WebSocketManager(okHttpClient, json)
+        return WebSocketManager(okHttpClient, json, context)
     }
 }
