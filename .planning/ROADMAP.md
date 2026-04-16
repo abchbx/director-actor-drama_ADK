@@ -178,7 +178,7 @@ Phase 16 (Android Foundation) ──── Phase 17 (Android Interaction) ──
 | 12. Integration & Polish | v1.0 | 4/4 | Complete | 2026-04-14 |
 | 13. API Foundation | v2.0 | 4/4 | Complete    | 2026-04-15 |
 | 14. WebSocket Layer | v2.0 | 3/3 | Complete   | 2026-04-15 |
-| 15. Authentication | v2.0 | 2/2 | Complete   | 2026-04-16 |
+| 15. Authentication | v2.0 | 2/2 | Complete    | 2026-04-16 |
 | 16. Android Foundation | v2.0 | 3/3 | Complete    | 2026-04-16 |
 | 17. Android Interaction | v2.0 | 0/~3 | Pending | — |
 | 18. Android Features | v2.0 | 0/~3 | Pending | — |

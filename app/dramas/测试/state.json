@@ -1,17 +1,59 @@
 {
   "actors": {
-    "测试": {
+    "快演员": {
+      "working_memory": [
+        {
+          "entry": "条目7",
+          "importance": "normal",
+          "scene": 7
+        },
+        {
+          "entry": "条目8",
+          "importance": "normal",
+          "scene": 8
+        },
+        {
+          "entry": "条目9",
+          "importance": "normal",
+          "scene": 9
+        },
+        {
+          "entry": "条目10",
+          "importance": "normal",
+          "scene": 10
+        },
+        {
+          "entry": "条目11",
+          "importance": "normal",
+          "scene": 11
+        }
+      ],
+      "scene_summaries": [
+        {
+          "summary": "我注意到输入中的 7 条工作记忆条目均为空（条目0-条目6），没有实际内容可供压缩。\n\n请提供具体的工作记忆内容，例如：\n\n```\n- [第1场] 朱棣怒斥群臣，质问太子下落\n- [第2场] 暗卫回报，发现建文帝下落\n- [第3场] 朱棣陷入犹豫，是否要斩草除根\n...\n```\n\n待您填充实际内容后，我将按照压缩规则生成 150-200 字的场景摘要。",
+          "scenes_covered": "0-6",
+          "key_events": [
+            "条目0。",
+            "条目1。",
+            "条目2。",
+            "条目3。",
+            "条目4。",
+            "条目5。",
+            "条目6。"
+          ],
+          "tags": []
+        }
+      ],
       "arc_summary": {
         "structured": {
-          "theme": "权力",
-          "key_characters": [
-            "朱棣"
-          ],
+          "theme": "",
+          "key_characters": [],
           "unresolved": [],
           "resolved": []
         },
-        "narrative": "新的弧线摘要"
+        "narrative": ""
       },
+      "critical_memories": [],
       "_pending_compression": {
         "working_to_scene": null,
         "scene_to_arc": null,
