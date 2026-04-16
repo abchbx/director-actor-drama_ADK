@@ -6,7 +6,7 @@ They call state_manager functions directly (D-05) for fast, predictable response
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.api.deps import get_tool_context
+from app.api.deps import get_tool_context, require_auth
 from app.api.models import (
     CastResponse,
     DramaListResponse,
@@ -36,7 +36,10 @@ def _require_active_drama(tool_context):
 
 
 @router.get("/drama/status", response_model=DramaStatusResponse)
-async def get_status(tool_context=Depends(get_tool_context)):
+async def get_status(
+    _auth: bool = Depends(require_auth),
+    tool_context=Depends(get_tool_context),
+):
     """Get the current drama status."""
     _require_active_drama(tool_context)
     result = get_current_state(tool_context)
@@ -44,7 +47,10 @@ async def get_status(tool_context=Depends(get_tool_context)):
 
 
 @router.get("/drama/cast", response_model=CastResponse)
-async def get_cast(tool_context=Depends(get_tool_context)):
+async def get_cast(
+    _auth: bool = Depends(require_auth),
+    tool_context=Depends(get_tool_context),
+):
     """Get the list of actors in the current drama."""
     _require_active_drama(tool_context)
     result = get_all_actors(tool_context)
@@ -52,7 +58,11 @@ async def get_cast(tool_context=Depends(get_tool_context)):
 
 
 @router.post("/drama/save", response_model=SaveLoadResponse)
-async def save_drama(request: SaveRequest, tool_context=Depends(get_tool_context)):
+async def save_drama(
+    request: SaveRequest,
+    _auth: bool = Depends(require_auth),
+    tool_context=Depends(get_tool_context),
+):
     """Save the current drama progress."""
     _require_active_drama(tool_context)
     result = save_progress(request.save_name, tool_context)
@@ -61,21 +71,29 @@ async def save_drama(request: SaveRequest, tool_context=Depends(get_tool_context
 
 
 @router.post("/drama/load", response_model=SaveLoadResponse)
-async def load_drama(request: LoadRequest, tool_context=Depends(get_tool_context)):
+async def load_drama(
+    request: LoadRequest,
+    _auth: bool = Depends(require_auth),
+    tool_context=Depends(get_tool_context),
+):
     """Load a previously saved drama."""
     result = load_progress(request.save_name, tool_context)
     return SaveLoadResponse(**result)
 
 
 @router.get("/drama/list", response_model=DramaListResponse)
-async def list_all_dramas():
+async def list_all_dramas(_auth: bool = Depends(require_auth)):
     """List all saved dramas."""
     result = list_dramas()
     return DramaListResponse(**result)
 
 
 @router.post("/drama/export", response_model=ExportResponse)
-async def export_drama(request: ExportRequest, tool_context=Depends(get_tool_context)):
+async def export_drama(
+    request: ExportRequest,
+    _auth: bool = Depends(require_auth),
+    tool_context=Depends(get_tool_context),
+):
     """Export the drama script."""
     _require_active_drama(tool_context)
     result = export_script(tool_context)

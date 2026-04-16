@@ -11,7 +11,7 @@ Each endpoint:
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from app.api.deps import get_runner, get_runner_lock, get_tool_context
+from app.api.deps import get_runner, get_runner_lock, get_tool_context, require_auth
 from app.api.models import (
     ActionRequest,
     AutoRequest,
@@ -53,6 +53,7 @@ def _get_event_callback(request: Request):
 async def start_drama(
     body: StartDramaRequest,
     req: Request,
+    _auth: bool = Depends(require_auth),
     runner=Depends(get_runner),
     lock=Depends(get_runner_lock),
     tool_context=Depends(get_tool_context),
@@ -80,6 +81,7 @@ async def start_drama(
 @router.post("/drama/next", response_model=CommandResponse)
 async def next_scene(
     req: Request,
+    _auth: bool = Depends(require_auth),
     runner=Depends(get_runner),
     lock=Depends(get_runner_lock),
     tool_context=Depends(get_tool_context),
@@ -98,6 +100,7 @@ async def next_scene(
 async def user_action(
     body: ActionRequest,
     req: Request,
+    _auth: bool = Depends(require_auth),
     runner=Depends(get_runner),
     lock=Depends(get_runner_lock),
     tool_context=Depends(get_tool_context),
@@ -116,6 +119,7 @@ async def user_action(
 async def actor_speak(
     body: SpeakRequest,
     req: Request,
+    _auth: bool = Depends(require_auth),
     runner=Depends(get_runner),
     lock=Depends(get_runner_lock),
     tool_context=Depends(get_tool_context),
@@ -137,6 +141,7 @@ async def actor_speak(
 async def steer_drama(
     body: SteerRequest,
     req: Request,
+    _auth: bool = Depends(require_auth),
     runner=Depends(get_runner),
     lock=Depends(get_runner_lock),
     tool_context=Depends(get_tool_context),
@@ -155,6 +160,7 @@ async def steer_drama(
 async def auto_advance(
     body: AutoRequest,
     req: Request,
+    _auth: bool = Depends(require_auth),
     runner=Depends(get_runner),
     lock=Depends(get_runner_lock),
     tool_context=Depends(get_tool_context),
@@ -172,6 +178,7 @@ async def auto_advance(
 @router.post("/drama/end", response_model=CommandResponse)
 async def end_drama(
     req: Request,
+    _auth: bool = Depends(require_auth),
     runner=Depends(get_runner),
     lock=Depends(get_runner_lock),
     tool_context=Depends(get_tool_context),
@@ -190,6 +197,7 @@ async def end_drama(
 async def trigger_storm(
     body: StormRequest,
     req: Request,
+    _auth: bool = Depends(require_auth),
     runner=Depends(get_runner),
     lock=Depends(get_runner_lock),
     tool_context=Depends(get_tool_context),
