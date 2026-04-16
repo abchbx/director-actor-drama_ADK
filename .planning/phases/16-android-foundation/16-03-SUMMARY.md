@@ -102,6 +102,17 @@ None
 - 暗色模式跟随系统，戏剧 App 沉浸感增强
 - 形状沿用 MD3 默认 rounded，未来如需定制可在 Theme.kt 添加 shape 参数
 
+## Self-Check: PASSED
+
+- [x] Color.kt exists with 0xFF1A237E brand color
+- [x] Type.kt exists with FontWeight.Bold
+- [x] Theme.kt exists with dynamicDarkColorScheme + Build.VERSION_CODES.S
+- [x] colors.xml exists with XML color resources
+- [x] themes.xml exists with XML theme
+- [x] MainActivity.kt uses DramaTheme
+- [x] Commit 7b4de89 exists
+- [x] Commit 4b99d5a (docs) exists
+
 ---
 *Phase: 16-android-foundation*
 *Completed: 2026-04-16*
