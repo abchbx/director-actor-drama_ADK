@@ -2,11 +2,11 @@ package com.drama.app.ui.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
+import com.drama.app.ui.screens.connection.ConnectionGuideDialog
 import com.drama.app.ui.screens.dramacreate.DramaCreateScreen
 import com.drama.app.ui.screens.dramadetail.DramaDetailScreen
 import com.drama.app.ui.screens.dramalist.DramaListScreen
@@ -24,8 +24,14 @@ fun DramaNavHost(
         modifier = modifier,
     ) {
         composable<ConnectionGuide> {
-            // Phase 16-02 实现：首次启动连接引导 Dialog
-            // 当前占位
+            ConnectionGuideDialog(
+                onConnected = {
+                    // 导航到 DramaList 并清除 ConnectionGuide 从 back stack (D-15)
+                    navController.navigate(DramaList) {
+                        popUpTo<ConnectionGuide> { inclusive = true }
+                    }
+                },
+            )
         }
         composable<DramaList> {
             DramaListScreen(
