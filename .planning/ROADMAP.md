@@ -181,7 +181,7 @@ Phase 16 (Android Foundation) ──── Phase 17 (Android Interaction) ──
 | 15. Authentication | v2.0 | 2/2 | Complete    | 2026-04-16 |
 | 16. Android Foundation | v2.0 | 3/3 | Complete    | 2026-04-16 |
 | 17. Android Interaction | v2.0 | 2/3 | In Progress|  |
-| 18. Android Features | v2.0 | 0/~3 | Pending | — |
+| 18. Android Features | v2.0 | 3/~3 | Complete    | 2026-04-16 |
 
 ---
 
