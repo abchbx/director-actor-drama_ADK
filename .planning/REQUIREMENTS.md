@@ -38,7 +38,7 @@ Requirements for C/S architecture: FastAPI API Server + Android (Kotlin/Jetpack 
 
 ### Android App — Core
 
-- [ ] **APP-01**: App connects to backend server via IP:port configuration
+- [x] **APP-01**: App connects to backend server via IP:port configuration
 - [ ] **APP-02**: Drama creation screen with theme input, triggers STORM discovery
 - [ ] **APP-03**: Drama list screen shows all saved dramas with load/resume/delete actions
 - [ ] **APP-04**: Main drama screen displays current scene with real-time WebSocket updates
@@ -56,10 +56,10 @@ Requirements for C/S architecture: FastAPI API Server + Android (Kotlin/Jetpack 
 
 ### Android App — Infrastructure
 
-- [ ] **APP-13**: MVVM architecture with Repository pattern
-- [ ] **APP-14**: Hilt dependency injection
+- [x] **APP-13**: MVVM architecture with Repository pattern
+- [x] **APP-14**: Hilt dependency injection
 - [ ] **APP-15**: WebSocket auto-reconnect with exponential backoff on network change
-- [ ] **APP-16**: Material Design 3 theming with dynamic colors and dark mode
+- [x] **APP-16**: Material Design 3 theming with dynamic colors and dark mode
 
 ## v2+ Requirements
 

@@ -90,7 +90,7 @@ Plans:
 
 **Goal:** Android 项目搭建，MVVM + Hilt + Material Design 3 主题，服务器连接配置，导航骨架
 **Requirements:** APP-01, APP-13, APP-14, APP-16
-**Plans:** ~3 plans
+**Plans:** 3/3 plans complete
 **Depends on:** — (可与 Phase 13-15 并行开发)
 **Success Criteria:**
 1. App 启动后显示服务器 IP:port 配置界面，连接成功后进入主界面
@@ -99,9 +99,9 @@ Plans:
 4. Navigation Compose 骨架包含 drama-list / drama-create / drama-detail / settings 路由
 
 Plans:
-- [ ] 16-01-PLAN.md — Project setup + Hilt + Gradle dependencies + Navigation skeleton
-- [ ] 16-02-PLAN.md — Server connection screen + Retrofit API service + Repository layer
-- [ ] 16-03-PLAN.md — Material Design 3 theming + dynamic colors + dark mode
+- [x] 16-01-PLAN.md — Project setup + Hilt + Gradle dependencies + Navigation skeleton
+- [x] 16-02-PLAN.md — Server connection screen + Retrofit API service + Repository layer
+- [x] 16-03-PLAN.md — Material Design 3 theming + dynamic colors + dark mode
 
 ### Phase 17: Android Interaction
 
@@ -179,7 +179,7 @@ Phase 16 (Android Foundation) ──── Phase 17 (Android Interaction) ──
 | 13. API Foundation | v2.0 | 4/4 | Complete    | 2026-04-15 |
 | 14. WebSocket Layer | v2.0 | 3/3 | Complete   | 2026-04-15 |
 | 15. Authentication | v2.0 | 0/~2 | Pending | — |
-| 16. Android Foundation | v2.0 | 0/~3 | Pending | — |
+| 16. Android Foundation | v2.0 | 3/3 | Complete    | 2026-04-16 |
 | 17. Android Interaction | v2.0 | 0/~3 | Pending | — |
 | 18. Android Features | v2.0 | 0/~3 | Pending | — |
 
