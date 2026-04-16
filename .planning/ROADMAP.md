@@ -3,7 +3,7 @@
 ## Milestones
 
 - ✅ **v1.0 无限畅写版** — Phases 1-12 (shipped 2026-04-14)
-- 🔄 **v2.0 Android 移动端** — Phases 13-18 (in progress)
+- ✅ **v2.0 Android 移动端** — Phases 13-18 (shipped 2026-04-16)
 
 ## Phases
 
@@ -27,7 +27,7 @@
 
 ---
 
-## 🔄 v2.0 Android 移动端 (Phases 13-18)
+## ✅ v2.0 Android 移动端 (Phases 13-18)
 
 **Goal:** 为 director-actor-drama 添加 C/S 架构支持 — Python FastAPI 后端提供 REST + WebSocket API，Android (Kotlin/Jetpack Compose) 作为纯 UI 客户端
 
@@ -126,7 +126,7 @@ Plans:
 
 **Goal:** 演员面板，戏剧状态概览，剧本导出，Typing 指示器，富文本渲染，WebSocket 自动重连
 **Requirements:** APP-07, APP-08, APP-09, APP-10, APP-11, APP-15
-**Plans:** 3 plans
+**Plans:** 3/3 plans complete
 **Depends on:** Phase 17
 **Success Criteria:**
 1. 演员面板显示角色列表（卡片：名字/身份/情绪/A2A 服务状态/记忆摘要）
@@ -137,9 +137,9 @@ Plans:
 6. WebSocket 断线自动重连（指数退避 1s→30s），网络切换后恢复连接
 
 Plans:
-- [ ] 18-01-PLAN.md — Actor panel + drama status overview (APP-07, APP-08)
-- [ ] 18-02-PLAN.md — Typing indicator + rich scene display + export (APP-09, APP-10, APP-11)
-- [ ] 18-03-PLAN.md — WebSocket auto-reconnect + network resilience + end-to-end polish (APP-15)
+- [x] 18-01-PLAN.md — Actor panel + drama status overview (APP-07, APP-08)
+- [x] 18-02-PLAN.md — Typing indicator + rich scene display + export (APP-09, APP-10, APP-11)
+- [x] 18-03-PLAN.md — WebSocket auto-reconnect + network resilience + end-to-end polish (APP-15)
 
 ---
 
@@ -180,8 +180,8 @@ Phase 16 (Android Foundation) ──── Phase 17 (Android Interaction) ──
 | 14. WebSocket Layer | v2.0 | 3/3 | Complete   | 2026-04-15 |
 | 15. Authentication | v2.0 | 2/2 | Complete    | 2026-04-16 |
 | 16. Android Foundation | v2.0 | 3/3 | Complete    | 2026-04-16 |
-| 17. Android Interaction | v2.0 | 2/3 | In Progress|  |
-| 18. Android Features | v2.0 | 3/~3 | Complete    | 2026-04-16 |
+| 17. Android Interaction | v2.0 | 3/3 | Complete    | 2026-04-16 |
+| 18. Android Features | v2.0 | 3/3 | Complete    | 2026-04-16 |
 
 ---
 
