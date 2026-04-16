@@ -74,7 +74,7 @@ Plans:
 
 **Goal:** 简单 Token 认证覆盖 REST + WebSocket，局域网/单用户场景，FastAPI HTTPBearer 依赖注入
 **Requirements:** AUTH-01, AUTH-02, AUTH-03, AUTH-04
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 **Depends on:** Phase 13 (REST), Phase 14 (WebSocket)
 **Success Criteria:**
 1. 服务端首次启动生成 API Token（或从 .env 读取），无 Token 配置时认证禁用（dev 模式）
@@ -83,8 +83,8 @@ Plans:
 4. FastAPI HTTPBearer 依赖注入统一验证，无重复校验代码
 
 Plans:
-- [ ] 15-01-PLAN.md — Token generation + HTTPBearer dependency + REST auth enforcement
-- [ ] 15-02-PLAN.md — WebSocket token validation + auth bypass mode + integration tests
+- [x] 15-01-PLAN.md — Token generation + HTTPBearer dependency + REST auth enforcement
+- [x] 15-02-PLAN.md — WebSocket token validation + auth bypass mode + integration tests
 
 ### Phase 16: Android Foundation
 
@@ -178,7 +178,7 @@ Phase 16 (Android Foundation) ──── Phase 17 (Android Interaction) ──
 | 12. Integration & Polish | v1.0 | 4/4 | Complete | 2026-04-14 |
 | 13. API Foundation | v2.0 | 4/4 | Complete    | 2026-04-15 |
 | 14. WebSocket Layer | v2.0 | 3/3 | Complete   | 2026-04-15 |
-| 15. Authentication | v2.0 | 0/~2 | Pending | — |
+| 15. Authentication | v2.0 | 2/2 | Complete   | 2026-04-16 |
 | 16. Android Foundation | v2.0 | 3/3 | Complete    | 2026-04-16 |
 | 17. Android Interaction | v2.0 | 0/~3 | Pending | — |
 | 18. Android Features | v2.0 | 0/~3 | Pending | — |

@@ -27,7 +27,7 @@ Requirements for C/S architecture: FastAPI API Server + Android (Kotlin/Jetpack 
 
 - [ ] **AUTH-01**: Server generates API token on first connection request
 - [ ] **AUTH-02**: All REST endpoints require Bearer token in Authorization header
-- [ ] **AUTH-03**: WebSocket accepts token via query parameter on handshake
+- [x] **AUTH-03**: WebSocket accepts token via query parameter on handshake
 - [ ] **AUTH-04**: Token validation uses FastAPI HTTPBearer dependency
 
 ### State Migration

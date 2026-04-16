@@ -2,29 +2,29 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Android 移动端
-current_phase: 17
-status: planning
-last_updated: "2026-04-16T05:30:49.431Z"
+current_phase: 15
+status: executing
+last_updated: "2026-04-16T06:05:43.596Z"
 last_activity: 2026-04-16
 progress:
   total_phases: 6
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 12
-  completed_plans: 10
-  percent: 83
+  completed_plans: 12
+  percent: 100
 ---
 
 # State
 
 **Project:** Director-Actor-Drama 无限畅写版
 **Milestone:** v2.0 Android 移动端
-**Current Phase:** 17
-**Status:** Ready to plan
+**Current Phase:** 15
+**Status:** Ready to execute
 
 ## Current Position
 
-Phase: 14 (websocket-layer) — EXECUTING
-Plan: Not started
+Phase: 15 (authentication) — EXECUTING
+Plan: 2 of 2
 Status: Ready to execute
 Last activity: 2026-04-16
 
@@ -34,9 +34,9 @@ Last activity: 2026-04-16
 - [x] v2.0 requirements defined (32 requirements)
 - [x] v2.0 roadmap created (6 phases, ~18 plans)
 - [x] Phase 13: API Foundation — 4/4 plans complete ✅
-- [ ] Phase 14: WebSocket Layer (2/3 plans complete)
-- [ ] Phase 15: Authentication
-- [ ] Phase 16: Android Foundation
+- [x] Phase 14: WebSocket Layer — 3/3 plans complete ✅
+- [ ] Phase 15: Authentication — 0/2 plans
+- [x] Phase 16: Android Foundation — 3/3 plans complete ✅
 - [ ] Phase 17: Android Interaction
 - [ ] Phase 18: Android Features
 
@@ -62,6 +62,9 @@ Last activity: 2026-04-16
 - [Phase 13]: flush-on-push hook: app.state.flush_state_sync reference for Phase 14 WebSocket (STATE-02)
 - [Phase 14]: connect() returns bool for acceptance/rejection check
 - [Phase 14]: heartbeat runs as asyncio.Task, cancelled on disconnect, 15s ping/30s timeout
+- [Phase 15]: _validate_ws_token as plain function (not Depends) — WS endpoints don't support HTTP DI for auth
+- [Phase 15]: WebSocketException(code=4001) raised before accept — ConnectionManager never polluted with unauthed connections
+- [Phase 15]: _validate_ws_token is synchronous — token comparison is CPU-only, no I/O needed
 
 ### v2.0 Decisions
 
@@ -93,4 +96,4 @@ Last activity: 2026-04-16
 
 See: .planning/PROJECT.md (updated 2026-04-14)
 **Core value:** 无限畅写，逻辑不断
-**Current focus:** Phase 14 — websocket-layer
+**Current focus:** Phase 15 — authentication
