@@ -41,7 +41,13 @@ fun DramaNavHost(
             )
         }
         composable<DramaCreate> {
-            DramaCreateScreen()
+            DramaCreateScreen(
+                onNavigateToDetail = { dramaId ->
+                    navController.navigate(DramaDetail(dramaId)) {
+                        popUpTo<DramaList> { inclusive = false }
+                    }
+                },
+            )
         }
         composable<Settings> {
             SettingsScreen()
