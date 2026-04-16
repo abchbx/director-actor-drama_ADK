@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Android 移动端
 current_phase: 17
-status: planning
-last_updated: "2026-04-16T07:30:00.000Z"
+status: executing
+last_updated: "2026-04-16T07:30:58Z"
 last_activity: 2026-04-16
 progress:
   total_phases: 6
-  completed_phases: 5
-  total_plans: 14
-  completed_plans: 14
-  percent: 83
+  completed_phases: 4
+  total_plans: 15
+  completed_plans: 15
+  percent: 100
 ---
 
 # State
@@ -19,13 +19,13 @@ progress:
 **Project:** Director-Actor-Drama 无限畅写版
 **Milestone:** v2.0 Android 移动端
 **Current Phase:** 17
-**Status:** Ready to plan
+**Status:** Executing Plan 17-03
 
 ## Current Position
 
-Phase: 17 (android-interaction) — PLANNING
-Plan: Not started
-Status: Ready to plan
+Phase: 17 (android-interaction) — EXECUTING
+Plan: 17-03 (next)
+Status: Plan 17-02 complete
 Last activity: 2026-04-16
 
 ## Progress
@@ -80,6 +80,12 @@ Last activity: 2026-04-16
 - 13-01: CORS allow_origins=["*"] dev mode; production restricts in Phase 15+
 - 13-01: ToolContextAdapter wraps session.state for state_manager compat
 - 13-01: Endpoint stubs return structured Pydantic models (not bare dicts)
+- 17-01: DELETE /drama/{folder} validates folder name with regex to prevent path traversal (T-17-01)
+- 17-01: DramaCreateViewModel waits for WS scene_start event before navigating (D-04), not REST response
+- 17-01: DramaRepository uses runCatching for all operations, no manual try-catch
+- 17-02: narration event only marks typing=false; actual text rendered from end_narration event (per event_mapper.py)
+- 17-02: Replay messages (type=replay) silently ignored in handleWsEvent to prevent bubble duplication (Pitfall 6)
+- 17-02: FREE_TEXT command type routes to userAction() — treating unstructured input as /action
 
 ## Key Risks (from PITFALLS.md)
 

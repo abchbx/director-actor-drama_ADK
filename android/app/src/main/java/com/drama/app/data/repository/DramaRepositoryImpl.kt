@@ -63,6 +63,16 @@ class DramaRepositoryImpl @Inject constructor(
             dramaApiService.endDrama()
         }
 
+    override suspend fun getScenes(): Result<com.drama.app.data.remote.dto.ScenesResponseDto> =
+        runCatching {
+            dramaApiService.getDramaScenes()
+        }
+
+    override suspend fun getSceneDetail(sceneNumber: Int): Result<com.drama.app.data.remote.dto.SceneDetailDto> =
+        runCatching {
+            dramaApiService.getDramaSceneDetail(sceneNumber)
+        }
+
     private fun dramaItemDtoToDrama(dto: com.drama.app.data.remote.dto.DramaItemDto): Drama =
         Drama(
             folder = dto.folder,

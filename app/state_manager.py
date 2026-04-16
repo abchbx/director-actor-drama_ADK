@@ -1506,3 +1506,80 @@ def load_archived_scene(theme: str, scene_num: int) -> dict | None:
         with open(archive_path, "r", encoding="utf-8") as f:
             return json.load(f)
     return None
+
+
+def get_scene_summaries(tool_context) -> dict:
+    """Get summary list of all scenes for the current drama.
+
+    Iterates scene 1~num_scenes, loading archived scenes from disk when
+    the in-memory scene data is a lightweight index (archived=True).
+
+    Returns:
+        dict with "scenes" (list of summary dicts) and "total" (int).
+    """
+    state = _get_state(tool_context)
+    theme = state.get("theme", "")
+    scenes_list = state.get("scenes", [])
+    num_scenes = len(scenes_list)
+
+    summaries = []
+    for i in range(num_scenes):
+        scene = scenes_list[i]
+        scene_num = scene.get("scene_number", i + 1)
+
+        if scene.get("archived"):
+            # Load from disk
+            full_scene = load_archived_scene(theme, scene_num)
+            if full_scene is None:
+                continue
+            title = full_scene.get("title", "")
+            narration = full_scene.get("narration", "") or full_scene.get("content", "")
+            description = narration[:50] if narration else ""
+        else:
+            title = scene.get("title", "")
+            narration = scene.get("narration", "") or scene.get("description", "") or scene.get("content", "")
+            description = narration[:50] if narration else ""
+
+        summaries.append({
+            "scene_number": scene_num,
+            "title": title,
+            "description": description,
+        })
+
+    return {"scenes": summaries, "total": len(summaries)}
+
+
+def get_scene_detail(theme: str, scene_num: int) -> dict:
+    """Get the full detail of a single scene.
+
+    First checks the in-memory scenes list, then falls back to archived
+    scene files on disk.
+
+    Args:
+        theme: The drama theme.
+        scene_num: The 1-based scene number.
+
+    Returns:
+        dict with scene data, or {"status": "error", "message": ...} if not found.
+    """
+    # Try to find in the current state's scenes list
+    # (we need to load the state from file since we don't have tool_context here)
+    state = _load_state_from_file(theme)
+    scenes_list = state.get("scenes", [])
+
+    for scene in scenes_list:
+        if scene.get("scene_number") == scene_num:
+            if scene.get("archived"):
+                # Load from disk
+                full_scene = load_archived_scene(theme, scene_num)
+                if full_scene is not None:
+                    return full_scene
+                return {"status": "error", "message": f"Scene {scene_num} not found"}
+            return scene
+
+    # If not found in state (maybe all archived), try disk
+    full_scene = load_archived_scene(theme, scene_num)
+    if full_scene is not None:
+        return full_scene
+
+    return {"status": "error", "message": f"Scene {scene_num} not found"}

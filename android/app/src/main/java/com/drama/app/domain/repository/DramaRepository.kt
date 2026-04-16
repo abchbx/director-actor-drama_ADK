@@ -3,6 +3,8 @@ package com.drama.app.domain.repository
 import com.drama.app.data.remote.dto.CommandResponseDto
 import com.drama.app.data.remote.dto.DramaStatusResponseDto
 import com.drama.app.data.remote.dto.SaveLoadResponseDto
+import com.drama.app.data.remote.dto.SceneDetailDto
+import com.drama.app.data.remote.dto.ScenesResponseDto
 import com.drama.app.domain.model.Drama
 
 interface DramaRepository {
@@ -16,4 +18,6 @@ interface DramaRepository {
     suspend fun userAction(description: String): Result<CommandResponseDto>
     suspend fun actorSpeak(actorName: String, situation: String): Result<CommandResponseDto>
     suspend fun endDrama(): Result<CommandResponseDto>
+    suspend fun getScenes(): Result<ScenesResponseDto>
+    suspend fun getSceneDetail(sceneNumber: Int): Result<SceneDetailDto>
 }

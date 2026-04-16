@@ -17,6 +17,8 @@ from app.api.models import (
     LoadRequest,
     SaveLoadResponse,
     SaveRequest,
+    SceneDetailResponse,
+    ScenesResponse,
 )
 from app.state_manager import (
     delete_drama as delete_drama_fn,
@@ -35,6 +37,43 @@ def _require_active_drama(tool_context):
     """Raise 404 if no active drama session exists."""
     if not tool_context.state.get("drama", {}).get("theme"):
         raise HTTPException(status_code=404, detail="No active drama session")
+
+
+@router.get("/drama/scenes", response_model=ScenesResponse)
+async def get_drama_scenes(
+    _auth: bool = Depends(require_auth),
+    tool_context=Depends(get_tool_context),
+):
+    """Get the list of scene summaries for the current drama."""
+    _require_active_drama(tool_context)
+    from app.state_manager import get_scene_summaries
+    result = get_scene_summaries(tool_context)
+    return ScenesResponse(**result)
+
+
+@router.get("/drama/scenes/{scene_number}", response_model=SceneDetailResponse)
+async def get_drama_scene_detail(
+    scene_number: int,
+    _auth: bool = Depends(require_auth),
+    tool_context=Depends(get_tool_context),
+):
+    """Get the full detail of a specific scene."""
+    _require_active_drama(tool_context)
+    # T-17-08: Validate scene_number range
+    if scene_number < 1 or scene_number > 999:
+        raise HTTPException(status_code=400, detail="scene_number must be between 1 and 999")
+    theme = tool_context.state.get("drama", {}).get("theme", "")
+    from app.state_manager import get_scene_detail
+    result = get_scene_detail(theme, scene_number)
+    if result.get("status") == "error":
+        raise HTTPException(status_code=404, detail=result["message"])
+    return SceneDetailResponse(
+        scene_number=scene_number,
+        title=result.get("title", ""),
+        narration=result.get("narration", "") or result.get("content", ""),
+        dialogue=result.get("dialogue", []),
+        raw=result,
+    )
 
 
 @router.get("/drama/status", response_model=DramaStatusResponse)

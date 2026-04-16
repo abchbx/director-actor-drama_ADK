@@ -121,6 +121,31 @@ class DramaListResponse(BaseModel):
     dramas: list[dict] = Field(default_factory=list)
 
 
+class SceneSummaryItem(BaseModel):
+    """Summary item for a single scene in the scenes list."""
+
+    scene_number: int
+    title: str = ""
+    description: str = ""
+
+
+class ScenesResponse(BaseModel):
+    """Response for the scene list query."""
+
+    scenes: list[SceneSummaryItem] = Field(default_factory=list)
+    total: int = 0
+
+
+class SceneDetailResponse(BaseModel):
+    """Response for a single scene detail query."""
+
+    scene_number: int = 0
+    title: str = ""
+    narration: str = ""
+    dialogue: list[dict] = Field(default_factory=list)
+    raw: dict = Field(default_factory=dict)
+
+
 class DeleteDramaResponse(BaseModel):
     """Response for drama delete operation."""
 

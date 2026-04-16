@@ -50,4 +50,11 @@ interface DramaApiService {
 
     @POST("drama/export")
     suspend fun exportDrama(@Body request: ExportRequestDto): ExportResponseDto
+
+    // === Scene History ===
+    @GET("drama/scenes")
+    suspend fun getDramaScenes(): ScenesResponseDto
+
+    @GET("drama/scenes/{sceneNumber}")
+    suspend fun getDramaSceneDetail(@Path("sceneNumber") sceneNumber: Int): SceneDetailDto
 }

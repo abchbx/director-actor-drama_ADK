@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.drama.app.data.local.ServerPreferences
+import com.drama.app.data.remote.dto.SceneSummaryDto
 import com.drama.app.data.remote.dto.WsEventDto
 import com.drama.app.data.remote.ws.WebSocketManager
 import com.drama.app.domain.model.CommandType
@@ -35,6 +36,12 @@ data class DramaDetailUiState(
     val stormPhase: String? = null,
     val isWsConnected: Boolean = false,
     val error: String? = null,
+    // D-18~D-20: 场景历史
+    val viewingHistoryScene: Int? = null,
+    val historyScenes: List<SceneSummaryDto> = emptyList(),
+    val showHistorySheet: Boolean = false,
+    // D-23: 保存操作
+    val showSaveDialog: Boolean = false,
 )
 
 sealed class DramaDetailEvent {
@@ -140,6 +147,100 @@ class DramaDetailViewModel @Inject constructor(
             "storm_research" -> _uiState.update { it.copy(stormPhase = "深入研究...") }
             "storm_outline" -> _uiState.update { it.copy(stormPhase = "综合构思大纲...") }
             "scene_start" -> _uiState.update { it.copy(stormPhase = null, isTyping = false) }
+            // D-22: 保存/加载确认
+            "save_confirm" -> {
+                val msg = event.data["message"]?.jsonPrimitive?.contentOrNull ?: "已保存"
+                _uiState.update { it.copy(isTyping = false) }
+                viewModelScope.launch { _events.emit(DramaDetailEvent.ShowSnackbar(msg)) }
+            }
+            "load_confirm" -> {
+                val msg = event.data["message"]?.jsonPrimitive?.contentOrNull ?: "已加载"
+                _uiState.update { it.copy(isTyping = false) }
+                viewModelScope.launch { _events.emit(DramaDetailEvent.ShowSnackbar(msg)) }
+            }
+        }
+    }
+
+    // D-18/D-19: 场景历史
+    fun loadScenes() {
+        viewModelScope.launch {
+            dramaRepository.getScenes()
+                .onSuccess { response ->
+                    _uiState.update { it.copy(historyScenes = response.scenes) }
+                }
+        }
+    }
+
+    fun showHistorySheet() {
+        loadScenes()
+        _uiState.update { it.copy(showHistorySheet = true) }
+    }
+
+    fun hideHistorySheet() {
+        _uiState.update { it.copy(showHistorySheet = false) }
+    }
+
+    // D-20: 查看历史场景
+    fun viewHistoryScene(sceneNumber: Int) {
+        viewModelScope.launch {
+            dramaRepository.getSceneDetail(sceneNumber)
+                .onSuccess { detail ->
+                    val historyBubbles = mutableListOf<SceneBubble>()
+                    if (detail.narration.isNotBlank()) {
+                        historyBubbles.add(
+                            SceneBubble.Narration(
+                                id = "hist_${sceneNumber}_n",
+                                text = detail.narration,
+                            ),
+                        )
+                    }
+                    for ((idx, d) in detail.dialogue.withIndex()) {
+                        val actorName = d["actor_name"]?.jsonPrimitive?.contentOrNull ?: ""
+                        val text = d["text"]?.jsonPrimitive?.contentOrNull ?: ""
+                        historyBubbles.add(
+                            SceneBubble.Dialogue(
+                                id = "hist_${sceneNumber}_d$idx",
+                                actorName = actorName,
+                                text = text,
+                            ),
+                        )
+                    }
+                    _uiState.update { it.copy(
+                        viewingHistoryScene = sceneNumber,
+                        bubbles = historyBubbles,
+                        showHistorySheet = false,
+                    ) }
+                }
+        }
+    }
+
+    fun returnToCurrentScene() {
+        _uiState.update { it.copy(viewingHistoryScene = null) }
+        // 重新连接 WS 以获取当前场景
+        connectWebSocket()
+    }
+
+    // D-23: 保存操作
+    fun showSaveDialog() {
+        _uiState.update { it.copy(showSaveDialog = true) }
+    }
+
+    fun hideSaveDialog() {
+        _uiState.update { it.copy(showSaveDialog = false) }
+    }
+
+    fun saveDrama(saveName: String = "") {
+        viewModelScope.launch {
+            dramaRepository.saveDrama(saveName)
+                .onSuccess { response ->
+                    _events.emit(
+                        DramaDetailEvent.ShowSnackbar("已保存：${saveName.ifBlank { response.theme }}"),
+                    )
+                }
+                .onFailure { e ->
+                    _events.emit(DramaDetailEvent.ShowSnackbar("保存失败：${e.message}"))
+                }
+            _uiState.update { it.copy(showSaveDialog = false) }
         }
     }
 

@@ -41,8 +41,8 @@ Requirements for C/S architecture: FastAPI API Server + Android (Kotlin/Jetpack 
 - [x] **APP-01**: App connects to backend server via IP:port configuration
 - [ ] **APP-02**: Drama creation screen with theme input, triggers STORM discovery
 - [ ] **APP-03**: Drama list screen shows all saved dramas with load/resume/delete actions
-- [ ] **APP-04**: Main drama screen displays current scene with real-time WebSocket updates
-- [ ] **APP-05**: Command input bar supports /next, /action, /speak, /end commands
+- [x] **APP-04**: Main drama screen displays current scene with real-time WebSocket updates
+- [x] **APP-05**: Command input bar supports /next, /action, /speak, /end commands
 - [ ] **APP-06**: Scene history scrollable list with timeline navigation
 
 ### Android App — Features
