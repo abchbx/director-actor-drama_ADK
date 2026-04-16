@@ -1,31 +1,31 @@
 ---
 gsd_state_version: 1.0
 milestone: v2.0
-milestone_name: Android 移动端
-current_phase: 18
-status: completed
-last_updated: "2026-04-16T16:00:00Z"
+milestone_name: Android 移动端 — Gap Closure
+current_phase: 19
+status: in_progress
+last_updated: "2026-04-16T17:00:00Z"
 last_activity: 2026-04-16
 progress:
-  total_phases: 6
+  total_phases: 9
   completed_phases: 6
-  total_plans: 18
+  total_plans: 21
   completed_plans: 18
-  percent: 100
+  percent: 67
 ---
 
 # State
 
 **Project:** Director-Actor-Drama 无限畅写版
-**Milestone:** v2.0 Android 移动端
-**Current Phase:** 18
-**Status:** v2.0 milestone complete — all phases shipped
+**Milestone:** v2.0 Android 移动端 — Gap Closure
+**Current Phase:** 19
+**Status:** Gap closure phases 19-21 added after audit
 
 ## Current Position
 
-Phase: 18 (android-features) — COMPLETE
-Plan: 18-03 (last)
-Status: All 3 plans in Phase 18 complete, v2.0 milestone finished
+Phase: 19 (ws-heartbeat-fix) — PENDING
+Plan: 19-01 (not yet created)
+Status: Audit found 6 partial requirements, 3 integration gaps, 2 broken flows
 Last activity: 2026-04-16
 
 ## Progress
@@ -39,6 +39,9 @@ Last activity: 2026-04-16
 - [x] Phase 16: Android Foundation — 3/3 plans complete ✅
 - [x] Phase 17: Android Interaction — 3/3 plans complete ✅
 - [x] Phase 18: Android Features — 3/3 plans complete ✅
+- [ ] Phase 19: WS Heartbeat Fix — 0/1 plans (PENDING)
+- [ ] Phase 20: Command & API Wiring Fix — 0/1 plans (PENDING)
+- [ ] Phase 21: Events & Export Completion — 0/1 plans (PENDING)
 
 ## Decisions
 

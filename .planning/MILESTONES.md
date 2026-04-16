@@ -1,8 +1,8 @@
 # Milestones — Director-Actor-Drama
 
-## v2.0 Android 移动端 — SHIPPED 2026-04-16
+## v2.0 Android 移动端 — GAP CLOSURE IN PROGRESS
 
-**Phases:** 6 | **Plans:** 18
+**Phases:** 6 (shipped) + 3 (gap closure) | **Plans:** 18 (done) + 3 (pending)
 
 ### Key Accomplishments
 

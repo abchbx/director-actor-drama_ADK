@@ -17,11 +17,11 @@ Requirements for C/S architecture: FastAPI API Server + Android (Kotlin/Jetpack 
 
 ### WebSocket Real-time Push
 
-- [ ] **WS-01**: WebSocket endpoint at `/api/v1/ws` receives real-time scene events
+- [x] **WS-01**: WebSocket endpoint at `/api/v1/ws` receives real-time scene events
 - [ ] **WS-02**: 18 event types: scene_start, narration, dialogue, scene_end, tension_update, actor_created, actor_status, storm_discover, storm_research, storm_outline, error, typing, status, cast_update, progress, save_confirm, load_confirm, end_narration
-- [ ] **WS-03**: EventBridge observes ADK Runner event stream without modifying tool code
+- [x] **WS-03**: EventBridge observes ADK Runner event stream without modifying tool code
 - [x] **WS-04**: 100-event replay buffer for reconnected clients to catch up
-- [x] **WS-05**: WebSocket connection lifecycle management (connect, heartbeat, disconnect, reconnect)
+- [ ] **WS-05**: WebSocket connection lifecycle management (connect, heartbeat, disconnect, reconnect)
 
 ### Authentication
 
@@ -39,19 +39,19 @@ Requirements for C/S architecture: FastAPI API Server + Android (Kotlin/Jetpack 
 ### Android App — Core
 
 - [x] **APP-01**: App connects to backend server via IP:port configuration
-- [ ] **APP-02**: Drama creation screen with theme input, triggers STORM discovery
-- [ ] **APP-03**: Drama list screen shows all saved dramas with load/resume/delete actions
-- [x] **APP-04**: Main drama screen displays current scene with real-time WebSocket updates
-- [x] **APP-05**: Command input bar supports /next, /action, /speak, /end commands
+- [x] **APP-02**: Drama creation screen with theme input, triggers STORM discovery
+- [x] **APP-03**: Drama list screen shows all saved dramas with load/resume/delete actions
+- [ ] **APP-04**: Main drama screen displays current scene with real-time WebSocket updates
+- [ ] **APP-05**: Command input bar supports /next, /action, /speak, /end commands
 - [x] **APP-06**: Scene history scrollable list with timeline navigation
 
 ### Android App — Features
 
-- [ ] **APP-07**: Actor panel shows cast list with A2A service status and memory summary
-- [ ] **APP-08**: Drama status overview (current scene, tension score, arc progress, time period)
+- [x] **APP-07**: Actor panel shows cast list with A2A service status and memory summary
+- [x] **APP-08**: Drama status overview (current scene, tension score, arc progress, time period)
 - [ ] **APP-09**: Script export to local file (Markdown format)
-- [ ] **APP-10**: Typing indicator displays during LLM generation (10-30s waits)
-- [ ] **APP-11**: Rich scene display with character name highlights and emotion tags
+- [x] **APP-10**: Typing indicator displays during LLM generation (10-30s waits)
+- [x] **APP-11**: Rich scene display with character name highlights and emotion tags
 - [x] **APP-12**: Save/load drama with confirmation feedback
 
 ### Android App — Infrastructure
@@ -98,44 +98,45 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | API-01 | 13 | ✅ Done (13-01) |
-| API-02 | 13 | Mapped |
+| API-02 | 13 | ✅ Done (13-02, 13-03) |
 | API-03 | 13 | ✅ Done (13-01) |
 | API-04 | 13 | ✅ Done (13-01) |
 | API-05 | 13 | ✅ Done (13-01) |
-| WS-01 | 14 | Mapped |
-| WS-02 | 14 | Mapped |
-| WS-03 | 14 | Mapped |
-| WS-04 | 14 | Mapped |
-| WS-05 | 14 | Mapped |
-| AUTH-01 | 15 | Mapped |
-| AUTH-02 | 15 | Mapped |
-| AUTH-03 | 15 | Mapped |
-| AUTH-04 | 15 | Mapped |
-| STATE-01 | 13 | Mapped |
-| STATE-02 | 13 | Mapped |
-| STATE-03 | 13 | Mapped |
-| APP-01 | 16 | Mapped |
-| APP-02 | 17 | Mapped |
-| APP-03 | 17 | Mapped |
-| APP-04 | 17 | Mapped |
-| APP-05 | 17 | Mapped |
-| APP-06 | 17 | Mapped |
-| APP-07 | 18 | Mapped |
-| APP-08 | 18 | Mapped |
-| APP-09 | 18 | Mapped |
-| APP-10 | 18 | Mapped |
-| APP-11 | 18 | Mapped |
-| APP-12 | 17 | Mapped |
-| APP-13 | 16 | Mapped |
-| APP-14 | 16 | Mapped |
-| APP-15 | 18 | Mapped |
-| APP-16 | 16 | Mapped |
+| WS-01 | 14 | ✅ Done (14-01) |
+| WS-02 | 21 | 🔄 Pending (gap closure) |
+| WS-03 | 14 | ✅ Done (14-01) |
+| WS-04 | 14 | ✅ Done (14-03) |
+| WS-05 | 19 | 🔄 Pending (gap closure) |
+| AUTH-01 | 15 | ✅ Done (15-01) |
+| AUTH-02 | 15 | ✅ Done (15-01) |
+| AUTH-03 | 15 | ✅ Done (15-02) |
+| AUTH-04 | 15 | ✅ Done (15-01) |
+| STATE-01 | 13 | ✅ Done (13-03) |
+| STATE-02 | 13 | ✅ Done (13-04) |
+| STATE-03 | 13 | ✅ Done (13-04) |
+| APP-01 | 16 | ✅ Done (16-02) |
+| APP-02 | 17 | ✅ Done (17-01) |
+| APP-03 | 17 | ✅ Done (17-01) |
+| APP-04 | 19 | 🔄 Pending (gap closure) |
+| APP-05 | 20 | 🔄 Pending (gap closure) |
+| APP-06 | 17 | ✅ Done (17-03) |
+| APP-07 | 18 | ✅ Done (18-01) |
+| APP-08 | 18 | ✅ Done (18-01) |
+| APP-09 | 21 | 🔄 Pending (gap closure) |
+| APP-10 | 18 | ✅ Done (18-02) |
+| APP-11 | 18 | ✅ Done (18-02) |
+| APP-12 | 17 | ✅ Done (17-03) |
+| APP-13 | 16 | ✅ Done (16-01) |
+| APP-14 | 16 | ✅ Done (16-01) |
+| APP-15 | 19 | 🔄 Pending (gap closure) |
+| APP-16 | 16 | ✅ Done (16-03) |
 
 **Coverage:**
 - v2 requirements: 32 total
-- Mapped to phases: 32 ✅
+- Fully satisfied: 26 ✅
+- Partial (gap closure pending): 6 🔄 (WS-02, WS-05, APP-04, APP-05, APP-09, APP-15)
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-14*
-*Last updated: 2026-04-14 after roadmap creation*
+*Last updated: 2026-04-16 — gap closure phases 19-21 added, 6 requirements reset to Pending*

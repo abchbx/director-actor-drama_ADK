@@ -75,9 +75,9 @@ _None — v2.0 milestone complete_
 - 多用户认证系统 — 简单 Token 足够，不做 OAuth/注册系统
 - 推送通知 — 场景推送通过 WebSocket 实时完成，无需 FCM
 
-## Current Milestone: v2.0 Android 移动端 — COMPLETE
+## Current Milestone: v2.0 Android 移动端 — GAP CLOSURE
 
-**Goal:** 为 director-actor-drama 添加 C/S 架构支持，Python 后端提供 API Server，Android App 作为纯 UI 客户端 — **SHIPPED 2026-04-16**
+**Goal:** 修复审计发现的6个需求差距、3个集成断裂、2个E2E流程中断 — Phases 19-21
 
 **Target features:**
 - FastAPI REST + WebSocket API Server

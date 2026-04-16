@@ -143,22 +143,75 @@ Plans:
 
 ---
 
+## v2.0 Gap Closure (Phases 19-21)
+
+**Goal:** 修复审计发现的6个需求差距、3个集成断裂、2个E2E流程中断
+
+### Phase 19: WebSocket 心跳修复
+
+**Goal:** 修复 Android WebSocketManager 不响应服务端 ping 的 CRITICAL bug，连接每30s断连导致实时推送不可靠
+**Requirements:** WS-05, APP-04, APP-15
+**Gap Closure:** Closes CRITICAL Gap 1 (WS Heartbeat Pong Missing)
+**Depends on:** Phase 14, Phase 18
+**Success Criteria:**
+1. Android WebSocketManager 收到 `{"type":"ping"}` 后立即发送 `{"type":"pong"}`
+2. WS 连接持续稳定 >5 分钟无断连（无心跳超时）
+3. 自动重连后 replay buffer 正确消费，无事件丢失
+4. 心跳超时恢复后 DramaDetailScreen 实时渲染恢复正常
+
+### Phase 20: 命令与 API 接线修复
+
+**Goal:** 修复 isProcessing 永不重置导致命令输入栏永久禁用的 CRITICAL bug，补全 /steer /auto /storm 三个 REST 端点的 Android 接线
+**Requirements:** APP-05, API-02 (partial)
+**Gap Closure:** Closes CRITICAL Gap 2 (isProcessing Never Resets) + HIGH Gap 3 (4 API Endpoints Unwired)
+**Depends on:** Phase 17, Phase 18, Phase 19
+**Success Criteria:**
+1. DramaDetailViewModel.sendCommand() 成功路径重置 isProcessing = false
+2. CommandType 枚举添加 STEER/AUTO/STORM，路由到正确 API 端点
+3. DramaRepository 添加 steerDrama()/autoAdvanceDrama()/stormDrama() 方法
+4. 命令端到端流程：/next → /action → /steer → /auto → /storm → /speak → /end 全部可执行
+5. 成功发送命令后输入栏立即可用，无永久禁用
+
+### Phase 21: 事件处理与 Export 补全
+
+**Goal:** 补全5种被忽略的 WS 事件类型处理，完成剧本导出功能（Repository + ViewModel + UI）
+**Requirements:** WS-02, APP-09
+**Gap Closure:** Closes HIGH Gap (5 WS Event Types Unhandled) + APP-09 (Export Incomplete)
+**Depends on:** Phase 19, Phase 20
+**Success Criteria:**
+1. Android ViewModel 正确处理 status/actor_status/actor_created/cast_update/progress 5种事件
+2. DramaRepository.exportDramaContent() 调用后端 /export 端点并返回 Markdown 内容
+3. DramaDetailViewModel 包含 export action + loading/success/error 状态管理
+4. DramaDetailScreen overflow menu 包含 Export 按钮，触发 Android Share Intent 分享
+
+---
+
 ## Dependency Graph
 
 ```
 Phase 13 (API Foundation) ─────┬─── Phase 14 (WebSocket Layer) ────┬─── Phase 15 (Auth)
-                                │                                    │
-                                └────────────────────────────────────┘
+|                                │                                    │
+|                                └────────────────────────────────────┘
                                            │
                                            ▼
 Phase 16 (Android Foundation) ──── Phase 17 (Android Interaction) ──── Phase 18 (Android Features)
-     (parallel with 13-15)
+     (parallel with 13-15)                                                             │
+                                                         ┌─────────────────────────────┘
+                                                         ▼
+                                                Phase 19 (WS Heartbeat Fix)
+                                                         │
+                                                         ▼
+                                                Phase 20 (Command & API Wiring Fix)
+                                                         │
+                                                         ▼
+                                                Phase 21 (Events & Export Completion)
 ```
 
 **Parallelization opportunities:**
 - Phase 13 + Phase 16 can start simultaneously (backend vs Android project setup)
 - Phase 14 + Phase 15 partially parallel (WS endpoint vs auth middleware)
 - Phase 17 requires both Phase 16 (Android) + Phase 13/14 (backend API) to be complete
+- Phase 19-21 are strictly sequential: heartbeat fix → command wiring → event/export completion
 
 ## Progress
 
@@ -182,8 +235,12 @@ Phase 16 (Android Foundation) ──── Phase 17 (Android Interaction) ──
 | 16. Android Foundation | v2.0 | 3/3 | Complete    | 2026-04-16 |
 | 17. Android Interaction | v2.0 | 3/3 | Complete    | 2026-04-16 |
 | 18. Android Features | v2.0 | 3/3 | Complete    | 2026-04-16 |
+| 19. WS Heartbeat Fix | v2.0-gap | 0/1 | Pending | — |
+| 20. Command & API Wiring Fix | v2.0-gap | 0/1 | Pending | — |
+| 21. Events & Export Completion | v2.0-gap | 0/1 | Pending | — |
 
 ---
 
 *Roadmap reorganized: 2026-04-14 after v1.0 milestone completion*
 *v2.0 phases added: 2026-04-14*
+*v2.0 gap closure phases 19-21 added: 2026-04-16*
