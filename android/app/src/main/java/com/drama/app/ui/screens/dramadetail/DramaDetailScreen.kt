@@ -5,25 +5,40 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.MoreVert
 import com.drama.app.ui.screens.dramadetail.components.CommandInputBar
 import com.drama.app.ui.screens.dramadetail.components.SceneBubbleList
+import com.drama.app.ui.screens.dramadetail.components.SceneHistorySheet
 import com.drama.app.ui.screens.dramadetail.components.TensionIndicator
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -45,18 +60,59 @@ fun DramaDetailScreen(
         }
     }
 
+    var showOverflowMenu by remember { mutableStateOf(false) }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Column {
-                        Text(uiState.theme, style = MaterialTheme.typography.titleMedium)
-                        Text("第 ${uiState.currentScene} 场", style = MaterialTheme.typography.bodySmall)
+                        if (uiState.viewingHistoryScene != null) {
+                            Text(
+                                "查看第 ${uiState.viewingHistoryScene} 场（历史）",
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                        } else {
+                            Text(uiState.theme, style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                "第 ${uiState.currentScene} 场",
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                    }
+                },
+                navigationIcon = {
+                    if (uiState.viewingHistoryScene != null) {
+                        IconButton(onClick = viewModel::returnToCurrentScene) {
+                            Icon(Icons.Filled.ArrowBack, contentDescription = "返回当前场景")
+                        }
                     }
                 },
                 actions = {
                     // D-16: 张力指示
                     TensionIndicator(score = uiState.tensionScore)
+                    // D-18: 历史按钮
+                    IconButton(onClick = viewModel::showHistorySheet) {
+                        Icon(Icons.Filled.History, contentDescription = "场景历史")
+                    }
+                    // D-23: 保存入口
+                    Box {
+                        IconButton(onClick = { showOverflowMenu = true }) {
+                            Icon(Icons.Filled.MoreVert, contentDescription = "更多")
+                        }
+                        DropdownMenu(
+                            expanded = showOverflowMenu,
+                            onDismissRequest = { showOverflowMenu = false },
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("保存") },
+                                onClick = {
+                                    viewModel.showSaveDialog()
+                                    showOverflowMenu = false
+                                },
+                            )
+                        }
+                    }
                 },
             )
         },
@@ -97,5 +153,36 @@ fun DramaDetailScreen(
                 }
             }
         }
+    }
+
+    // D-18/D-19: 场景历史 BottomSheet
+    if (uiState.showHistorySheet) {
+        SceneHistorySheet(
+            scenes = uiState.historyScenes,
+            onSceneClick = viewModel::viewHistoryScene,
+            onDismiss = viewModel::hideHistorySheet,
+        )
+    }
+
+    // D-23: 保存 Dialog
+    if (uiState.showSaveDialog) {
+        var saveName by remember { mutableStateOf("") }
+        AlertDialog(
+            title = { Text("保存戏剧") },
+            text = {
+                OutlinedTextField(
+                    value = saveName,
+                    onValueChange = { saveName = it },
+                    placeholder = { Text("保存名（可选，默认用主题名）") },
+                    singleLine = true,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.saveDrama(saveName) }) { Text("保存") }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::hideSaveDialog) { Text("取消") }
+            },
+        )
     }
 }
