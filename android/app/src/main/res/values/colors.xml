@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="deep_indigo_primary">#FF1A237E</color>
+    <color name="deep_indigo_primary_container">#FFC5CAE9</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="black">#FF000000</color>
+</resources>

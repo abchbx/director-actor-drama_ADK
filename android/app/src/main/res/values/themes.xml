@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Material3 theme placeholder — Phase 16-03 will replace with proper MD3 theme -->
     <style name="Theme.DramaApp" parent="android:Theme.Material.Light.NoActionBar" />
 </resources>

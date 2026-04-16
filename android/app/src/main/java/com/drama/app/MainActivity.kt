@@ -6,7 +6,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -21,6 +20,7 @@ import com.drama.app.ui.components.AppBottomNavigationBar
 import com.drama.app.ui.components.bottomNavItems
 import com.drama.app.ui.navigation.ConnectionGuide
 import com.drama.app.ui.navigation.DramaList
+import com.drama.app.ui.theme.DramaTheme
 import com.drama.app.ui.navigation.DramaNavHost
 import com.drama.app.ui.screens.connection.ConnectionViewModel
 import dagger.hilt.android.AndroidEntryPoint
@@ -56,7 +56,7 @@ fun DramaApp(serverRepository: ServerRepository) {
         currentDestination?.hasRoute(item.route::class) == true
     }
 
-    MaterialTheme {  // Phase 16-03 将替换为 DramaTheme
+    DramaTheme {
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             bottomBar = {
