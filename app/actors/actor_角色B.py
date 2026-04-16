@@ -1,6 +1,6 @@
 """A2A Actor Service: 角色B"""
 import os
-os.environ["OPENAI_API_KEY"] = 'sk-9wZ1DkQ75U90NymzORAVxeE0m3QqRvrCVLsmcejyB8UZh5E4'
+os.environ["OPENAI_API_KEY"] = 'sk-ZVxTzDiYr8BNW5PDVx0kgutm6KYQsYvnhzh3mp8PDheUbtRn'
 os.environ["OPENAI_BASE_URL"] = 'https://gpt-agent.cc/v1'
 
 import uvicorn

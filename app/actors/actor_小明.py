@@ -1,6 +1,6 @@
 """A2A Actor Service: 小明"""
 import os
-os.environ["OPENAI_API_KEY"] = 'sk-9wZ1DkQ75U90NymzORAVxeE0m3QqRvrCVLsmcejyB8UZh5E4'
+os.environ["OPENAI_API_KEY"] = 'sk-ZVxTzDiYr8BNW5PDVx0kgutm6KYQsYvnhzh3mp8PDheUbtRn'
 os.environ["OPENAI_BASE_URL"] = 'https://gpt-agent.cc/v1'
 
 import uvicorn
@@ -90,17 +90,9 @@ actor_agent = Agent(
 
 ## 你的历史记忆（从存档恢复）
 以下是你之前的经历和记忆，请在回应时参考这些信息：
-- 我说：嘿！你来啦！今天想喝点什么？我基本上每天都来这儿报到，咖啡师都认识我了。你是新面孔吧？
+- 面对情境: 第1场情境
 - 面对情境: 第2场情境
-- 我说：嗨，你刚才点的那杯咖啡怎么样？美式还是拿铁？
-
-（内心：这人看起来挺面善的，应该挺好聊的）
 - 面对情境: 第3场情境
-- 我说：嘿，今天过得怎么样？看你样子是刚下班吧？
-
-（内心：这人感觉挺随和的，正好聊聊天打发时间）
-
-对了，你平时都喝什么咖啡？我一般点拿铁，不过最近想换个口味试试。你要是常来可以给我推荐推荐！
 
 ## 行为准则
 1. 始终以角色身份说话和行动，不要跳出角色

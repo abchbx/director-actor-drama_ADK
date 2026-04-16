@@ -12,6 +12,7 @@ sealed class SceneBubble {
         override val id: String,
         val actorName: String,
         val text: String,
+        val emotion: String = "",       // D-10: emotion tag
     ) : SceneBubble()
 
     data class SceneDivider(

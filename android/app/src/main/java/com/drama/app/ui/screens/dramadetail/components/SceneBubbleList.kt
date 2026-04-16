@@ -19,6 +19,7 @@ import com.drama.app.domain.model.SceneBubble
 fun SceneBubbleList(
     bubbles: List<SceneBubble>,
     isTyping: Boolean,
+    typingText: String = "处理中...",
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
@@ -52,7 +53,7 @@ fun SceneBubbleList(
         }
         if (isTyping) {
             item(key = "typing_indicator") {
-                TypingIndicator()
+                TypingIndicator(typingText = typingText)
             }
         }
     }

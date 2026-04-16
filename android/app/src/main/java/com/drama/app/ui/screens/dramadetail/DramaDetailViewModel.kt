@@ -13,6 +13,7 @@ import com.drama.app.domain.model.CommandType
 import com.drama.app.domain.model.SceneBubble
 import com.drama.app.domain.repository.DramaRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import com.drama.app.ui.screens.dramadetail.components.getTypingText
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,6 +39,7 @@ data class DramaDetailUiState(
     val tensionScore: Int = 0,
     val bubbles: List<SceneBubble> = emptyList(),
     val isTyping: Boolean = false,
+    val typingText: String = "处理中...",
     val isProcessing: Boolean = false,
     val stormPhase: String? = null,
     val isWsConnected: Boolean = false,
@@ -121,7 +123,15 @@ class DramaDetailViewModel @Inject constructor(
             }
             "dialogue" -> {
                 val actorName = event.data["actor_name"]?.jsonPrimitive?.contentOrNull ?: ""
+                val emotion = event.data["emotion"]?.jsonPrimitive?.contentOrNull ?: ""
                 _uiState.update { it.copy(isTyping = false) }
+                val bubble = SceneBubble.Dialogue(
+                    id = "b_${bubbleCounter++}",
+                    actorName = actorName,
+                    text = event.data["text"]?.jsonPrimitive?.contentOrNull ?: "",
+                    emotion = emotion,
+                )
+                _uiState.update { it.copy(bubbles = it.bubbles + bubble) }
             }
             "end_narration" -> {
                 val text = event.data["text"]?.jsonPrimitive?.contentOrNull ?: ""
@@ -144,7 +154,9 @@ class DramaDetailViewModel @Inject constructor(
                 _uiState.update { it.copy(tensionScore = score) }
             }
             "typing" -> {
-                _uiState.update { it.copy(isTyping = true) }
+                val toolName = event.data["tool"]?.jsonPrimitive?.contentOrNull
+                val text = getTypingText(toolName)
+                _uiState.update { it.copy(isTyping = true, typingText = text) }
             }
             "error" -> {
                 val msg = event.data["message"]?.jsonPrimitive?.contentOrNull ?: "Unknown error"
@@ -204,11 +216,13 @@ class DramaDetailViewModel @Inject constructor(
                     for ((idx, d) in detail.dialogue.withIndex()) {
                         val actorName = d["actor_name"]?.jsonPrimitive?.contentOrNull ?: ""
                         val text = d["text"]?.jsonPrimitive?.contentOrNull ?: ""
+                        val emotion = d["emotion"]?.jsonPrimitive?.contentOrNull ?: ""
                         historyBubbles.add(
                             SceneBubble.Dialogue(
                                 id = "hist_${sceneNumber}_d$idx",
                                 actorName = actorName,
                                 text = text,
+                                emotion = emotion,
                             ),
                         )
                     }

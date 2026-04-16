@@ -20,9 +20,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
+fun getTypingText(toolName: String?): String = when (toolName) {
+    "director_narrate" -> "导演正在构思..."
+    "actor_speak" -> "演员正在思考..."
+    "next_scene", "write_scene" -> "剧情推进中..."
+    else -> "处理中..."
+}
+
 @Composable
-fun TypingIndicator() {
-    // 脉冲动画 + "导演正在构思..."
+fun TypingIndicator(typingText: String = "处理中...") {
     val infiniteTransition = rememberInfiniteTransition(label = "typing")
     val alpha by infiniteTransition.animateFloat(
         initialValue = 0.3f,
@@ -44,7 +50,7 @@ fun TypingIndicator() {
         )
         Spacer(modifier = Modifier.width(8.dp))
         Text(
-            text = "导演正在构思...",
+            text = typingText,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
         )

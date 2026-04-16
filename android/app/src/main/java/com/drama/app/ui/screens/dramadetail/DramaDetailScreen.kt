@@ -183,6 +183,7 @@ fun DramaDetailScreen(
                         SceneBubbleList(
                             bubbles = uiState.bubbles,
                             isTyping = uiState.isTyping,
+                            typingText = uiState.typingText,
                         )
                     }
 
