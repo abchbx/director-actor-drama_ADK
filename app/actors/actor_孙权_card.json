@@ -1,0 +1,26 @@
+{
+  "name": "actor_孙权",
+  "description": "演员 孙权，角色：第三方势力/江东之主",
+  "url": "http://localhost:9006/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_孙权",
+      "name": "扮演孙权",
+      "description": "以孙权的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

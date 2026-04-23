@@ -1,0 +1,26 @@
+{
+  "name": "actor_周德昌",
+  "description": "演员 周德昌，角色：反派/对立面",
+  "url": "http://localhost:9100/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_周德昌",
+      "name": "扮演周德昌",
+      "description": "以周德昌的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "name": "actor_林子轩",
+  "description": "演员 林子轩，角色：新郎/旁观者→觉醒者",
+  "url": "http://localhost:9001/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_林子轩",
+      "name": "扮演林子轩",
+      "description": "以林子轩的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

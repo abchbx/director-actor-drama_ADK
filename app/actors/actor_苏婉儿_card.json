@@ -1,0 +1,26 @@
+{
+  "name": "actor_苏婉儿",
+  "description": "演员 苏婉儿，角色：旁观者/社会视角",
+  "url": "http://localhost:9068/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_苏婉儿",
+      "name": "扮演苏婉儿",
+      "description": "以苏婉儿的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

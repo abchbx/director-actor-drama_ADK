@@ -1,0 +1,26 @@
+{
+  "name": "actor_徐庶元直",
+  "description": "演员 徐庶元直，角色：挚友/羁绊",
+  "url": "http://localhost:9001/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_徐庶元直",
+      "name": "扮演徐庶元直",
+      "description": "以徐庶元直的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

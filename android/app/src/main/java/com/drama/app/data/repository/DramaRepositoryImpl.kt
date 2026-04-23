@@ -2,6 +2,7 @@ package com.drama.app.data.repository
 
 import com.drama.app.data.remote.api.DramaApiService
 import com.drama.app.data.remote.dto.ActionRequestDto
+import com.drama.app.data.remote.dto.ChatRequestDto
 import com.drama.app.data.remote.dto.LoadRequestDto
 import com.drama.app.data.remote.dto.SaveRequestDto
 import com.drama.app.data.remote.dto.SpeakRequestDto
@@ -81,6 +82,11 @@ class DramaRepositoryImpl @Inject constructor(
     override suspend fun getCast(): Result<com.drama.app.data.remote.dto.CastResponseDto> =
         runCatching {
             dramaApiService.getCast()
+        }
+
+    override suspend fun sendChatMessage(message: String, mention: String?): Result<com.drama.app.data.remote.dto.CommandResponseDto> =
+        runCatching {
+            dramaApiService.chatMessage(ChatRequestDto(message, mention))
         }
 
     private fun dramaItemDtoToDrama(dto: com.drama.app.data.remote.dto.DramaItemDto): Drama =

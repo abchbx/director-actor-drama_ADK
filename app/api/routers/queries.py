@@ -82,8 +82,21 @@ async def get_status(
     _auth: bool = Depends(require_auth),
     tool_context=Depends(get_tool_context),
 ):
-    """Get the current drama status."""
-    _require_active_drama(tool_context)
+    """Get the current drama status.
+
+    When no active drama session exists (e.g., during initial STORM after /start),
+    returns an empty/pending status instead of 404. This avoids false errors from
+    polling clients that query before the async /start command has written state.
+    """
+    if not tool_context.state.get("drama", {}).get("theme"):
+        # No active drama yet — return empty pending state for graceful polling
+        return DramaStatusResponse(
+            theme="",
+            drama_status="",
+            current_scene=0,
+            num_actors=0,
+            drama_folder="",
+        )
     result = get_current_state(tool_context)
     return DramaStatusResponse(**result)
 
@@ -148,12 +161,13 @@ async def delete_drama(
     _auth: bool = Depends(require_auth),
 ):
     """Delete a drama by folder name."""
-    # T-17-01: Validate folder name to prevent path traversal
+    # T-17-01: Validate folder name to prevent path traversal.
+    # Allow Unicode word chars (CJK, etc.) but reject path-separator characters.
     import re
-    if not re.match(r"^[a-zA-Z0-9_\-]+$", folder):
+    if not folder or "/" in folder or "\\" in folder or ".." in folder:
         raise HTTPException(
             status_code=400,
-            detail="Invalid folder name: only alphanumeric, underscore, and hyphen allowed",
+            detail="Invalid folder name",
         )
     result = delete_drama_fn(folder)
     if result.get("status") == "error":

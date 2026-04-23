@@ -1,0 +1,26 @@
+{
+  "name": "actor_沈婉清",
+  "description": "演员 沈婉清，角色：女主角",
+  "url": "http://localhost:9021/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_沈婉清",
+      "name": "扮演沈婉清",
+      "description": "以沈婉清的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

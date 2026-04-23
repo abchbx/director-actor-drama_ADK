@@ -1,0 +1,26 @@
+{
+  "name": "actor_张飞",
+  "description": "演员 张飞，角色：义弟/武将",
+  "url": "http://localhost:9026/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_张飞",
+      "name": "扮演张飞",
+      "description": "以张飞的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

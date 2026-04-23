@@ -1,0 +1,26 @@
+{
+  "name": "actor_庞统士元",
+  "description": "演员 庞统士元，角色：挚友/对手",
+  "url": "http://localhost:9024/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_庞统士元",
+      "name": "扮演庞统士元",
+      "description": "以庞统士元的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

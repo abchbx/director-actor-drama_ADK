@@ -1,0 +1,26 @@
+{
+  "name": "actor_关羽",
+  "description": "演员 关羽，角色：盟友",
+  "url": "http://localhost:9050/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_关羽",
+      "name": "扮演关羽",
+      "description": "以关羽的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

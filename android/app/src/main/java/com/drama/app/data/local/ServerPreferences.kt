@@ -18,6 +18,7 @@ class ServerPreferences @Inject constructor(
     companion object {
         val SERVER_IP = stringPreferencesKey("server_ip")
         val SERVER_PORT = stringPreferencesKey("server_port")
+        val SERVER_BASE_URL = stringPreferencesKey("server_base_url")
         private const val ENCRYPTED_KEY_TOKEN = "auth_token"  // D-04: token encrypted via EncryptedSharedPreferences
         val LAST_CONNECTED = longPreferencesKey("last_connected")
     }
@@ -25,11 +26,13 @@ class ServerPreferences @Inject constructor(
     val serverConfig: Flow<ServerConfig?> = dataStore.data.map { prefs ->
         val ip = prefs[SERVER_IP] ?: return@map null
         val port = prefs[SERVER_PORT] ?: return@map null
+        val baseUrl = prefs[SERVER_BASE_URL]
         ServerConfig(
             ip = ip,
             port = port,
             token = encryptedPrefs.getString(ENCRYPTED_KEY_TOKEN, null),
             lastConnected = prefs[LAST_CONNECTED],
+            baseUrl = baseUrl,
         )
     }
 
@@ -38,6 +41,11 @@ class ServerPreferences @Inject constructor(
             prefs[SERVER_IP] = config.ip
             prefs[SERVER_PORT] = config.port
             prefs[LAST_CONNECTED] = System.currentTimeMillis()
+            if (config.baseUrl.isNullOrBlank()) {
+                prefs.remove(SERVER_BASE_URL)
+            } else {
+                prefs[SERVER_BASE_URL] = config.baseUrl
+            }
         }
         // D-04: Token encrypted separately via EncryptedSharedPreferences
         config.token?.let { token ->

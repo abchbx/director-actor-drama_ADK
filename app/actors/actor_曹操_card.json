@@ -1,0 +1,26 @@
+{
+  "name": "actor_曹操",
+  "description": "演员 曹操，角色：对立面/乱世奸雄",
+  "url": "http://localhost:9034/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_曹操",
+      "name": "扮演曹操",
+      "description": "以曹操的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

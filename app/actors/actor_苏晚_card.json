@@ -1,0 +1,26 @@
+{
+  "name": "actor_苏晚",
+  "description": "演员 苏晚，角色：命运的镜像",
+  "url": "http://localhost:9066/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_苏晚",
+      "name": "扮演苏晚",
+      "description": "以苏晚的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

@@ -31,6 +31,59 @@ USER_ID = "drama_user"
 SESSION_ID = "drama_session"
 
 
+def _restore_session_state(session_service: InMemorySessionService):
+    """Restore drama state from disk into the session after hot-reload.
+
+    When uvicorn WatchFiles detects code changes (e.g., actor file updates),
+    it kills and restarts the server process. The InMemorySessionService loses
+    all state. This function reads the last saved state.json back into memory
+    so that GET /drama/status returns correct data immediately.
+
+    CRITICAL: InMemorySessionService.get_session() returns a copy.deepcopy of
+    the session, so writing to session.state["drama"] only modifies the copy.
+    We must write to session_service.sessions[app][user][session_id].state
+    directly to persist state across get_session() calls.
+    """
+    import json as _json
+    from pathlib import Path
+
+    # Find the most recent state.json under app/dramas/
+    dramas_dir = Path(__file__).resolve().parent.parent / "dramas"
+    if not dramas_dir.exists():
+        return
+
+    # Look for any state.json files; pick the one with latest mtime
+    candidates = list(dramas_dir.glob("*/state.json"))
+    if not candidates:
+        return
+
+    best = max(candidates, key=lambda p: p.stat().st_mtime)
+    try:
+        with open(best, "r", encoding="utf-8") as f:
+            saved_state = _json.load(f)
+        theme = saved_state.get("theme", "")
+        if not theme:
+            return
+
+        # Write directly to the INTERNAL session object (not the get_session copy)
+        # get_session() does copy.deepcopy, so writing to the returned copy is lost
+        internal_session = (
+            session_service.sessions
+            .get(APP_NAME, {})
+            .get(USER_ID, {})
+            .get(SESSION_ID)
+        )
+        if internal_session is not None:
+            internal_session.state["drama"] = saved_state
+            logger.info(f"🔄 Restored drama state from disk: theme='{theme}', "
+                         f"status={saved_state.get('status', '?')}, "
+                         f"actors={len(saved_state.get('actors', {}))}")
+        else:
+            logger.warning(f"Could not find internal session for state restore")
+    except Exception as e:
+        logger.warning(f"Failed to restore state from {best}: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage Runner lifecycle: create on startup, cleanup on shutdown."""
@@ -42,6 +95,10 @@ async def lifespan(app: FastAPI):
     await session_service.create_session(
         app_name=APP_NAME, user_id=USER_ID, session_id=SESSION_ID
     )
+
+    # ── Restore persisted state from disk if exists (survives hot-reload) ──
+    _restore_session_state(session_service)
+
     runner = Runner(
         agent=root_agent,
         app_name=APP_NAME,

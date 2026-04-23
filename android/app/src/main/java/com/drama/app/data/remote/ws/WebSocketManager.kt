@@ -35,6 +35,7 @@ class WebSocketManager @Inject constructor(
     private var currentHost: String = ""
     private var currentPort: String = ""
     private var currentToken: String? = null
+    private var currentBaseUrl: String? = null
 
     // D-14: Exponential backoff state
     private var currentDelayMs = 1000L  // Initial 1s
@@ -61,10 +62,11 @@ class WebSocketManager @Inject constructor(
     // Callback for reconnect success
     var onReconnected: (() -> Unit)? = null
 
-    fun connect(host: String, port: String, token: String?): Flow<WsEventDto> {
+    fun connect(host: String, port: String, token: String?, baseUrl: String? = null): Flow<WsEventDto> {
         currentHost = host
         currentPort = port
         currentToken = token
+        currentBaseUrl = baseUrl
         isIntentionalDisconnect = false
         currentDelayMs = 1000L  // D-14: Reset on new connect
 
@@ -75,8 +77,14 @@ class WebSocketManager @Inject constructor(
     }
 
     private fun connectInternal() {
-        val url = if (currentToken != null) {
-            "ws://$currentHost:$currentPort/api/v1/ws?token=$currentToken"
+        val baseUrl = currentBaseUrl
+        val token = currentToken
+        val url = if (!baseUrl.isNullOrBlank()) {
+            val base = baseUrl.trimEnd('/')
+            val wsBase = base.replace("https://", "wss://").replace("http://", "ws://")
+            if (token != null) "$wsBase/api/v1/ws?token=$token" else "$wsBase/api/v1/ws"
+        } else if (token != null) {
+            "ws://$currentHost:$currentPort/api/v1/ws?token=$token"
         } else {
             "ws://$currentHost:$currentPort/api/v1/ws"
         }

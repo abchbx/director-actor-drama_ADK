@@ -1,0 +1,26 @@
+{
+  "name": "actor_季眠",
+  "description": "演员 季眠，角色：对立面",
+  "url": "http://localhost:9072/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_季眠",
+      "name": "扮演季眠",
+      "description": "以季眠的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

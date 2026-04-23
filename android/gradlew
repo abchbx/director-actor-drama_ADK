@@ -161,19 +161,20 @@ DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
 #   * application-specific options, e.g. -Dgradle.user.home=...
 #   * user-specific options, e.g. -Dorg.gradle.daemon=false
 
+# Determine if --daemon should be added
+GRADLE_DAEMON_OPT=""
+if ! "$cygwin" && ! "$msys" ; then
+    case " $* " in
+        *" --help "*|*" -h "*|*" --no-daemon "*) ;;
+        *) GRADLE_DAEMON_OPT="--daemon" ;;
+    esac
+fi
+
 set -- \
         "-Dorg.gradle.appname=$APP_BASE_NAME" \
         -classpath "$CLASSPATH" \
         org.gradle.wrapper.GradleWrapperMain \
-        "$@"
-
-# Stop when "xeli" is specified on the command line; just show
-# the help message and exit.
-if ! "$cygwin" && ! "$msys" ; then
-    case $1 in
-        --help | -h) ;;
-        *) set -- --daemon "$@" ;;
-    esac
-fi
+        "$@" \
+        $GRADLE_DAEMON_OPT
 
 exec "$JAVACMD" "$@"

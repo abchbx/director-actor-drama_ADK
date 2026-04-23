@@ -51,6 +51,17 @@ class StormRequest(BaseModel):
     focus: str | None = Field(default=None, description="Optional focus area for STORM discovery")
 
 
+class ChatRequest(BaseModel):
+    """Request to send a chat message in group chat mode.
+
+    If mention is provided, routes to /speak for that actor.
+    Otherwise, routes to /action (broadcast to all actors).
+    """
+
+    message: str = Field(..., min_length=1, description="Chat message text")
+    mention: str | None = Field(default=None, description="Optional @mention actor name")
+
+
 class SaveRequest(BaseModel):
     """Request to save drama progress."""
 

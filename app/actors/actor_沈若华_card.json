@@ -1,0 +1,26 @@
+{
+  "name": "actor_沈若华",
+  "description": "演员 沈若华，角色：关键角色/命运视角",
+  "url": "http://localhost:9029/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_沈若华",
+      "name": "扮演沈若华",
+      "description": "以沈若华的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

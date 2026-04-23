@@ -3,7 +3,7 @@ package com.drama.app.data.repository
 import com.drama.app.data.remote.api.AuthApiService
 import com.drama.app.domain.model.AuthMode
 import com.drama.app.domain.repository.AuthRepository
-import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
+import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -17,15 +17,21 @@ class AuthRepositoryImpl @Inject constructor(
     private val json: Json,
 ) : AuthRepository {
 
-    override suspend fun verifyServer(ip: String, port: String): Result<AuthMode> {
+    override suspend fun verifyServer(ip: String, port: String, baseUrl: String?): Result<AuthMode> {
         return try {
             // 临时构建 Retrofit 实例用于验证（连接前不知道最终服务器）
             // 验证请求不注入 token，使用无拦截器的 OkHttpClient
             val noAuthClient = okHttpClient.newBuilder()
                 .addInterceptor { chain -> chain.proceed(chain.request()) }
                 .build()
+            val apiBaseUrl = if (!baseUrl.isNullOrBlank()) {
+                val base = baseUrl.trimEnd('/')
+                "$base/api/v1/"
+            } else {
+                "http://$ip:$port/api/v1/"
+            }
             val retrofit = Retrofit.Builder()
-                .baseUrl("http://$ip:$port/api/v1/")
+                .baseUrl(apiBaseUrl)
                 .client(noAuthClient)
                 .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
                 .build()

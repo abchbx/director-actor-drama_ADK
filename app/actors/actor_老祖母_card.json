@@ -1,0 +1,26 @@
+{
+  "name": "actor_老祖母",
+  "description": "演员 老祖母，角色：传统权威/隐藏的见证者",
+  "url": "http://localhost:9017/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_老祖母",
+      "name": "扮演老祖母",
+      "description": "以老祖母的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "name": "actor_罗伯特·胡克",
+  "description": "演员 罗伯特·胡克，角色：对手/镜像",
+  "url": "http://localhost:9074/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_罗伯特_胡克",
+      "name": "扮演罗伯特·胡克",
+      "description": "以罗伯特·胡克的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

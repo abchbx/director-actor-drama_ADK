@@ -1,0 +1,26 @@
+{
+  "name": "actor_白鹭",
+  "description": "演员 白鹭，角色：旁观者/社会视角",
+  "url": "http://localhost:9042/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_白鹭",
+      "name": "扮演白鹭",
+      "description": "以白鹭的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

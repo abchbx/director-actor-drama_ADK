@@ -45,6 +45,7 @@ fun DramaNavHost(
                 onNavigateToDetail = { dramaId ->
                     navController.navigate(DramaDetail(dramaId)) {
                         popUpTo<DramaList> { inclusive = false }
+                        launchSingleTop = true
                     }
                 },
             )

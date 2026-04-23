@@ -1,0 +1,26 @@
+{
+  "name": "actor_诸葛亮",
+  "description": "演员 诸葛亮，角色：谋士/智慧的象征",
+  "url": "http://localhost:9077/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_诸葛亮",
+      "name": "扮演诸葛亮",
+      "description": "以诸葛亮的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

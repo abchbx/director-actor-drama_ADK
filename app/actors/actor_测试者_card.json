@@ -1,0 +1,26 @@
+{
+  "name": "actor_测试者",
+  "description": "演员 测试者，角色：主角",
+  "url": "http://localhost:9019/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_测试者",
+      "name": "扮演测试者",
+      "description": "以测试者的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

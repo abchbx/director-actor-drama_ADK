@@ -1,0 +1,26 @@
+{
+  "name": "actor_索菲亚",
+  "description": "演员 索菲亚，角色：伦理学家/哲学家",
+  "url": "http://localhost:9052/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_索菲亚",
+      "name": "扮演索菲亚",
+      "description": "以索菲亚的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

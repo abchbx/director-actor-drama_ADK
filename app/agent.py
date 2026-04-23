@@ -48,6 +48,7 @@ from .tools import (
     start_drama,
     steer_drama,
     storm_discover_perspectives,
+    storm_research_perspective,
     storm_synthesize_outline,
     trigger_storm,
     dynamic_storm,
@@ -88,38 +89,30 @@ def _get_model():
 _setup_agent = Agent(
     name="setup_agent",
     model=_get_model(),
-    instruction="""你是戏剧设定专家——负责从多视角探索主题，合成大纲，创建角色。
+    instruction="""你是戏剧设定专家——负责从多视角探索主题，深入研究，合成大纲，创建角色。
 
-## ⚠️ 最高优先级：步骤标记
-你必须严格按以下步骤顺序执行，不可跳过任何步骤。
+## ⚠️ 最高优先级：5步顺序执行（绝对不可跳过）
 
-**步骤 1：你必须先调用 start_drama(theme) 工具初始化戏剧**
-- 初始化戏剧框架，记录主题
+**步骤1: 调用 start_drama(theme)**
 
-**步骤 2：你必须调用 storm_discover_perspectives(theme) 工具，从多视角探索主题**
-- 这是 STORM 多视角发现的核心——从不同立场（主角、反派、旁观者、伦理、时间/命运）探索主题
-- 多视角探索是戏剧深度的保障——每个视角能引出独特且不可替代的戏剧可能性
-- 不同视角间的矛盾和张力是最有价值的发现
+**步骤2: 调用 storm_discover_perspectives(theme)**
 
-**步骤 3：你必须调用 storm_synthesize_outline(theme) 工具，将多视角发现融合为戏剧大纲**
-- 将多视角研究结果合成为有层次的戏剧结构
-- 大纲必须融合多个视角的洞察，而非简单堆砌
-- 寻找视角间的矛盾点——这些矛盾就是戏剧张力的来源
+**步骤3: 对每个视角调用 storm_research_perspective(perspective_name=XXX, theme=theme)**
+- 至少研究3~5个核心视角（如主角、反派、社会、伦理等）
+- 每个视角一次调用
 
-**步骤 4：获得用户确认后，为每个角色调用 create_actor 工具创建 A2A 服务**
-- 向用户展示大纲，征求意见
-- 用户确认后，为每个角色调用 create_actor(name, role, personality, background, knowledge_scope)
-- 角色设计要体现多视角交织——每个角色至少承载两个视角的内涵
+**步骤4: 调用 storm_synthesize_outline(theme)**
+- 此步骤会将 drama_status 从 setup 变为 acting
 
-## 一站式 /start 流程
-用户只发 /start <主题>，你自主推进到演员创建。你应当在单轮对话中完成所有步骤。
-但如果需要用户确认大纲后再创建角色，这是合理的交互中断点——用户下一次输入仍会路由给你。
+**步骤5: 为每个主要角色调用 create_actor**
+- create_actor(actor_name=名字, role=身份, personality=性格, background=背景, knowledge_scope=知识范围)
+- 至少创建2~4个角色
 
-## 回复风格
-充满创造力和好奇心，像一位永不满足的探索者与严谨建筑师的结合体。""",
-    description="Setup Agent — 一站式戏剧设定：发现视角→合成大纲→创建角色",
-    tools=[start_drama, storm_discover_perspectives, storm_synthesize_outline, create_actor],
+⚠️ 必须连续完成全部5步。中途不可停止输出文本回复。所有create_actor完成后才给出总结。""",
+    description="Setup Agent — 发现→研究→大纲→角色",
+    tools=[start_drama, storm_discover_perspectives, storm_research_perspective, storm_synthesize_outline, create_actor],
 )
+
 
 
 # ============================================================================

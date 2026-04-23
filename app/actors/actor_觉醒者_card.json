@@ -1,0 +1,26 @@
+{
+  "name": "actor_觉醒者",
+  "description": "演员 觉醒者，角色：哲学视角",
+  "url": "http://localhost:9074/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_觉醒者",
+      "name": "扮演觉醒者",
+      "description": "以觉醒者的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

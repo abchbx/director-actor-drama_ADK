@@ -1,0 +1,26 @@
+{
+  "name": "actor_季白",
+  "description": "演员 季白，角色：主角",
+  "url": "http://localhost:9036/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_季白",
+      "name": "扮演季白",
+      "description": "以季白的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

@@ -7,7 +7,11 @@ Each endpoint:
 3. Formats message matching CLI command format
 4. Calls run_command_and_collect to execute via Runner
 5. Returns structured CommandResponse
+DEBUG: All endpoints log entry/exit with timing and key parameters.
 """
+
+import logging
+import time
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
@@ -15,6 +19,7 @@ from app.api.deps import get_runner, get_runner_lock, get_tool_context, require_
 from app.api.models import (
     ActionRequest,
     AutoRequest,
+    ChatRequest,
     CommandResponse,
     SpeakRequest,
     StartDramaRequest,
@@ -24,6 +29,8 @@ from app.api.models import (
 from app.api.runner_utils import run_command_and_collect
 
 router = APIRouter(tags=["commands"])
+
+logger = logging.getLogger(__name__)
 
 # Module-level constants matching app.py session configuration
 USER_ID = "drama_user"
@@ -62,18 +69,33 @@ async def start_drama(
 
     D-06: Auto-saves existing drama before starting a new one.
     """
+    t0 = time.monotonic()
+    theme = body.theme.strip()
+    logger.info("[DIRECTOR-LOG] 🎬 === /drama/start 入口 === theme='%s'", theme)
+
     async with lock:
         # D-06: auto-save existing drama before starting new one
         drama_state = tool_context.state.get("drama", {})
         if drama_state.get("theme"):
+            old_theme = drama_state["theme"]
+            logger.info("[DIRECTOR-LOG] 💾 保存旧剧本: '%s' → 开始新创作", old_theme)
             from app.state_manager import save_progress, flush_state_sync
 
             save_progress(save_name="", tool_context=tool_context)
             flush_state_sync()
+            logger.info("[DIRECTOR-LOG] ✅ 旧剧本已保存")
 
+        logger.info("[DIRECTOR-LOG] ⏳ 调用 Runner: /start %s (等待LLM完成全部STORM流程)...", theme)
         result = await run_command_and_collect(
-            runner, f"/start {body.theme}", USER_ID, SESSION_ID,
+            runner, f"/start {theme}", USER_ID, SESSION_ID,
             event_callback=_get_event_callback(req),
+        )
+        elapsed = time.monotonic() - t0
+        final_resp_preview = (result.get("final_response") or "")[:100]
+        tool_count = len(result.get("tool_results", []))
+        logger.info(
+            "[DIRECTOR-LOG] 🏁 /drama/start 完成! 用时=%.1fs, 工具调用=%d, 响应=%s",
+            elapsed, tool_count, final_resp_preview.replace("\n", " "),
         )
         return CommandResponse(**result)
 
@@ -206,6 +228,35 @@ async def trigger_storm(
     async with lock:
         _require_active_drama(tool_context)
         msg = f"/storm {body.focus}" if body.focus else "/storm"
+        result = await run_command_and_collect(
+            runner, msg, USER_ID, SESSION_ID,
+            event_callback=_get_event_callback(req),
+        )
+        return CommandResponse(**result)
+
+
+@router.post("/drama/chat", response_model=CommandResponse)
+async def chat_message(
+    body: ChatRequest,
+    req: Request,
+    _auth: bool = Depends(require_auth),
+    runner=Depends(get_runner),
+    lock=Depends(get_runner_lock),
+    tool_context=Depends(get_tool_context),
+):
+    """Send a chat message in group chat mode.
+
+    If mention is provided, routes to /speak for that actor.
+    Otherwise, routes to /action (broadcast to all actors).
+    """
+    async with lock:
+        _require_active_drama(tool_context)
+        if body.mention:
+            # @提及 → /speak 角色名 情境
+            msg = f"/speak {body.mention} {body.message}"
+        else:
+            # 群消息 → /action
+            msg = f"/action {body.message}"
         result = await run_command_and_collect(
             runner, msg, USER_ID, SESSION_ID,
             event_callback=_get_event_callback(req),

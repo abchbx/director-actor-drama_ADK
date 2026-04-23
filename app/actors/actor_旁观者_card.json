@@ -1,0 +1,26 @@
+{
+  "name": "actor_旁观者",
+  "description": "演员 旁观者，角色：社会视角",
+  "url": "http://localhost:9096/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_旁观者",
+      "name": "扮演旁观者",
+      "description": "以旁观者的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

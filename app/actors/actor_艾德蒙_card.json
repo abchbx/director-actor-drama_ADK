@@ -1,0 +1,26 @@
+{
+  "name": "actor_艾德蒙",
+  "description": "演员 艾德蒙，角色：旁观者/调剂",
+  "url": "http://localhost:9043/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_艾德蒙",
+      "name": "扮演艾德蒙",
+      "description": "以艾德蒙的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

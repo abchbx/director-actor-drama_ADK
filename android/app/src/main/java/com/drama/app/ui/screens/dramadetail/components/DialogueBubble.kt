@@ -18,15 +18,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.drama.app.domain.model.SceneBubble
-import kotlin.math.abs
+import com.drama.app.ui.theme.ActorPalette
 
 fun actorColor(name: String): Color {
-    val hue = (abs(name.hashCode()) % 360).toFloat()
-    return Color.hsl(hue = hue, saturation = 0.6f, lightness = 0.5f)
+    val idx = Math.abs(name.hashCode()) % ActorPalette.size
+    return ActorPalette[idx]
 }
 
 @Composable
@@ -34,57 +40,88 @@ fun DialogueBubble(bubble: SceneBubble.Dialogue) {
     val color = actorColor(bubble.actorName)
 
     Row(
-        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 64.dp, top = 4.dp, bottom = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 12.dp, end = 48.dp, top = 6.dp, bottom = 2.dp),
+        verticalAlignment = Alignment.Top,
     ) {
-        // D-11: Avatar — 32dp CircleShape Box with hash-based color + white first letter
+        // Avatar — 36dp circle with gradient
         Box(
-            modifier = Modifier.size(32.dp).clip(CircleShape).background(color),
+            modifier = Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(
+                    brush = Brush.linearGradient(
+                        colors = listOf(color, color.copy(alpha = 0.7f))
+                    )
+                )
+                .shadow(2.dp, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             Text(
                 text = bubble.actorName.firstOrNull()?.uppercase() ?: "?",
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
                 color = Color.White,
             )
         }
-        Spacer(modifier = Modifier.width(8.dp))
-        // Right side column: name row + speech bubble
+
+        Spacer(modifier = Modifier.width(10.dp))
+
+        // Content column
         Column {
-            // D-09, D-10: Name row with bold themed-color name + emotion badge
+            // Name + emotion
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = bubble.actorName,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = color,
                 )
                 if (bubble.emotion.isNotBlank()) {
-                    Spacer(modifier = Modifier.width(4.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
                     Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = color.copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(10.dp),
+                        color = color.copy(alpha = 0.12f),
                     ) {
                         Text(
                             text = bubble.emotion,
                             style = MaterialTheme.typography.labelSmall,
+                            fontStyle = FontStyle.Italic,
                             color = color,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                         )
                     }
                 }
             }
-            // Speech bubble
+
+            Spacer(modifier = Modifier.width(2.dp))
+
+            // Speech bubble — chat-style with rounded corners
+            // ★ 支持 \n 换行：Compose Text 默认不解析 \n，需用 AnnotatedString 分段渲染
             Surface(
-                shape = MaterialTheme.shapes.medium,
-                color = color.copy(alpha = 0.1f),
-                modifier = Modifier.padding(top = 2.dp),
+                shape = RoundedCornerShape(
+                    topStart = 4.dp,  // Small radius near avatar
+                    topEnd = 16.dp,
+                    bottomStart = 16.dp,
+                    bottomEnd = 16.dp,
+                ),
+                color = color.copy(alpha = 0.08f),
+                modifier = Modifier.padding(top = 4.dp),
+                shadowElevation = 1.dp,
             ) {
-                Text(
-                    text = bubble.text,
-                    modifier = Modifier.padding(12.dp),
-                    style = MaterialTheme.typography.bodyLarge,
+                val textStyle = MaterialTheme.typography.bodyLarge.copy(
+                    lineHeight = 22.sp,
                     color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = buildAnnotatedString {
+                        bubble.text.split("\n").forEachIndexed { idx, line ->
+                            if (idx > 0) append("\n")
+                            withStyle(textStyle.toSpanStyle()) { append(line) }
+                        }
+                    },
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                 )
             }
         }

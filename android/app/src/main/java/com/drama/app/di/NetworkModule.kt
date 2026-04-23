@@ -6,7 +6,7 @@ import com.drama.app.data.remote.api.AuthApiService
 import com.drama.app.data.remote.api.DramaApiService
 import com.drama.app.data.remote.interceptor.AuthInterceptor
 import com.drama.app.data.remote.ws.WebSocketManager
-import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
+import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -50,8 +50,8 @@ object NetworkModule {
             .addInterceptor(HttpLoggingInterceptor().apply {
                 level = HttpLoggingInterceptor.Level.BODY
             })
-            .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(300, TimeUnit.SECONDS)  // LLM calls can take minutes
             .writeTimeout(30, TimeUnit.SECONDS)
             .build()
     }
@@ -67,11 +67,8 @@ object NetworkModule {
         serverPreferences: ServerPreferences,
     ): Retrofit {
         val config = runBlocking { serverPreferences.serverConfig.first() }
-        val baseUrl = if (config != null) {
-            "http://${config.ip}:${config.port}/api/v1/"
-        } else {
-            "http://127.0.0.1:8000/api/v1/"  // 占位，首次启动未连接时
-        }
+        val baseUrl = config?.toApiBaseUrl()
+            ?: "http://127.0.0.1:8000/api/v1/"  // 占位，首次启动未连接时
         return Retrofit.Builder()
             .baseUrl(baseUrl)
             .client(okHttpClient)

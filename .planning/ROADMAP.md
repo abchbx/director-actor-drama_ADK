@@ -186,6 +186,30 @@ Plans:
 
 ---
 
+## v3.0 群聊模式 (Phase 22)
+
+**Goal:** 将Android剧本详情页从导演指令模式改造为群聊模式：用户输入主题→创建角色→进入群聊界面→@角色对话→角色可主动发言
+
+### Phase 22: 群聊模式改造
+
+**Goal:** 用户消息右对齐气泡 + @提及选择器 + 输入框聊天化 + 角色主动插话
+**Requirements:** CHAT-01~CHAT-08
+**Depends on:** Phase 17, Phase 18
+**Success Criteria:**
+1. 用户在输入框发消息，显示为右对齐用户气泡
+2. 输入 @ 弹出角色选择器，选择后 @角色名 插入输入框
+3. @角色 发送消息 → 路由到 /speak，角色回复显示为左对齐气泡
+4. 不 @ 发送消息 → 路由到 /action（群消息）
+5. /next /end 保留为底部快捷按钮
+6. 角色可主动发言（WS 推送 actor_chime_in 事件）
+7. 体验为"和角色们群聊"，而非"导演下指令"
+
+Plans:
+- [ ] 22-01-PLAN.md — Android群聊UI改造 + @提及 + 用户消息气泡 + 输入框重构
+- [ ] 22-02-PLAN.md — 后端 /drama/chat API + 角色主动插话机制
+
+---
+
 ## Dependency Graph
 
 ```
@@ -238,6 +262,7 @@ Phase 16 (Android Foundation) ──── Phase 17 (Android Interaction) ──
 | 19. WS Heartbeat Fix | v2.0-gap | 0/1 | Pending | — |
 | 20. Command & API Wiring Fix | v2.0-gap | 0/1 | Pending | — |
 | 21. Events & Export Completion | v2.0-gap | 0/1 | Pending | — |
+| 22. 群聊模式改造 | v3.0 | 0/2 | In Progress | — |
 
 ---
 

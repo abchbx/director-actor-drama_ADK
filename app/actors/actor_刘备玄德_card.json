@@ -1,0 +1,26 @@
+{
+  "name": "actor_刘备玄德",
+  "description": "演员 刘备玄德，角色：君主/对立面",
+  "url": "http://localhost:9066/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_刘备玄德",
+      "name": "扮演刘备玄德",
+      "description": "以刘备玄德的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

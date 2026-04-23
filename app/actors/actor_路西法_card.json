@@ -1,0 +1,26 @@
+{
+  "name": "actor_路西法",
+  "description": "演员 路西法，角色：反派/对立面",
+  "url": "http://localhost:9039/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_路西法",
+      "name": "扮演路西法",
+      "description": "以路西法的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

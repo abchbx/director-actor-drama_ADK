@@ -1,0 +1,26 @@
+{
+  "name": "actor_陈月娥",
+  "description": "演员 陈月娥，角色：母亲/反派",
+  "url": "http://localhost:9051/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_陈月娥",
+      "name": "扮演陈月娥",
+      "description": "以陈月娥的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

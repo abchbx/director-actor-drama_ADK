@@ -24,4 +24,5 @@ interface DramaRepository {
     suspend fun getSceneDetail(sceneNumber: Int): Result<SceneDetailDto>
     suspend fun getCastStatus(): Result<CastStatusResponseDto>
     suspend fun getCast(): Result<CastResponseDto>
+    suspend fun sendChatMessage(message: String, mention: String? = null): Result<CommandResponseDto>
 }

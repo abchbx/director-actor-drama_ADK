@@ -1,0 +1,26 @@
+{
+  "name": "actor_林墨",
+  "description": "演员 林墨，角色：主角",
+  "url": "http://localhost:9047/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_林墨",
+      "name": "扮演林墨",
+      "description": "以林墨的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

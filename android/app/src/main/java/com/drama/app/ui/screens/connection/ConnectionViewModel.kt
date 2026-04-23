@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.drama.app.domain.model.AuthMode
 import com.drama.app.domain.model.ConnectionStatus
+import com.drama.app.domain.model.ErrorType
 import com.drama.app.domain.model.ServerConfig
 import com.drama.app.domain.repository.AuthRepository
 import com.drama.app.domain.repository.ServerRepository
@@ -19,6 +20,8 @@ import javax.inject.Inject
 data class ConnectionUiState(
     val ip: String = "",
     val port: String = "8000",
+    val baseUrl: String = "",  // Cloud URL (e.g. https://xxx.cloudstudio.club/)
+    val useCloudUrl: Boolean = false,  // Toggle between IP:port and full URL
     val token: String = "",
     val showTokenInput: Boolean = false,  // D-02: 需要 token 时弹出
     val status: ConnectionStatus = ConnectionStatus.Idle,
@@ -50,12 +53,24 @@ class ConnectionViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(token = token)
     }
 
+    fun updateBaseUrl(url: String) {
+        _uiState.value = _uiState.value.copy(baseUrl = url)
+    }
+
+    fun setUseCloudUrl(use: Boolean) {
+        _uiState.value = _uiState.value.copy(useCloudUrl = use)
+    }
+
     fun connect() {
         val state = _uiState.value
         viewModelScope.launch {
             _uiState.value = state.copy(status = ConnectionStatus.Connecting)
 
-            val result = authRepository.verifyServer(state.ip, state.port)
+            val result = if (state.useCloudUrl && state.baseUrl.isNotBlank()) {
+                authRepository.verifyServer("", "", state.baseUrl.trimEnd('/'))
+            } else {
+                authRepository.verifyServer(state.ip, state.port)
+            }
             result.onSuccess { authMode ->
                 when (authMode) {
                     is AuthMode.Bypass -> {
@@ -70,10 +85,10 @@ class ConnectionViewModel @Inject constructor(
             }.onFailure { error ->
                 // D-03: 区分错误类型
                 val errorType = when (error.message) {
-                    "TIMEOUT" -> ConnectionStatus.ErrorType.TIMEOUT
-                    "NETWORK_UNREACHABLE" -> ConnectionStatus.ErrorType.NETWORK_UNREACHABLE
-                    "AUTH_FAILED" -> ConnectionStatus.ErrorType.AUTH_FAILED
-                    else -> ConnectionStatus.ErrorType.UNKNOWN
+                    "TIMEOUT" -> ErrorType.TIMEOUT
+                    "NETWORK_UNREACHABLE" -> ErrorType.NETWORK_UNREACHABLE
+                    "AUTH_FAILED" -> ErrorType.AUTH_FAILED
+                    else -> ErrorType.UNKNOWN
                 }
                 _uiState.value = _uiState.value.copy(
                     status = ConnectionStatus.Error(error.message ?: "连接失败", errorType),
@@ -90,7 +105,10 @@ class ConnectionViewModel @Inject constructor(
     }
 
     private suspend fun saveConfigAndConnect(ip: String, port: String, token: String?) {
-        serverRepository.saveServerConfig(ServerConfig(ip = ip, port = port, token = token))
+        val baseUrl = if (_uiState.value.useCloudUrl && _uiState.value.baseUrl.isNotBlank()) {
+            _uiState.value.baseUrl.trimEnd('/')
+        } else null
+        serverRepository.saveServerConfig(ServerConfig(ip = ip, port = port, token = token, baseUrl = baseUrl))
         _uiState.value = _uiState.value.copy(status = ConnectionStatus.Connected, showTokenInput = false)
     }
 

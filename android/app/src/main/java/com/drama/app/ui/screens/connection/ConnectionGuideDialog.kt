@@ -3,6 +3,7 @@ package com.drama.app.ui.screens.connection
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Snackbar
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -80,28 +82,54 @@ fun ConnectionGuideDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
 
-                // D-01: IP 输入
-                OutlinedTextField(
-                    value = uiState.ip,
-                    onValueChange = viewModel::updateIp,
-                    label = { Text("IP 地址") },
-                    placeholder = { Text(savedConfig?.ip ?: "192.168.1.100") },
-                    singleLine = true,
+                // Cloud URL toggle
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    enabled = uiState.status !is ConnectionStatus.Connecting,
-                )
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text("云端 URL", style = MaterialTheme.typography.bodyMedium)
+                    Switch(
+                        checked = uiState.useCloudUrl,
+                        onCheckedChange = viewModel::setUseCloudUrl,
+                    )
+                }
 
-                // D-01: Port 输入
-                OutlinedTextField(
-                    value = uiState.port,
-                    onValueChange = viewModel::updatePort,
-                    label = { Text("端口") },
-                    placeholder = { Text(savedConfig?.port ?: "8000") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = uiState.status !is ConnectionStatus.Connecting,
-                )
+                if (uiState.useCloudUrl) {
+                    // Cloud URL input
+                    OutlinedTextField(
+                        value = uiState.baseUrl,
+                        onValueChange = viewModel::updateBaseUrl,
+                        label = { Text("服务器 URL") },
+                        placeholder = { Text("https://xxx.cloudstudio.club") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = uiState.status !is ConnectionStatus.Connecting,
+                    )
+                } else {
+                    // D-01: IP 输入
+                    OutlinedTextField(
+                        value = uiState.ip,
+                        onValueChange = viewModel::updateIp,
+                        label = { Text("IP 地址") },
+                        placeholder = { Text(savedConfig?.ip ?: "192.168.1.100") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = uiState.status !is ConnectionStatus.Connecting,
+                    )
+
+                    // D-01: Port 输入
+                    OutlinedTextField(
+                        value = uiState.port,
+                        onValueChange = viewModel::updatePort,
+                        label = { Text("端口") },
+                        placeholder = { Text(savedConfig?.port ?: "8000") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = uiState.status !is ConnectionStatus.Connecting,
+                    )
+                }
 
                 // D-02: Token 输入（需要时弹出）
                 if (uiState.showTokenInput) {
@@ -125,7 +153,8 @@ fun ConnectionGuideDialog(
                     Button(
                         onClick = viewModel::connect,
                         modifier = Modifier.fillMaxWidth(),
-                        enabled = uiState.ip.isNotBlank() && uiState.port.isNotBlank() &&
+                        enabled = (if (uiState.useCloudUrl) uiState.baseUrl.isNotBlank()
+                            else uiState.ip.isNotBlank() && uiState.port.isNotBlank()) &&
                             uiState.status !is ConnectionStatus.Connecting,
                     ) {
                         if (uiState.status is ConnectionStatus.Connecting) {

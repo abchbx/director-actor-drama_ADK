@@ -26,6 +26,9 @@ interface DramaApiService {
     @POST("drama/storm")
     suspend fun triggerStorm(@Body request: StormRequestDto): CommandResponseDto
 
+    @POST("drama/chat")
+    suspend fun chatMessage(@Body request: ChatRequestDto): CommandResponseDto
+
     @POST("drama/end")
     suspend fun endDrama(): CommandResponseDto
 

@@ -1,0 +1,26 @@
+{
+  "name": "actor_质疑者",
+  "description": "演员 质疑者，角色：反派/对立面",
+  "url": "http://localhost:9025/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_质疑者",
+      "name": "扮演质疑者",
+      "description": "以质疑者的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

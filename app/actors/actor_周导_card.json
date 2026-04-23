@@ -1,0 +1,26 @@
+{
+  "name": "actor_周导",
+  "description": "演员 周导，角色：旁观者/引路人",
+  "url": "http://localhost:9052/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_周导",
+      "name": "扮演周导",
+      "description": "以周导的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

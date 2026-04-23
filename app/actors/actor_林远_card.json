@@ -1,0 +1,26 @@
+{
+  "name": "actor_林远",
+  "description": "演员 林远，角色：主角/穿越者",
+  "url": "http://localhost:9008/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_林远",
+      "name": "扮演林远",
+      "description": "以林远的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}
