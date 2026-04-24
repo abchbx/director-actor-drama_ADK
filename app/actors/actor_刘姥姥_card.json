@@ -1,0 +1,26 @@
+{
+  "name": "actor_刘姥姥",
+  "description": "演员 刘姥姥，角色：旁观者 · 乡村老妪",
+  "url": "http://localhost:9043/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_刘姥姥",
+      "name": "扮演刘姥姥",
+      "description": "以刘姥姥的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

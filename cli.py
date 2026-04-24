@@ -140,13 +140,20 @@ def _extract_actors_from_response(resp: dict) -> str:
 
 
 async def _send_message(runner: Runner, message: str) -> str:
-    """Send a message to the agent and collect the response."""
+    """Send a message to the agent and collect the response.
+
+    ★ 核心修复：添加 final_received 标志，防止 ADK 产生多个
+    is_final_response() 事件时重复打印最终回复。
+    只处理第一个 final_response，后续的忽略。
+    """
     content = types.Content(
         role="user",
         parts=[types.Part.from_text(text=message)],
     )
 
     response_parts = []
+    # ★ 核心修复：标记是否已收到 final_response，防止重复
+    final_received = False
     # Content fields from tool responses that should be displayed to the user
     _content_keys = [
         "formatted_narration",
@@ -156,6 +163,8 @@ async def _send_message(runner: Runner, message: str) -> str:
         "narration",
         "message",
     ]
+    # ★ 去重集合：跟踪已显示的 function_response，防止重复打印
+    _seen_responses: set[str] = set()
 
     # Spinner for LLM wait indicator (D-13/D-14)
     console = Console()
@@ -180,6 +189,11 @@ async def _send_message(runner: Runner, message: str) -> str:
                     spinner_active = True
 
             if event.is_final_response():
+                # ★ 核心修复：只处理第一个 final_response，忽略后续重复的
+                if final_received:
+                    continue
+                final_received = True
+
                 # Stop spinner before printing final response
                 if spinner_active:
                     try:
@@ -214,10 +228,16 @@ async def _send_message(runner: Runner, message: str) -> str:
                                 args_str = args_str[:80] + "..."
                             print(f"  ⚙️ {fn_name}({args_str})")
                     if part.function_response:
-                        # Display content from tool responses so users can see
-                        # dialogue, narration, scene content, etc.
+                        # ★ 核心修复：去重，同一工具调用只显示一次
                         resp = part.function_response.response
                         if resp:
+                            fn_name = part.function_response.name or "?"
+                            resp_id = resp.get("id", resp.get("scene_number", ""))
+                            dedup_key = f"{fn_name}:{resp_id}"
+                            if dedup_key in _seen_responses:
+                                continue
+                            _seen_responses.add(dedup_key)
+
                             for key in _content_keys:
                                 if key in resp and resp[key]:
                                     text = str(resp[key]).strip()

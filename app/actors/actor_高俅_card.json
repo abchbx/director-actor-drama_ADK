@@ -1,0 +1,26 @@
+{
+  "name": "actor_高俅",
+  "description": "演员 高俅，角色：太尉",
+  "url": "http://localhost:9013/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_高俅",
+      "name": "扮演高俅",
+      "description": "以高俅的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

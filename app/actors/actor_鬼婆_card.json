@@ -1,0 +1,26 @@
+{
+  "name": "actor_鬼婆",
+  "description": "演员 鬼婆，角色：恩人/操控者",
+  "url": "http://localhost:9041/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_鬼婆",
+      "name": "扮演鬼婆",
+      "description": "以鬼婆的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

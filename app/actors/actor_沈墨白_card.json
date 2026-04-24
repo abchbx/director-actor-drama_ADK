@@ -1,0 +1,26 @@
+{
+  "name": "actor_沈墨白",
+  "description": "演员 沈墨白，角色：反派/权臣",
+  "url": "http://localhost:9034/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_沈墨白",
+      "name": "扮演沈墨白",
+      "description": "以沈墨白的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

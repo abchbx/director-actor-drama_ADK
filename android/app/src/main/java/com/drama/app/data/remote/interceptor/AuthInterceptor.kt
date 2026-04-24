@@ -1,17 +1,16 @@
 package com.drama.app.data.remote.interceptor
 
-import com.drama.app.data.local.ServerPreferences
-import kotlinx.coroutines.runBlocking
+import com.drama.app.data.local.SecureStorage
 import okhttp3.Interceptor
 import okhttp3.Response
 import javax.inject.Inject
 
 class AuthInterceptor @Inject constructor(
-    private val serverPreferences: ServerPreferences,
+    private val secureStorage: SecureStorage,
 ) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val originalRequest = chain.request()
-        val token = runBlocking { serverPreferences.getTokenSync() }
+        val token = secureStorage.getToken()
         val request = if (token != null) {
             originalRequest.newBuilder()
                 .header("Authorization", "Bearer $token")

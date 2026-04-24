@@ -1,0 +1,26 @@
+{
+  "name": "actor_小精灵·萤",
+  "description": "演员 小精灵·萤，角色：旅伴",
+  "url": "http://localhost:9007/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_小精灵_萤",
+      "name": "扮演小精灵·萤",
+      "description": "以小精灵·萤的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

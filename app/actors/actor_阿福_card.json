@@ -1,0 +1,26 @@
+{
+  "name": "actor_阿福",
+  "description": "演员 阿福，角色：忠仆/证人",
+  "url": "http://localhost:9019/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_阿福",
+      "name": "扮演阿福",
+      "description": "以阿福的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

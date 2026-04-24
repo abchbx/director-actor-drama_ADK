@@ -14,22 +14,30 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -54,6 +62,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,6 +80,8 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.TheaterComedy
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
@@ -86,6 +97,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun DramaDetailScreen(
     dramaId: String,
+    skipLoad: Boolean = false,
     viewModel: DramaDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -133,14 +145,62 @@ fun DramaDetailScreen(
             }
         },
         content = {
+            // === 初始化同步中的全屏加载 ===
+            if (uiState.initialSyncing) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator()
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            "正在同步剧本数据...",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            } else if (uiState.initError != null) {
+                // === 初始化失败：错误 + 重试按钮 ===
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Filled.TheaterComedy,
+                            contentDescription = null,
+                            modifier = Modifier.size(64.dp),
+                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f),
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            uiState.initError!!,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.error,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 32.dp),
+                        )
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Button(onClick = viewModel::retryInit) {
+                            Icon(
+                                Icons.Filled.Refresh,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(modifier = Modifier.size(8.dp))
+                            Text("重试")
+                        }
+                    }
+                }
+            } else {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    // 关键修复：同时消费状态栏和导航栏 insets，防止底部空白泄漏
+                    // 仅消费状态栏 insets，防止 TopAppBar 被遮挡
+                    // 导航栏 insets 不在这里消费，避免 imePadding() 计算时被扣除
                     .consumeWindowInsets(WindowInsets.statusBars)
-                    .consumeWindowInsets(WindowInsets.navigationBars)
-                    // ★ 不再手动添加 imeHeightPx padding — ChatInputBar 已有 .imePadding()
-                    // 双重 padding 会导致输入法上方出现大片空白
             ) {
                 TopAppBar(
                     title = {
@@ -197,22 +257,35 @@ fun DramaDetailScreen(
                     },
                 )
 
+                // 离线断连横幅
+                // ★ 修复：初始同步期间不显示横幅（WS 可能还在复用连接的过渡期）
+                // 只在真正降级到 REST 模式（未连接且未在重连且初始化已完成）时显示横幅
+                ConnectionBanner(
+                    isConnected = uiState.isWsConnected,
+                    isReconnecting = uiState.isReconnecting,
+                    isInitialSyncing = uiState.initialSyncing,
+                )
+
                 // 中间内容区域 — 填充剩余空间
                 Box(modifier = Modifier.weight(1f)) {
-                    if (uiState.bubbles.isEmpty() && !uiState.isTyping) {
-                        // 空状态：带脉冲动画的引导性容器
-                        DramaEmptyState()
-                    } else {
-                        SceneBubbleList(
-                            bubbles = uiState.bubbles,
-                            isTyping = uiState.isTyping,
-                            typingText = uiState.typingText,
-                        )
-                    }
-
-                    // WS 连接状态指示
-                    if (!uiState.isWsConnected) {
-                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter))
+                    when {
+                        uiState.outlineSummary.isNotBlank() && uiState.currentScene == 0 && uiState.bubbles.isEmpty() -> {
+                            OutlineConfirmPanel(
+                                outline = uiState.outlineSummary,
+                                onConfirm = { viewModel.sendCommand("/action 开始") },
+                            )
+                        }
+                        uiState.bubbles.isEmpty() && !uiState.isTyping -> {
+                            // 空状态：带脉冲动画的引导性容器
+                            DramaEmptyState()
+                        }
+                        else -> {
+                            SceneBubbleList(
+                                bubbles = uiState.bubbles,
+                                isTyping = uiState.isTyping,
+                                typingText = uiState.typingText,
+                            )
+                        }
                     }
 
                     // STORM 进度
@@ -227,8 +300,10 @@ fun DramaDetailScreen(
                 }
 
                 // 底部聊天输入栏 — 浮动玻璃态，带平滑的键盘跟随和入场动画
+                // ★ imePadding() 必须应用在 AnimatedVisibility 外侧，避免动画容器阻断 insets 传递
                 androidx.compose.animation.AnimatedVisibility(
                     visible = true,
+                    modifier = Modifier.imePadding(),
                     enter = slideInVertically(
                         initialOffsetY = { it },
                         animationSpec = tween(450, easing = FastOutSlowInEasing),
@@ -243,9 +318,12 @@ fun DramaDetailScreen(
                         onSend = viewModel::sendChatMessage,
                         onCommand = viewModel::sendCommand,
                         isProcessing = uiState.isProcessing,
+                        isWsConnected = uiState.isWsConnected,
+                        isReconnecting = uiState.isReconnecting,
                     )
                 }
             }
+            } // end else (not initialSyncing, not initError)
         },
     )
 
@@ -260,7 +338,7 @@ fun DramaDetailScreen(
 
     // D-23: 保存 Dialog
     if (uiState.showSaveDialog) {
-        var saveName by remember { mutableStateOf("") }
+        var saveName by rememberSaveable { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = viewModel::hideSaveDialog,
             title = { Text("保存戏剧") },
@@ -279,6 +357,58 @@ fun DramaDetailScreen(
                 TextButton(onClick = viewModel::hideSaveDialog) { Text("取消") }
             },
         )
+    }
+}
+
+// ============================================================
+// OutlineConfirmPanel — 大纲确认面板（第0场时展示）
+// ============================================================
+
+@Composable
+private fun OutlineConfirmPanel(
+    outline: String,
+    onConfirm: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp, vertical = 24.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = "剧本大纲",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = outline,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 360.dp)
+                        .verticalScroll(androidx.compose.foundation.rememberScrollState()),
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+                Button(
+                    onClick = onConfirm,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth(0.7f),
+                ) {
+                    Text("确认方向，开始创作")
+                }
+            }
+        }
     }
 }
 
@@ -344,6 +474,53 @@ private fun DramaEmptyState() {
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                 textAlign = TextAlign.Center,
             )
+        }
+    }
+}
+
+// ============================================================
+// ConnectionBanner — 离线断连横幅
+// ============================================================
+
+/** 断连横幅：在 TopAppBar 下方显示"连接已断开，正在尝试重连..." */
+@Composable
+private fun ConnectionBanner(
+    isConnected: Boolean,
+    isReconnecting: Boolean = false,
+    isInitialSyncing: Boolean = false,
+) {
+    // ★ 修复：初始同步期间不显示横幅（避免 WS 复用过渡期的闪烁）
+    // 只在真正降级到 REST 模式（未连接且未在重连且初始化已完成）时显示
+    AnimatedVisibility(
+        visible = !isConnected && !isReconnecting && !isInitialSyncing,
+        enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(tween(200)),
+        exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut(tween(200)),
+    ) {
+        Surface(
+            color = MaterialTheme.colorScheme.errorContainer,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .wrapContentHeight()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.CloudOff,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onErrorContainer,
+                )
+                Spacer(modifier = Modifier.size(8.dp))
+                Text(
+                    text = "WebSocket 连接失败，已降级到 REST 轮询模式",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                )
+            }
         }
     }
 }

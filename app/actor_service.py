@@ -124,9 +124,12 @@ async def call_actor(actor_name: str, message: str, tool_context=None) -> str:
     
     if not os.path.exists(card_file):
         return f"[无法找到演员 {actor_name} 的信息]"
-    
-    with open(card_file, "r") as f:
-        card_data = json.load(f)
+
+    try:
+        with open(card_file, "r") as f:
+            card_data = json.load(f)
+    except (json.JSONDecodeError, ValueError):
+        return f"[演员 {actor_name} 的信息文件损坏]"
     agent_card = AgentCard(**card_data)
     
     httpx_client = httpx.AsyncClient(timeout=httpx.Timeout(60.0))
@@ -339,8 +342,11 @@ def get_actor_remote_config(actor_name: str, saved_port: int | None = None) -> O
     if not os.path.exists(card_file):
         return None
 
-    with open(card_file, "r", encoding="utf-8") as f:
-        card_data = json.load(f)
+    try:
+        with open(card_file, "r", encoding="utf-8") as f:
+            card_data = json.load(f)
+    except (json.JSONDecodeError, ValueError):
+        return None
 
     # Prefer the URL from the card file (written at service creation time) as
     # the single source of truth; fall back to deterministic calculation.

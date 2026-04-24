@@ -106,6 +106,7 @@ class DramaStatusResponse(BaseModel):
     drama_folder: str = ""
     arc_progress: list[dict] = Field(default_factory=list, description="Per-actor arc progress")
     time_period: str = Field(default="", description="Current time period description")
+    has_outline: bool = Field(default=False, description="Whether STORM outline has been synthesized")
 
 
 class CastResponse(BaseModel):

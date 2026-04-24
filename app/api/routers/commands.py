@@ -7,9 +7,11 @@ Each endpoint:
 3. Formats message matching CLI command format
 4. Calls run_command_and_collect to execute via Runner
 5. Returns structured CommandResponse
-DEBUG: All endpoints log entry/exit with timing and key parameters.
+DEBUG: All lifecycle events are logged via logging module (server console)
+     and optionally pushed as 'director_log' WS events for Android visibility.
 """
 
+import asyncio
 import logging
 import time
 
@@ -56,6 +58,35 @@ def _get_event_callback(request: Request):
     return None
 
 
+async def _run_storm_setup(
+    runner,
+    lock,
+    theme: str,
+    event_callback,
+):
+    """Run STORM setup in background after /start has returned immediately.
+
+    This allows Android clients to poll /drama/status while the LLM
+    progressively creates actors. The lock serializes access so other
+    commands (like /next) block until setup completes — acceptable during
+    the setup phase.
+    """
+    try:
+        async with lock:
+            logger.info("[DIRECTOR-LOG] 🔄 后台 STORM 开始: /start %s", theme)
+            result = await run_command_and_collect(
+                runner, f"/start {theme}", USER_ID, SESSION_ID,
+                timeout=600.0,
+                event_callback=event_callback,
+            )
+            logger.info(
+                "[DIRECTOR-LOG] ✅ 后台 STORM 完成: %s (tools=%d)",
+                theme, len(result.get("tool_results", [])),
+            )
+    except Exception as e:
+        logger.error("[DIRECTOR-LOG] 💥 后台 STORM 失败: %s | %s", theme, e)
+
+
 @router.post("/drama/start", response_model=CommandResponse)
 async def start_drama(
     body: StartDramaRequest,
@@ -68,6 +99,9 @@ async def start_drama(
     """Start a new drama with the given theme.
 
     D-06: Auto-saves existing drama before starting a new one.
+
+    CRITICAL: Returns immediately after initializing state. STORM setup
+    runs in a background task so Android polling clients don't hit 504.
     """
     t0 = time.monotonic()
     theme = body.theme.strip()
@@ -85,19 +119,28 @@ async def start_drama(
             flush_state_sync()
             logger.info("[DIRECTOR-LOG] ✅ 旧剧本已保存")
 
-        logger.info("[DIRECTOR-LOG] ⏳ 调用 Runner: /start %s (等待LLM完成全部STORM流程)...", theme)
-        result = await run_command_and_collect(
-            runner, f"/start {theme}", USER_ID, SESSION_ID,
-            event_callback=_get_event_callback(req),
-        )
-        elapsed = time.monotonic() - t0
-        final_resp_preview = (result.get("final_response") or "")[:100]
-        tool_count = len(result.get("tool_results", []))
+        # ★ 关键修复：立即初始化新剧本状态，不等待 LLM
+        from app.state_manager import init_drama_state, flush_state_sync
+        init_result = init_drama_state(theme, tool_context)
+        flush_state_sync()
         logger.info(
-            "[DIRECTOR-LOG] 🏁 /drama/start 完成! 用时=%.1fs, 工具调用=%d, 响应=%s",
-            elapsed, tool_count, final_resp_preview.replace("\n", " "),
+            "[DIRECTOR-LOG] ✅ 新剧本已初始化: %s", init_result.get("drama_folder", "")
         )
-        return CommandResponse(**result)
+
+    # Spawn STORM background task — Android will poll /drama/status for progress
+    event_callback = _get_event_callback(req)
+    asyncio.create_task(_run_storm_setup(runner, lock, theme, event_callback))
+
+    elapsed = time.monotonic() - t0
+    logger.info(
+        "[DIRECTOR-LOG] 🏁 /drama/start 已返回! 用时=%.2fs, 后台 STORM 运行中...", elapsed
+    )
+    return CommandResponse(
+        status="success",
+        message=f"剧本「{theme}」已初始化，导演正在后台构思世界观...",
+        final_response=f"已开始创作「{theme}」，请稍候...",
+        tool_results=[{"status": "success", "message": init_result.get("message", "")}],
+    )
 
 
 @router.post("/drama/next", response_model=CommandResponse)
@@ -114,6 +157,7 @@ async def next_scene(
         result = await run_command_and_collect(
             runner, "/next", USER_ID, SESSION_ID,
             event_callback=_get_event_callback(req),
+            timeout=300.0,
         )
         return CommandResponse(**result)
 
@@ -231,6 +275,7 @@ async def trigger_storm(
         result = await run_command_and_collect(
             runner, msg, USER_ID, SESSION_ID,
             event_callback=_get_event_callback(req),
+            timeout=300.0,
         )
         return CommandResponse(**result)
 
@@ -260,5 +305,6 @@ async def chat_message(
         result = await run_command_and_collect(
             runner, msg, USER_ID, SESSION_ID,
             event_callback=_get_event_callback(req),
+            timeout=300.0,
         )
         return CommandResponse(**result)

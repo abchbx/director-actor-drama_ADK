@@ -9,8 +9,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -82,15 +80,11 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.drama.app.domain.model.Drama
@@ -107,6 +101,20 @@ fun DramaListScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // ★ 关键修复：从详情页返回时自动刷新列表，避免新创建的剧本不显示
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                viewModel.loadDramas()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
@@ -572,7 +580,7 @@ private fun DramaCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable(enabled = !isSelectionMode) {
-                    if (!isSelectionMode) onDramaClick(drama.folder)
+                    if (!isSelectionMode) onDramaClick(drama.theme)
                 }
                 .padding(start = if (isSelectionMode) 4.dp else 16.dp, end = 8.dp, top = 16.dp, bottom = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -666,68 +674,60 @@ private fun DramaCard(
                 }
             }
 
-            // === 右侧菜单按钮 ===
+            // === 右侧菜单按钮 — 使用 Box 包裹以便 Popup 定位到此锚点 ===
             AnimatedVisibility(
                 visible = !isSelectionMode,
                 enter = fadeIn(),
                 exit = fadeOut(),
             ) {
-                IconButton(onClick = { showMenu = true }) {
-                    Icon(Icons.Filled.MoreVert, "更多操作", modifier = Modifier.size(20.dp))
-                }
-            }
-        }
-    }
-
-    // ★ 玻璃态系统菜单 — 使用 Popup 精确定位到三点按钮
-    if (!isSelectionMode && showMenu) {
-        Popup(
-            alignment = Alignment.TopEnd,
-            offset = IntOffset(x = with(LocalDensity.current) { (-4).dp.toPx().toInt() }, y = with(LocalDensity.current) { (-8).dp.toPx().toInt() }),
-            properties = PopupProperties(
-                focusable = true,
-                dismissOnBackPress = true,
-                dismissOnClickOutside = true,
-            ),
-            onDismissRequest = { showMenu = false },
-        ) {
-            Surface(
-                shape = RoundedCornerShape(14.dp),
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
-                shadowElevation = 16.dp,
-                tonalElevation = 8.dp,
-                border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.15f)),
-                modifier = Modifier.padding(vertical = 6.dp),
-            ) {
-                Column(modifier = Modifier.widthIn(min = 160.dp, max = 200.dp)) {
-                    // 继续 — Play 图标（主色调）
-                    GlassyMenuItem(
-                        icon = { Icon(Icons.Outlined.PlayArrow, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
-                        label = "继续",
-                        labelColor = MaterialTheme.colorScheme.onSurface,
-                        onClick = { showMenu = false; onDramaClick(drama.folder) },
-                    )
-
-                    // 加载存档 — History 图标（次色调）
-                    GlassyMenuItem(
-                        icon = { Icon(Icons.Outlined.History, null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(18.dp)) },
-                        label = "加载存档",
-                        labelColor = MaterialTheme.colorScheme.onSurface,
-                        onClick = { showMenu = false; onLoadDrama() },
-                    )
-
-                    HorizontalDivider(
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
-                    )
-
-                    // 删除 — Delete 图标（红色警告色）
-                    GlassyMenuItem(
-                        icon = { Icon(Icons.Filled.Delete, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp)) },
-                        label = "删除",
-                        labelColor = MaterialTheme.colorScheme.error,
-                        onClick = { showMenu = false; showDeleteDialog = true },
-                    )
+                Box {
+                    IconButton(onClick = { showMenu = true }) {
+                        Icon(Icons.Filled.MoreVert, "更多操作", modifier = Modifier.size(20.dp))
+                    }
+                    // ★ 修复：将 DropdownMenu 放在 IconButton 的 Box 内部，使其自动定位到三点按钮位置
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false },
+                        modifier = Modifier.widthIn(min = 160.dp, max = 200.dp),
+                    ) {
+                        // 继续 — Play 图标（主色调）
+                        DropdownMenuItem(
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Outlined.PlayArrow, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text("继续", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                                }
+                            },
+                            onClick = { showMenu = false; onDramaClick(drama.theme) },
+                        )
+                        // 加载存档 — History 图标（次色调）
+                        DropdownMenuItem(
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Outlined.History, null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text("加载存档", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                                }
+                            },
+                            onClick = { showMenu = false; onLoadDrama() },
+                        )
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                        )
+                        // 删除 — Delete 图标（红色警告色）
+                        DropdownMenuItem(
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Filled.Delete, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text("删除", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.error)
+                                }
+                            },
+                            onClick = { showMenu = false; showDeleteDialog = true },
+                        )
+                    }
                 }
             }
         }
@@ -749,34 +749,4 @@ private fun DramaCard(
     }
 }
 
-/**
- * 玻璃态菜单项 — iOS 系统菜单风格行组件
- * 带 18dp 彩色图标、标签文字、按压高亮效果
- */
-@Composable
-private fun GlassyMenuItem(
-    icon: @Composable () -> Unit,
-    label: String,
-    labelColor: Color = MaterialTheme.colorScheme.onSurface,
-    onClick: () -> Unit,
-) {
-    Surface(
-        shape = RoundedCornerShape(10.dp),
-        color = Color.Transparent,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(interactionSource = null, indication = null) { onClick() }
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            icon()
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-                color = labelColor,
-            )
-        }
-    }
-}
+

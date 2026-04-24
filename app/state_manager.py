@@ -156,6 +156,22 @@ def _sanitize_name(name: str) -> str:
     return "".join(c if c.isalnum() or c in "-_" else "_" for c in name)
 
 
+def _write_active_theme(theme: str):
+    """Write the current active theme to a marker file for hot-reload recovery.
+
+    When uvicorn WatchFiles triggers a server restart, _restore_session_state()
+    reads this marker to know which drama was active, instead of guessing by
+    file mtime (which can pick the wrong drama when multiple exist).
+    """
+    marker_path = os.path.join(DRAMAS_DIR, "_active_theme")
+    try:
+        os.makedirs(DRAMAS_DIR, exist_ok=True)
+        with open(marker_path, "w", encoding="utf-8") as f:
+            f.write(theme)
+    except Exception as e:
+        logger.warning(f"Failed to write _active_theme marker: {e}")
+
+
 def _get_drama_folder(theme: str) -> str:
     """Get or create the folder path for a drama based on its theme."""
     folder_name = _sanitize_name(theme)
@@ -199,17 +215,38 @@ def _load_state_from_file(theme: str) -> dict:
     """Load drama state from disk."""
     state_file = _get_state_file(theme)
     if os.path.exists(state_file):
-        with open(state_file, "r", encoding="utf-8") as f:
-            return json.load(f)
+        try:
+            with open(state_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, ValueError):
+            # Corrupted or empty state file – treat as missing
+            return {}
     return {}
 
 
 def _save_state_to_file(theme: str, state: dict):
-    """Save drama state to disk."""
+    """Save drama state to disk atomically (write-to-temp + rename).
+
+    Prevents corruption if the process crashes mid-write, which would
+    leave an empty/truncated state.json and cause JSONDecodeError on
+    the next read.
+    """
+    import tempfile
     _ensure_drama_dirs(theme)
     state_file = _get_state_file(theme)
-    with open(state_file, "w", encoding="utf-8") as f:
-        json.dump(state, f, ensure_ascii=False, indent=2)
+    dir_name = os.path.dirname(state_file)
+    try:
+        fd, tmp_path = tempfile.mkstemp(dir=dir_name, suffix=".tmp")
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(state, f, ensure_ascii=False, indent=2)
+        os.replace(tmp_path, state_file)
+    except Exception:
+        # Clean up temp file on failure
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
 
 
 def _flush_state():
@@ -279,6 +316,7 @@ def add_conversation(
 
     # Trigger debounced save instead of immediate _save_conversations
     _set_state(state, tool_context)
+    _write_active_theme(state.get("theme", ""))
 
     return {"status": "success", "entry": entry}
 
@@ -538,6 +576,7 @@ def init_drama_state(theme: str, tool_context=None) -> dict:
 
     _set_state(state, tool_context)
     _save_state_to_file(theme, state)
+    _write_active_theme(theme)
 
     return {
         "status": "success",
@@ -571,6 +610,7 @@ def save_progress(save_name: str = "", tool_context=None) -> dict:
     state["updated_at"] = datetime.now().isoformat()
     flush_state_sync()
     _save_state_to_file(theme, state)
+    _write_active_theme(theme)
 
     # Create named snapshot if requested
     snapshot_path = None
@@ -755,6 +795,7 @@ def load_progress(save_name: str, tool_context=None) -> dict:
     state.setdefault("scene_context", {})
 
     _set_state(state, tool_context)
+    _write_active_theme(state.get("theme", ""))
 
     return {
         "status": "success",
@@ -1100,6 +1141,25 @@ def get_current_state(tool_context=None) -> dict:
     if timeline.get("time_periods"):
         time_period = timeline["time_periods"][-1].get("description", "")
 
+    has_outline = bool(state.get("storm", {}).get("outline"))
+    outline_summary = ""
+    if has_outline:
+        outline = state.get("storm", {}).get("outline", {})
+        acts = outline.get("acts", [])
+        act_lines = []
+        for act in acts:
+            desc = act.get("description", "")[:50]
+            act_lines.append(f"第{act.get('act_number', '?')}幕「{act.get('title', '')}」：{desc}...")
+        tensions = outline.get("core_tensions", [])
+        tension_str = "、".join(tensions[:3]) if tensions else ""
+        act_lines_str = "\n".join(act_lines)
+        outline_summary = (
+            f"主题：{outline.get('theme', theme)}\n"
+            f"\n"
+            f"{act_lines_str}\n"
+            f"\n"
+            f"核心张力：{tension_str}"
+        )
     return {
         "status": "success",
         "theme": theme,
@@ -1111,6 +1171,8 @@ def get_current_state(tool_context=None) -> dict:
         "drama_folder": _get_drama_folder(theme) if theme else "",
         "arc_progress": arc_progress,
         "time_period": time_period,
+        "has_outline": has_outline,
+        "outline_summary": outline_summary,
     }
 
 
@@ -1346,6 +1408,7 @@ def storm_add_perspective(
     storm_data["perspectives"] = perspectives
     state["storm"] = storm_data
     _set_state(state, tool_context)
+    _write_active_theme(state.get("theme", ""))
 
     return {"status": "success", "message": f"Perspective '{perspective_name}' added."}
 
@@ -1395,6 +1458,7 @@ def storm_add_research_result(
     storm_data["research_results"] = results
     state["storm"] = storm_data
     _set_state(state, tool_context)
+    _write_active_theme(state.get("theme", ""))
 
     return {
         "status": "success",
@@ -1429,6 +1493,7 @@ def storm_set_outline(outline: dict, tool_context=None) -> dict:
     storm_data["outline"] = outline
     state["storm"] = storm_data
     _set_state(state, tool_context)
+    _write_active_theme(state.get("theme", ""))
 
     return {"status": "success", "message": "STORM outline saved."}
 

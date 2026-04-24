@@ -1,0 +1,26 @@
+{
+  "name": "actor_李逵",
+  "description": "演员 李逵，角色：黑旋风 / 沂州充军",
+  "url": "http://localhost:9057/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_李逵",
+      "name": "扮演李逵",
+      "description": "以李逵的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

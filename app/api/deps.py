@@ -58,7 +58,25 @@ async def get_tool_context(
     session = await session_service.get_session(
         app_name=APP_NAME, user_id=USER_ID, session_id=SESSION_ID
     )
-    return ToolContextAdapter(state=session.state)
+    if session is None:
+        await session_service.create_session(
+            app_name=APP_NAME, user_id=USER_ID, session_id=SESSION_ID
+        )
+
+    # CRITICAL: InMemorySessionService.get_session() returns a deepcopy.
+    # Writing to session.state only modifies the copy and is lost for subsequent
+    # requests. We must reference the internal session object directly so that
+    # state_manager functions (e.g., init_drama_state -> _set_state) persist.
+    internal_session = (
+        session_service.sessions
+        .get(APP_NAME, {})
+        .get(USER_ID, {})
+        .get(SESSION_ID)
+    )
+    if internal_session is None:
+        raise RuntimeError("Internal session not found after creation")
+
+    return ToolContextAdapter(state=internal_session.state)
 
 
 # HTTPBearer scheme for Swagger UI auto-detection (AUTH-04)

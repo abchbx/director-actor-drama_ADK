@@ -1,0 +1,26 @@
+{
+  "name": "actor_宋江",
+  "description": "演员 宋江，角色：梁山寨主 / 郓城押司",
+  "url": "http://localhost:9047/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_宋江",
+      "name": "扮演宋江",
+      "description": "以宋江的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

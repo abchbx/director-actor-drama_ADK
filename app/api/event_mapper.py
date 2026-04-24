@@ -17,20 +17,23 @@ logger = logging.getLogger(__name__)
 
 # D-05: Primary mapping table — function_call.name → list of business event types
 TOOL_EVENT_MAP: dict[str, list[str]] = {
-    "start_drama": ["scene_start", "status"],       # D-07: one-to-many
-    "next_scene": ["scene_start"],
+    "start_drama": ["scene_start", "status", "command_echo"],       # ★ command_echo 回显用户指令
+    "next_scene": ["scene_start", "command_echo"],
     "director_narrate": ["narration"],
     "actor_speak": ["dialogue", "actor_chime_in"],   # CHAT-07: chime_in when actor speaks
+    "user_action": ["dialogue", "command_echo"],       # ★ 用户行动回显指令 + 触发对话
     "write_scene": ["scene_end"],
     "update_emotion": ["actor_status"],
     "create_actor": ["actor_created", "cast_update"],  # D-06: cast_update
     "storm_discover_perspectives": ["storm_discover"],
     "storm_research_perspective": ["storm_research"],
     "storm_synthesize_outline": ["storm_outline"],
-    "save_drama": ["save_confirm"],
-    "load_drama": ["load_confirm"],
-    "export_drama": ["progress"],
-    "end_drama": ["end_narration"],
+    "save_drama": ["save_confirm", "command_echo"],
+    "load_drama": ["load_confirm", "command_echo"],
+    "export_drama": ["progress", "command_echo"],
+    "end_drama": ["end_narration", "command_echo"],
+    "steer_drama": ["command_echo"],                    # ★ steer 也回显
+    "auto_advance": ["command_echo"],                   # ★ auto 也回显
 }
 
 # DEBUG: Tools whose function_call/function_response should emit rich 'director_log' events.
@@ -50,21 +53,39 @@ def _extract_call_data(event_type: str, function_call) -> dict:
     elif event_type == "status":
         return {"tool": function_call.name}
     elif event_type == "narration":
-        return {"tool": function_call.name}
+        content = args.get("content", args.get("text", ""))
+        return {"tool": function_call.name, "text": content}
     elif event_type == "dialogue":
-        return {"actor_name": args.get("actor_name", ""), "tool": function_call.name}
+        return {
+            "actor_name": args.get("actor_name", ""),
+            "tool": function_call.name,
+            "situation": args.get("situation", ""),
+        }
     elif event_type == "actor_created":
         return {"actor_name": args.get("actor_name", ""), "tool": function_call.name}
     elif event_type == "cast_update":
         return {"tool": function_call.name}
     elif event_type == "actor_chime_in":
         return {"actor_name": args.get("actor_name", ""), "tool": function_call.name}
+    elif event_type == "command_echo":
+        # ★ 新增：command_echo 事件 — 回显用户指令到前端
+        # 前端收到此事件后，在会话界面显示用户执行的命令
+        return {
+            "tool": function_call.name,
+            "command": _format_command_echo(function_call.name, args),
+            "args": {k: str(v)[:100] for k, v in args.items()},
+        }
     else:
         return {"tool": function_call.name}
 
 
 def _extract_response_data(event_type: str, response: dict) -> dict:
-    """Extract relevant data from function_response for the given event type."""
+    """Extract relevant data from function_response for the given event type.
+
+    ★ 核心修复：dialogue 和 narration 事件必须在 response 阶段携带完整文本，
+    前端依赖这些数据创建对话/旁白气泡。call 阶段只有元数据（typing 指示），
+    response 阶段才有 LLM 生成的完整内容。
+    """
     if event_type == "scene_end":
         return {
             "scene_number": response.get("scene_number"),
@@ -75,6 +96,24 @@ def _extract_response_data(event_type: str, response: dict) -> dict:
             "actor_name": response.get("actor_name", ""),
             "emotion": response.get("emotion", ""),
         }
+    elif event_type == "dialogue":
+        # ★ 核心修复：携带完整对话文本和情绪，前端创建气泡
+        return {
+            "actor_name": response.get("actor_name", ""),
+            "text": response.get("text", ""),
+            "emotion": response.get("emotion", ""),
+        }
+    elif event_type == "actor_chime_in":
+        # ★ 修复：插话事件也需要完整文本
+        return {
+            "actor_name": response.get("actor_name", ""),
+            "text": response.get("text", ""),
+        }
+    elif event_type == "narration":
+        # ★ 核心修复：携带旁白完整文本
+        return {
+            "text": response.get("formatted_narration", response.get("text", response.get("narration", ""))),
+        }
     elif event_type == "save_confirm":
         return {"message": response.get("message", "")}
     elif event_type == "load_confirm":
@@ -83,8 +122,67 @@ def _extract_response_data(event_type: str, response: dict) -> dict:
         return {"message": response.get("message", ""), "export_path": response.get("export_path", "")}
     elif event_type == "end_narration":
         return {"text": response.get("formatted_narration", response.get("message", ""))}
+    elif event_type == "storm_outline":
+        # ★ 修复：传递大纲摘要数据到前端，而非空 dict
+        outline = response.get("outline", {})
+        acts = outline.get("acts", [])
+        act_summaries = []
+        for act in acts:
+            act_summaries.append({
+                "act_number": act.get("act_number", 0),
+                "title": act.get("title", ""),
+                "description": act.get("description", ""),
+                "key_conflict": act.get("key_conflict", ""),
+                "emotional_arc": act.get("emotional_arc", ""),
+            })
+        return {
+            "theme": response.get("theme", outline.get("theme", "")),
+            "message": response.get("message", ""),
+            "num_acts": len(acts),
+            "acts": act_summaries,
+            "core_tensions": outline.get("core_tensions", []),
+            "new_status": response.get("new_status", "acting"),
+        }
     else:
         return {}
+
+
+def _format_command_echo(fn_name: str, args: dict) -> str:
+    """Format a human-readable command echo string for the frontend.
+
+    ★ 新增：将工具调用转换为可读的用户指令格式，
+    前端收到 command_echo 事件后可直接显示。
+    """
+    match fn_name:
+        case "start_drama":
+            theme = args.get("theme", "")
+            return f"/start {theme}"
+        case "next_scene":
+            return "/next"
+        case "user_action":
+            desc = args.get("description", "")[:60]
+            return f"/action {desc}"
+        case "actor_speak":
+            actor = args.get("actor_name", "")
+            return f"@{actor}"
+        case "save_drama":
+            name = args.get("save_name", "")
+            return f"/save {name}".strip()
+        case "load_drama":
+            name = args.get("save_name", "")
+            return f"/load {name}"
+        case "export_drama":
+            return "/export"
+        case "end_drama":
+            return "/end"
+        case "steer_drama":
+            direction = args.get("direction", "")
+            return f"/steer {direction}"
+        case "auto_advance":
+            n = args.get("num_scenes", "?")
+            return f"/auto {n}"
+        case _:
+            return f"/{fn_name}"
 
 
 def _extract_tension(response: dict) -> int | None:

@@ -27,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,10 +38,13 @@ import androidx.compose.ui.unit.dp
 fun CommandInputBar(
     onCommand: (String) -> Unit,
     isProcessing: Boolean,
+    isWsConnected: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
-    var inputText by remember { mutableStateOf("") }
+    var inputText by rememberSaveable { mutableStateOf("") }
     val focusRequester = remember { FocusRequester() }
+    // ★ 修复：REST API 不依赖 WebSocket，WS 断连时不应禁用输入
+    val inputEnabled = !isProcessing
 
     Column(
         modifier = modifier
@@ -85,13 +89,13 @@ fun CommandInputBar(
                     .heightIn(max = 100.dp),
                 placeholder = { 
                     Text(
-                        "输入命令或描述...",
+                        if (!isWsConnected) "离线模式 — 命令将通过 REST 发送" else "输入命令或描述...",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                     )
                 },
                 maxLines = 3,
-                enabled = !isProcessing,
+                enabled = inputEnabled,
                 textStyle = MaterialTheme.typography.bodyMedium,
                 shape = RoundedCornerShape(20.dp),
                 colors = androidx.compose.material3.TextFieldDefaults.colors(
@@ -114,12 +118,12 @@ fun CommandInputBar(
                         inputText = ""
                     }
                 },
-                enabled = !isProcessing && inputText.isNotBlank(),
+                enabled = inputEnabled && inputText.isNotBlank(),
                 modifier = Modifier.size(40.dp),
             ) {
                 Surface(
                     shape = RoundedCornerShape(14.dp),
-                    color = if (inputText.isNotBlank() && !isProcessing)
+                    color = if (inputText.isNotBlank() && inputEnabled)
                         MaterialTheme.colorScheme.primary
                     else
                         MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -129,7 +133,7 @@ fun CommandInputBar(
                             Icons.AutoMirrored.Filled.Send,
                             contentDescription = "发送",
                             modifier = Modifier.size(18.dp),
-                            tint = if (inputText.isNotBlank() && !isProcessing)
+                            tint = if (inputText.isNotBlank() && inputEnabled)
                                 MaterialTheme.colorScheme.onPrimary
                             else
                                 MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),

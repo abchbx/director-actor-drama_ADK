@@ -1,18 +1,20 @@
 package com.drama.app.ui.screens.dramadetail
 
+import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.drama.app.data.local.ServerPreferences
 import com.drama.app.data.remote.dto.ArcProgressDto
+import com.drama.app.data.remote.dto.CommandResponseDto
 import com.drama.app.data.remote.dto.SceneSummaryDto
 import com.drama.app.data.remote.dto.WsEventDto
 import com.drama.app.data.remote.ws.WebSocketManager
 import com.drama.app.domain.model.ActorInfo
 import com.drama.app.domain.model.CommandType
-import com.drama.app.domain.model.InteractionType
 import com.drama.app.domain.model.SceneBubble
 import com.drama.app.domain.repository.DramaRepository
+import com.drama.app.domain.usecase.DetectActorInteractionUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import com.drama.app.ui.screens.dramadetail.components.getTypingText
 import kotlinx.coroutines.Job
@@ -26,11 +28,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import javax.inject.Inject
@@ -42,7 +40,11 @@ import javax.inject.Inject
  */
 data class DramaDetailUiState(
     // === 剧本标识 — 数据隔离核心 ===
-    val activeDramaId: String = "",          // 当前正在查看的剧本 ID（folder name）
+    val activeDramaId: String = "",
+
+    // === 初始化同步状态 — 防止竞态 ===
+    val initialSyncing: Boolean = true,
+    val initError: String? = null,
 
     // === 剧本内容 ===
     val theme: String = "",
@@ -56,6 +58,7 @@ data class DramaDetailUiState(
 
     // === 连接状态 ===
     val isWsConnected: Boolean = false,
+    val isReconnecting: Boolean = false,  // ★ 区分"正在重连"和"已降级到 REST"
     val error: String? = null,
 
     // === 场景历史 D-18~D-20 ===
@@ -65,6 +68,9 @@ data class DramaDetailUiState(
 
     // === 保存操作 D-23 ===
     val showSaveDialog: Boolean = false,
+
+    // === 大纲确认 ===
+    val outlineSummary: String = "",
 
     // === 演员面板 D-01~D-04 ===
     val actors: List<ActorInfo> = emptyList(),
@@ -85,16 +91,16 @@ class DramaDetailViewModel @Inject constructor(
     private val dramaRepository: DramaRepository,
     private val webSocketManager: WebSocketManager,
     private val serverPreferences: ServerPreferences,
+    private val detectActorInteraction: DetectActorInteractionUseCase,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
-    /**
-     * 当前活跃的剧本标识符。
-     * 来自导航参数，用于：
-     * 1. 数据隔离判断（防止不同剧本事件串台）
-     * 2. 日志追踪
-     * 3. 未来可扩展为请求参数
-     */
+    companion object {
+        private const val TAG = "DramaDetailViewModel"
+    }
+
     private val activeDramaId: String = savedStateHandle["dramaId"] ?: ""
+    /** 从创建页进入时为 true，跳过 loadDrama（后端已是当前活跃剧本） */
+    private val skipLoad: Boolean = savedStateHandle["skipLoad"] ?: false
 
     private val _uiState = MutableStateFlow(DramaDetailUiState())
     val uiState: StateFlow<DramaDetailUiState> = _uiState.asStateFlow()
@@ -108,147 +114,137 @@ class DramaDetailViewModel @Inject constructor(
     private var pollingJob: Job? = null
     private var replyPollJob: Job? = null
     private var lastKnownScene: Int = 0
+    // ★ 修复：防止重组导致的连接抖动
+    private var hasCalledConnectWebSocket = false
 
     init {
-        // ★ 核心：初始化时完全重置状态 + 设置 dramaId
         resetAllState(activeDramaId)
+        performInitSync()
+    }
 
-        // ★★★ 关键修复：先调 POST /drama/load 切换服务端上下文到当前剧本 ★★★
-        // 后端所有 API（status/cast/scenes/chat）都是基于"当前活跃剧本"返回数据的。
-        // 如果不等 loadDrama 完成就去 loadInitialStatus，服务端仍返回上一个操作的剧本数据（如"南阳三子"），
-        // 导致：创建新剧本后跳转看到旧剧本的内容和演员。
-        if (activeDramaId.isNotBlank()) {
-            viewModelScope.launch {
-                switchToDramaAndWait(activeDramaId)
-                // loadDrama 完成后，再依次初始化其他模块（严格顺序）
-                loadInitialStatus()
-                connectWebSocket()
-                startPolling()
+    /**
+     * 执行初始化同步。
+     *
+     * - 从列表进入（skipLoad=false）：需要 loadDrama 切换后端活跃剧本
+     * - 从创建页进入（skipLoad=true）：后端已是当前活跃剧本，直接加载状态即可
+     *
+     * 失败时设置 initError，阻止后续流程，UI 显示重试按钮。
+     */
+    private fun performInitSync() {
+        viewModelScope.launch {
+            if (activeDramaId.isNotBlank() && !skipLoad) {
+                val success = switchToDramaAndWait(activeDramaId)
+                if (!success) {
+                    _uiState.update { it.copy(
+                        initialSyncing = false,
+                        initError = "切换剧本失败，请检查网络后重试",
+                    ) }
+                    return@launch
+                }
             }
-        } else {
-            // 无 dramaId 时降级处理（理论上不会走到这里）
+            _uiState.update { it.copy(initialSyncing = false, initError = null) }
+
+            // ★ 核心优化：loadInitialStatus 和 connectWebSocket 并行启动
+            // 之前是串行：先等 REST 状态加载完，再连接 WS → 浪费 0.5-2 秒
+            // 现在并行：两者同时启动，WS 复用连接时几乎瞬时完成
             loadInitialStatus()
-            connectWebSocket()
+            if (!hasCalledConnectWebSocket) {
+                hasCalledConnectWebSocket = true
+                connectWebSocket()
+            }
             startPolling()
         }
     }
 
-    /**
-     * 切换服务端活跃剧本上下文 — 同步等待版本（带超时）
-     *
-     * 调用 POST /drama/load 告诉后端"我们要操作哪个剧本了"，并**等待其完成**。
-     * 这是解决"创建新剧本跳转到旧剧本数据"的核心方法。
-     *
-     * @return true 表示成功（或可忽略的失败），false 表示需要降级处理
-     */
+    /** 重试初始化同步（用户点击重试按钮时调用） */
+    fun retryInit() {
+        _uiState.update { it.copy(initialSyncing = true, initError = null) }
+        performInitSync()
+    }
+
+    // ============================================================
+    // 初始化与状态管理
+    // ============================================================
+
     private suspend fun switchToDramaAndWait(dramaId: String): Boolean {
         return try {
             dramaRepository.loadDrama(dramaId)
-                .onSuccess {
-                    // loadDrama 成功，服务端已切换到目标剧本
-                }
-                .onFailure { e ->
-                    // 即使 loadDrama 失败也继续（可能新剧本尚未有存档）
-                    // 后续 getDramaStatus 会获取当前状态作为降级
-                }
             true
         } catch (e: Exception) {
             false
         }
     }
 
-    /**
-     * 切换服务端活跃剧本上下文（异步版本，供 returnToCurrentScene 等场景使用）
-     */
     private fun switchToDrama(dramaId: String) {
-        viewModelScope.launch {
-            switchToDramaAndWait(dramaId)
-        }
+        viewModelScope.launch { switchToDramaAndWait(dramaId) }
     }
 
-    /**
-     * 完全重置所有状态为初始值，并设置新的 dramaId。
-     * 此方法是数据隔离的核心——每次进入新剧本时调用，
-     * 确保不会看到上一个剧本的气泡、演员、场景历史等。
-     */
     private fun resetAllState(dramaId: String) {
         bubbleCounter = 0
         lastKnownScene = 0
         replyPollJob?.cancel()
         replyPollJob = null
-
-        _uiState.value = DramaDetailUiState(
-            activeDramaId = dramaId,
-        )
+        _uiState.value = DramaDetailUiState(activeDramaId = dramaId)
     }
 
     private fun loadInitialStatus() {
         viewModelScope.launch {
             dramaRepository.getDramaStatus()
                 .onSuccess { status ->
+                    // ★ 修复：当 skipLoad=true 但后端返回的 theme 与 activeDramaId 不匹配时，
+                    // 说明热重载或竞态导致后端状态漂移到旧剧本，需要主动 switchToDrama 修正
+                    if (activeDramaId.isNotBlank() && status.theme.isNotBlank()
+                        && status.theme.trim() != activeDramaId.trim()
+                        && !status.theme.contains(activeDramaId)
+                        && !activeDramaId.contains(status.theme)
+                    ) {
+                        val corrected = switchToDramaAndWait(activeDramaId)
+                        if (corrected) {
+                            // 重新获取状态
+                            dramaRepository.getDramaStatus()
+                                .onSuccess { correctedStatus ->
+                                // ★ isWsConnected 由 connectionState Flow 驱动，不在此处设置
+                                _uiState.update { it.copy(
+                                    theme = correctedStatus.theme,
+                                    currentScene = correctedStatus.current_scene,
+                                    arcProgress = correctedStatus.arc_progress,
+                                    timePeriod = correctedStatus.time_period,
+                                    outlineSummary = correctedStatus.outline_summary,
+                                ) }
+                                    if (correctedStatus.current_scene > 0) {
+                                        lastKnownScene = correctedStatus.current_scene
+                                        loadSceneBubbles(correctedStatus.current_scene, "init_")
+                                    }
+                                    // ★ 修复：无论 num_actors 是否为 0，都尝试预加载演员面板
+                                    // 创建后进入时后端可能短暂返回 0，但演员数据实际已存在
+                                    preloadActorPanel()
+                                }
+                            return@launch
+                        }
+                        // ★ 修复：switchToDrama 失败时不可静默使用旧状态，必须报错
+                        _uiState.update { it.copy(
+                            initialSyncing = false,
+                            initError = "后端当前为「${status.theme}」而非「$activeDramaId」，且切换失败。请返回列表重新进入。",
+                        ) }
+                        return@launch
+                    }
+
+                    // ★ isWsConnected 由 connectionState Flow 驱动，不在此处设置
+                    // REST 轮询成功不代表 WS 已连接，避免 ConnectionBanner 闪烁
                     _uiState.update { it.copy(
                         theme = status.theme,
                         currentScene = status.current_scene,
-                        isWsConnected = true,
                         arcProgress = status.arc_progress,
                         timePeriod = status.time_period,
+                        outlineSummary = status.outline_summary,
                     ) }
-                    // 加载完基础状态后，加载当前场景的已有对话内容
                     if (status.current_scene > 0) {
                         lastKnownScene = status.current_scene
-                        loadExistingBubbles(status.current_scene)
+                        loadSceneBubbles(status.current_scene, "init_")
                     }
-                    // ★ 自动预加载演员面板数据
-                    // 这样用户点击演员按钮时无需等待网络请求
-                    if (status.num_actors > 0) {
-                        preloadActorPanel()
-                    }
-                }
-        }
-    }
-
-    /**
-     * 加载已存在的对话气泡（用于剧本恢复或首次加载）
-     */
-    private fun loadExistingBubbles(sceneNumber: Int) {
-        viewModelScope.launch {
-            dramaRepository.getSceneDetail(sceneNumber)
-                .onSuccess { detail ->
-                    val existingBubbles = mutableListOf<SceneBubble>()
-
-                    // 添加场景分隔线
-                    existingBubbles.add(SceneBubble.SceneDivider(
-                        id = "init_div_$sceneNumber",
-                        sceneNumber = sceneNumber,
-                        sceneTitle = detail.title,
-                    ))
-
-                    // 添加旁白
-                    if (detail.narration.isNotBlank()) {
-                        existingBubbles.add(SceneBubble.Narration(
-                            id = "init_${sceneNumber}_n",
-                            text = detail.narration,
-                        ))
-                    }
-
-                    // 添加所有已有对话
-                    for ((idx, d) in detail.dialogue.withIndex()) {
-                        val actorName = d["actor_name"]?.jsonPrimitive?.contentOrNull ?: ""
-                        val text = d["text"]?.jsonPrimitive?.contentOrNull ?: ""
-                        val emotion = d["emotion"]?.jsonPrimitive?.contentOrNull ?: ""
-                        if (actorName.isNotBlank() && text.isNotBlank()) {
-                            existingBubbles.add(SceneBubble.Dialogue(
-                                id = "init_${sceneNumber}_d$idx",
-                                actorName = actorName,
-                                text = text,
-                                emotion = emotion,
-                            ))
-                        }
-                    }
-
-                    if (existingBubbles.size > 1) { // 超过分隔线本身
-                        _uiState.update { it.copy(bubbles = existingBubbles) }
-                    }
+                    // ★ 修复：无论 num_actors 是否为 0，都尝试预加载演员面板
+                    // 从创建页进入时后端可能短暂返回 0，但演员数据实际已存在
+                    preloadActorPanel()
                 }
         }
     }
@@ -258,22 +254,39 @@ class DramaDetailViewModel @Inject constructor(
     // ============================================================
 
     fun connectWebSocket() {
-        // 先断开旧连接（防止多剧本同时监听同一 WS 导致事件串台）
         disconnectWebSocketSafely()
-
         wsJob?.cancel()
         connectionStateJob?.cancel()
 
-        wsJob = viewModelScope.launch {
-            val config = serverPreferences.serverConfig.first() ?: return@launch
-            webSocketManager.onReconnected = {
-                refreshStatus()
+        // ★ 核心修复：检测 WS 是否已连接（从创建页复用），避免断连闪烁
+        val isAlreadyConnected = webSocketManager.connectionState.value
+
+        // 设置回调（无论是否复用连接都需要）
+        webSocketManager.onReconnected = {
+            onWsReconnected()
+        }
+        webSocketManager.onPermanentFailure = {
+            Log.w(TAG, "WS permanent failure, degrading to REST mode")
+            _uiState.update { it.copy(isWsConnected = false) }
+        }
+
+        if (isAlreadyConnected) {
+            // ★ 复用已有连接：直接开始 collect 事件，无需重新 connect()
+            // 这是从创建页导航过来的场景，WS 物理连接仍然活跃
+            Log.i(TAG, "WS already connected, reusing existing connection")
+            wsJob = viewModelScope.launch {
+                webSocketManager.events
+                    .catch { e -> _uiState.update { it.copy(isWsConnected = false, error = e.message) } }
+                    .collect { event -> handleWsEvent(event) }
             }
-            webSocketManager.connect(config.ip, config.port, config.token, config.baseUrl)
-                .catch { e ->
-                    _uiState.update { it.copy(isWsConnected = false, error = e.message) }
-                }
-                .collect { event -> handleWsEvent(event) }
+        } else {
+            // 正常流程：建立新的 WS 连接
+            wsJob = viewModelScope.launch {
+                val config = serverPreferences.serverConfig.first() ?: return@launch
+                webSocketManager.connect(config.ip, config.port, config.token, config.baseUrl)
+                    .catch { e -> _uiState.update { it.copy(isWsConnected = false, error = e.message) } }
+                    .collect { event -> handleWsEvent(event) }
+            }
         }
 
         connectionStateJob = viewModelScope.launch {
@@ -281,16 +294,23 @@ class DramaDetailViewModel @Inject constructor(
                 _uiState.update { it.copy(isWsConnected = connected) }
             }
         }
+
+        // 收集 isReconnecting 状态，让 UI 可以区分"正在重连"和"已降级到 REST"
+        viewModelScope.launch {
+            webSocketManager.isReconnecting.collect { reconnecting ->
+                _uiState.update { it.copy(isReconnecting = reconnecting) }
+            }
+        }
     }
 
-    /**
-     * 安全断开 WS 连接（仅断开监听，不关闭全局单例连接）
-     * 用于切换剧本时停止接收旧事件
-     */
     private fun disconnectWebSocketSafely() {
         wsJob?.cancel()
         wsJob = null
+        connectionStateJob?.cancel()
+        connectionStateJob = null
         webSocketManager.onReconnected = null
+        // ★ 修复：断开时重置标志，允许后续重新连接
+        hasCalledConnectWebSocket = false
     }
 
     // ============================================================
@@ -302,104 +322,108 @@ class DramaDetailViewModel @Inject constructor(
         pollingJob = viewModelScope.launch {
             while (true) {
                 kotlinx.coroutines.delay(3000)
-                if (!_uiState.value.isWsConnected) {
-                    pollStatus()
-                }
+                if (!_uiState.value.isWsConnected) pollStatus()
             }
         }
     }
 
     private fun pollStatus() {
         viewModelScope.launch {
-            dramaRepository.getDramaStatus()
-                .onSuccess { status ->
-                    _uiState.update { it.copy(
-                        theme = status.theme,
-                        currentScene = status.current_scene,
-                        arcProgress = status.arc_progress,
-                        timePeriod = status.time_period,
-                    ) }
+                dramaRepository.getDramaStatus()
+                    .onSuccess { status ->
+                        // ★ isWsConnected 由 connectionState Flow 驱动，不在此处设置
+                        _uiState.update { it.copy(
+                            theme = status.theme,
+                            currentScene = status.current_scene,
+                            arcProgress = status.arc_progress,
+                            timePeriod = status.time_period,
+                            outlineSummary = status.outline_summary,
+                        ) }
                     if (status.current_scene > lastKnownScene) {
                         lastKnownScene = status.current_scene
-                        loadNewSceneBubbles(status.current_scene)
-                    }
-                }
-        }
-    }
-
-    private fun loadNewSceneBubbles(sceneNumber: Int) {
-        viewModelScope.launch {
-            dramaRepository.getSceneDetail(sceneNumber)
-                .onSuccess { detail ->
-                    val newBubbles = mutableListOf<SceneBubble>()
-                    if (detail.narration.isNotBlank()) {
-                        newBubbles.add(SceneBubble.Narration(
-                            id = "poll_${sceneNumber}_n",
-                            text = detail.narration,
-                        ))
-                    }
-                    for ((idx, d) in detail.dialogue.withIndex()) {
-                        val actorName = d["actor_name"]?.jsonPrimitive?.contentOrNull ?: ""
-                        val text = d["text"]?.jsonPrimitive?.contentOrNull ?: ""
-                        val emotion = d["emotion"]?.jsonPrimitive?.contentOrNull ?: ""
-                        newBubbles.add(SceneBubble.Dialogue(
-                            id = "poll_${sceneNumber}_d$idx",
-                            actorName = actorName,
-                            text = text,
-                            emotion = emotion,
-                        ))
-                    }
-                    if (newBubbles.isNotEmpty()) {
-                        val divider = SceneBubble.SceneDivider(
-                            id = "poll_div_$sceneNumber",
-                            sceneNumber = sceneNumber,
-                        )
-                        _uiState.update { it.copy(
-                            bubbles = it.bubbles + divider + newBubbles,
-                            isTyping = false,
-                            isProcessing = false,
-                            stormPhase = null,
-                        ) }
+                        loadSceneBubbles(status.current_scene, "poll_")
                     }
                 }
         }
     }
 
     // ============================================================
-    // WS 事件处理（含 dramaId 隐式隔离）
+    // WS 事件处理
     // ============================================================
+
+    /**
+     * 将换行符转换为 Markdown 支持的格式
+     * 单个 \n 转换为双 \n\n，以支持 Markdown 段落分隔
+     */
+    private fun normalizeLineBreaks(text: String): String {
+        return text.replace("\\n", "\n\n")
+    }
 
     private fun handleWsEvent(event: WsEventDto) {
-        // 过滤 replay 消息
         if (event.type == "replay") return
 
-        // 数据隔离防护：
-        // 由于后端 WS 事件不携带 dramaId，我们通过以下方式隐式隔离：
-        // 1. 每个 DramaDetailViewModel 有独立的状态流
-        // 2. 当用户离开此屏幕时，wsJob 被取消，不再接收任何事件
-        // 3. 进入新屏幕时 resetAllState() 清空旧数据
-        //
-        // 因此只要用户不在两个剧本间快速切换（backStack 中保留多个实例），
-        // 就不会出现串台。如果确实需要严格隔离，后端需在 WS 事件中加入 drama_id 字段。
+        // 历史查看模式下，不处理实时 WS 事件，防止干扰历史数据展示
+        if (_uiState.value.viewingHistoryScene != null) return
+
+        // ★ 新增：director_log 事件 — 显示后端详细进度（创建演员等）
+        if (event.type == "director_log") {
+            val msg = event.data["message"]?.jsonPrimitive?.contentOrNull
+            if (!msg.isNullOrBlank()) {
+                // 更新 stormPhase 显示进度，不添加到 bubbles
+                _uiState.update { it.copy(stormPhase = msg) }
+            }
+            return
+        }
 
         when (event.type) {
+            // ★ 修复：narration 事件 — 仅在 response 阶段（text 非空）创建气泡
             "narration" -> {
+                val text = event.data["text"]?.jsonPrimitive?.contentOrNull ?: ""
+
+                if (text.isBlank()) {
+                    // call 阶段：只更新 typing 指示
+                    _uiState.update { it.copy(isTyping = true, typingText = "旁白正在讲述...") }
+                    return
+                }
+
                 _uiState.update { it.copy(isTyping = false) }
+                val normalizedText = normalizeLineBreaks(text)
+                if (normalizedText.isNotBlank()) {
+                    val bubble = SceneBubble.Narration(
+                        id = "b_${bubbleCounter++}",
+                        text = normalizedText,
+                        avatarType = SceneBubble.AvatarType.DIRECTOR,
+                    )
+                    _uiState.update { it.copy(bubbles = it.bubbles + bubble, typingText = "AI 正在思考...") }
+                }
             }
+
             "dialogue" -> {
                 val actorName = event.data["actor_name"]?.jsonPrimitive?.contentOrNull ?: ""
+                val text = event.data["text"]?.jsonPrimitive?.contentOrNull ?: ""
                 val emotion = event.data["emotion"]?.jsonPrimitive?.contentOrNull ?: ""
-                _uiState.update { it.copy(isTyping = false) }
 
-                // ★ 智能互动检测：判断此发言是否为对其他角色的回复
-                // 检查前一个气泡是否为不同角色的对话
+                // ★ 核心修复：仅当 text 非空时才创建气泡
+                // 后端 event_mapper 对同一个 tool 会发出两次 dialogue 事件：
+                //   1. function_call 阶段：text=""（仅标记 actor_name，typing 指示）
+                //   2. function_response 阶段：text=完整对话内容（此时才创建气泡）
+                if (text.isBlank()) {
+                    // call 阶段：只更新 typing 指示，不创建气泡
+                    _uiState.update { it.copy(isTyping = true, typingText = "${actorName}正在说话...") }
+                    return
+                }
+
+                _uiState.update { it.copy(isTyping = false) }
+                val normalizedText = normalizeLineBreaks(text)
+
                 val lastBubble = _uiState.value.bubbles.lastOrNull()
-                val interactionBubble = tryDetectActorInteraction(
+                val interactionBubble = detectActorInteraction(
                     currentActor = actorName,
-                    text = event.data["text"]?.jsonPrimitive?.contentOrNull ?: "",
+                    text = normalizedText,
                     emotion = emotion,
                     lastBubble = lastBubble,
                     eventType = "dialogue",
+                    bubbleCounter = bubbleCounter++,
                 )
 
                 if (interactionBubble != null) {
@@ -408,77 +432,128 @@ class DramaDetailViewModel @Inject constructor(
                     val bubble = SceneBubble.Dialogue(
                         id = "b_${bubbleCounter++}",
                         actorName = actorName,
-                        text = event.data["text"]?.jsonPrimitive?.contentOrNull ?: "",
+                        text = normalizedText,
                         emotion = emotion,
+                        avatarType = SceneBubble.AvatarType.ACTOR,
                     )
                     _uiState.update { it.copy(bubbles = it.bubbles + bubble) }
                 }
             }
+
             "end_narration" -> {
                 val text = event.data["text"]?.jsonPrimitive?.contentOrNull ?: ""
-                if (text.isNotBlank()) {
-                    val bubble = SceneBubble.Narration(id = "b_${bubbleCounter++}", text = text)
+                val normalizedText = normalizeLineBreaks(text)
+                if (normalizedText.isNotBlank()) {
+                    val bubble = SceneBubble.Narration(
+                        id = "b_${bubbleCounter++}",
+                        text = normalizedText,
+                        avatarType = SceneBubble.AvatarType.DIRECTOR,
+                    )
                     _uiState.update { it.copy(bubbles = it.bubbles + bubble) }
                 }
             }
+
             "scene_end" -> {
                 val sceneNum = event.data["scene_number"]?.jsonPrimitive?.intOrNull ?: 0
                 val sceneTitle = event.data["scene_title"]?.jsonPrimitive?.contentOrNull ?: ""
                 val divider = SceneBubble.SceneDivider(id = "b_${bubbleCounter++}", sceneNumber = sceneNum, sceneTitle = sceneTitle)
-                _uiState.update { it.copy(
-                    bubbles = it.bubbles + divider,
-                    currentScene = sceneNum,
-                ) }
+                _uiState.update { it.copy(bubbles = it.bubbles + divider, currentScene = sceneNum) }
             }
+
             "tension_update" -> {
                 val score = event.data["tension_score"]?.jsonPrimitive?.intOrNull ?: 0
                 _uiState.update { it.copy(tensionScore = score) }
             }
+
             "typing" -> {
                 val toolName = event.data["tool"]?.jsonPrimitive?.contentOrNull
-                val text = getTypingText(toolName)
-                _uiState.update { it.copy(isTyping = true, typingText = text) }
+                val typingText = getTypingText(toolName)
+                _uiState.update { it.copy(isTyping = true, typingText = typingText) }
             }
+
             "error" -> {
                 val msg = event.data["message"]?.jsonPrimitive?.contentOrNull ?: "Unknown error"
                 _uiState.update { it.copy(isTyping = false, error = msg) }
                 viewModelScope.launch { _events.emit(DramaDetailEvent.ShowSnackbar(msg)) }
             }
+
             "storm_discover" -> _uiState.update { it.copy(stormPhase = "发现新视角...") }
             "storm_research" -> _uiState.update { it.copy(stormPhase = "深入研究...") }
-            "storm_outline" -> _uiState.update { it.copy(stormPhase = "综合构思大纲...") }
-            "scene_start" -> _uiState.update { it.copy(stormPhase = null, isTyping = false) }
-            "actor_chime_in" -> {
-                // CHAT-07: 角色主动插话 — 优先渲染为互动气泡
-                val actorName = event.data["actor_name"]?.jsonPrimitive?.contentOrNull ?: ""
-                _uiState.update { it.copy(isTyping = false) }
-                val text = event.data["text"]?.jsonPrimitive?.contentOrNull
-                if (text != null && text.isNotBlank()) {
-                    val lastBubble = _uiState.value.bubbles.lastOrNull()
-                    val interactionBubble = tryDetectActorInteraction(
-                        currentActor = actorName,
-                        text = text,
-                        emotion = "",
-                        lastBubble = lastBubble,
-                        eventType = "chime_in",
-                    )
-                    if (interactionBubble != null) {
-                        _uiState.update { it.copy(bubbles = it.bubbles + interactionBubble) }
-                    } else {
-                        val bubble = SceneBubble.Dialogue(
-                            id = "chime_${bubbleCounter++}",
-                            actorName = actorName,
-                            text = text,
-                        )
-                        _uiState.update { it.copy(bubbles = it.bubbles + bubble) }
-                    }
+            "storm_outline" -> {
+                // ★ 修复：解析大纲事件数据，显示大纲摘要
+                val msg = event.data["message"]?.jsonPrimitive?.contentOrNull ?: ""
+                val numActs = event.data["num_acts"]?.jsonPrimitive?.intOrNull ?: 0
+                _uiState.update { it.copy(
+                    stormPhase = if (msg.isNotBlank()) msg else "大纲已完成（${numActs}幕），等待确认...",
+                ) }
+            }
+            "scene_start" -> {
+                _uiState.update { it.copy(stormPhase = null, isTyping = false) }
+                preloadActorPanel()
+            }
+
+            // ★ 新增：command_echo 事件 — 后端回显用户指令
+            // 前端在 sendCommand/sendChatMessage 中已自行添加用户气泡，
+            // 此事件仅作为确认（避免重复添加气泡），更新 stormPhase 显示当前操作
+            "command_echo" -> {
+                val command = event.data["command"]?.jsonPrimitive?.contentOrNull ?: ""
+                if (command.isNotBlank()) {
+                    _uiState.update { it.copy(stormPhase = "执行: $command") }
                 }
             }
+
+            "actor_created" -> {
+                // 演员创建事件 — 清除 stormPhase，重新加载演员面板
+                val actorName = event.data["actor_name"]?.jsonPrimitive?.contentOrNull ?: ""
+                _uiState.update { it.copy(stormPhase = null) }
+                preloadActorPanel()
+            }
+
+            "cast_update" -> {
+                // 演员阵容更新 — 重新加载演员面板
+                preloadActorPanel()
+            }
+
+            "actor_chime_in" -> {
+                val actorName = event.data["actor_name"]?.jsonPrimitive?.contentOrNull ?: ""
+                val text = event.data["text"]?.jsonPrimitive?.contentOrNull ?: ""
+
+                // ★ 修复：仅当 text 非空时才创建气泡（同 dialogue 逻辑）
+                if (text.isBlank()) {
+                    _uiState.update { it.copy(isTyping = true, typingText = "${actorName}想要发言...") }
+                    return
+                }
+
+                _uiState.update { it.copy(isTyping = false) }
+                val normalizedText = normalizeLineBreaks(text)
+                val lastBubble = _uiState.value.bubbles.lastOrNull()
+                val interactionBubble = detectActorInteraction(
+                    currentActor = actorName,
+                    text = normalizedText,
+                    emotion = "",
+                    lastBubble = lastBubble,
+                    eventType = "chime_in",
+                    bubbleCounter = bubbleCounter++,
+                )
+                if (interactionBubble != null) {
+                    _uiState.update { it.copy(bubbles = it.bubbles + interactionBubble) }
+                } else {
+                    val bubble = SceneBubble.Dialogue(
+                        id = "chime_${bubbleCounter++}",
+                        actorName = actorName,
+                        text = normalizedText,
+                        avatarType = SceneBubble.AvatarType.ACTOR,
+                    )
+                    _uiState.update { it.copy(bubbles = it.bubbles + bubble) }
+                }
+            }
+
             "save_confirm" -> {
                 val msg = event.data["message"]?.jsonPrimitive?.contentOrNull ?: "已保存"
                 _uiState.update { it.copy(isTyping = false) }
                 viewModelScope.launch { _events.emit(DramaDetailEvent.ShowSnackbar(msg)) }
             }
+
             "load_confirm" -> {
                 val msg = event.data["message"]?.jsonPrimitive?.contentOrNull ?: "已加载"
                 _uiState.update { it.copy(isTyping = false) }
@@ -488,84 +563,18 @@ class DramaDetailViewModel @Inject constructor(
     }
 
     // ============================================================
-    // ★ 角色互动智能检测
+    // 场景气泡加载（委托 Repository 层映射）
     // ============================================================
 
-    /**
-     * 智能检测角色间互动：判断当前发言是否应渲染为 ActorInteraction 气泡
-     *
-     * 判定规则：
-     * 1. 前一个气泡是不同角色的 Dialogue → 可能是回复（REPLY）
-     * 2. 事件类型为 actor_chime_in → 插话（CHIME_IN）
-     * 3. 文本包含引用性词汇（"你说的对"、"我不这么认为"等）→ 反驳或回复
-     * 4. 有明确的 target_actor 数据 → 直接使用
-     *
-     * @return 如果判定为互动则返回 ActorInteraction，否则返回 null
-     */
-    private fun tryDetectActorInteraction(
-        currentActor: String,
-        text: String,
-        emotion: String,
-        lastBubble: SceneBubble?,
-        eventType: String,  // "dialogue" | "chime_in"
-    ): SceneBubble.ActorInteraction? {
-        if (currentActor.isBlank() || text.isBlank()) return null
-
-        // 规则1：从 WS 事件数据中获取目标角色（如果后端提供了）
-        val explicitTarget = "" // 后续可扩展：event.data["target_actor"]?.contentOrNull
-
-        // 规则2：基于前一个气泡推断
-        var inferredTarget: String? = null
-        var interactionType: InteractionType? = null
-
-        when {
-            eventType == "chime_in" -> {
-                interactionType = InteractionType.CHIME_IN
-                // 插话时找最近发言的其他角色作为隐式目标
-                if (lastBubble is SceneBubble.Dialogue && lastBubble.actorName != currentActor) {
-                    inferredTarget = lastBubble.actorName
+    private fun loadSceneBubbles(sceneNumber: Int, prefix: String, includeDivider: Boolean = true) {
+        viewModelScope.launch {
+            dramaRepository.getSceneBubbles(sceneNumber, prefix, includeDivider)
+                .onSuccess { bubbles ->
+                    if (bubbles.isNotEmpty()) {
+                        _uiState.update { it.copy(bubbles = it.bubbles + bubbles) }
+                    }
                 }
-            }
-            lastBubble is SceneBubble.Dialogue && lastBubble.actorName != currentActor -> {
-                interactionType = InteractionType.REPLY
-                inferredTarget = lastBubble.actorName
-            }
-            lastBubble is SceneBubble.UserMessage && lastBubble.mention != null -> {
-                interactionType = InteractionType.REPLY
-                inferredTarget = lastBubble.mention
-            }
-            lastBubble is SceneBubble.ActorInteraction && lastBubble.fromActor != currentActor -> {
-                interactionType = InteractionType.REPLY
-                inferredTarget = lastBubble.fromActor
-            }
         }
-
-        // 规则3：文本语义分析 — 检测反驳/协商关键词
-        if (interactionType == InteractionType.REPLY) {
-            val counterKeywords = listOf("不对", "不是", "我不同意", "错了", "荒谬", "胡说",
-                "不认同", "反对", "但是", "然而", "可是")
-            val proposeKeywords = listOf("不如", "建议", "我们可以", "要不要", "也许应该",
-                "不如我们", "或许可以", "要不")
-            
-            if (counterKeywords.any { text.contains(it) }) {
-                interactionType = InteractionType.COUNTER
-            } else if (proposeKeywords.any { text.contains(it) }) {
-                interactionType = InteractionType.PROPOSE
-            }
-        }
-
-        // 综合确定目标角色
-        val finalTarget = explicitTarget ?: inferredTarget ?: return null
-
-        return SceneBubble.ActorInteraction(
-            id = "interaction_${bubbleCounter++}",
-            fromActor = currentActor,
-            toActor = finalTarget,
-            text = text,
-            emotion = emotion,
-            interactionType = interactionType ?: InteractionType.REPLY,
-            replyToText = (lastBubble as? SceneBubble.Dialogue)?.text?.take(50),
-        )
     }
 
     // ============================================================
@@ -592,26 +601,11 @@ class DramaDetailViewModel @Inject constructor(
 
     fun viewHistoryScene(sceneNumber: Int) {
         viewModelScope.launch {
-            dramaRepository.getSceneDetail(sceneNumber)
-                .onSuccess { detail ->
-                    val historyBubbles = mutableListOf<SceneBubble>()
-                    if (detail.narration.isNotBlank()) {
-                        historyBubbles.add(SceneBubble.Narration(id = "hist_${sceneNumber}_n", text = detail.narration))
-                    }
-                    for ((idx, d) in detail.dialogue.withIndex()) {
-                        val actorName = d["actor_name"]?.jsonPrimitive?.contentOrNull ?: ""
-                        val text = d["text"]?.jsonPrimitive?.contentOrNull ?: ""
-                        val emotion = d["emotion"]?.jsonPrimitive?.contentOrNull ?: ""
-                        historyBubbles.add(SceneBubble.Dialogue(
-                            id = "hist_${sceneNumber}_d$idx",
-                            actorName = actorName,
-                            text = text,
-                            emotion = emotion,
-                        ))
-                    }
+            dramaRepository.getSceneBubbles(sceneNumber, "hist_", includeDivider = false)
+                .onSuccess { bubbles ->
                     _uiState.update { it.copy(
                         viewingHistoryScene = sceneNumber,
-                        bubbles = historyBubbles,
+                        bubbles = bubbles,
                         showHistorySheet = false,
                     ) }
                 }
@@ -619,10 +613,11 @@ class DramaDetailViewModel @Inject constructor(
     }
 
     fun returnToCurrentScene() {
-        // 返回当前场景时重置为实时气泡列表
         _uiState.update { it.copy(viewingHistoryScene = null) }
-        // 重新确认服务端上下文 + 重新连接 WS 以继续接收实时更新
         switchToDrama(activeDramaId)
+        // ★ 修复：从历史场景返回时，重新连接 WebSocket
+        // hasCalledConnectWebSocket 已在 disconnectWebSocketSafely 中重置
+        disconnectWebSocketSafely()
         connectWebSocket()
     }
 
@@ -652,7 +647,7 @@ class DramaDetailViewModel @Inject constructor(
     }
 
     // ============================================================
-    // 演员面板 D-01~D-04
+    // 演员面板 D-01~D-04（委托 Repository 层合并）
     // ============================================================
 
     fun showActorDrawer() {
@@ -666,91 +661,23 @@ class DramaDetailViewModel @Inject constructor(
 
     private fun loadActorPanel() {
         viewModelScope.launch {
-            val castResult = dramaRepository.getCast()
-            val statusResult = dramaRepository.getCastStatus()
-
-            val mergedActors = mutableListOf<ActorInfo>()
-
-            castResult.onSuccess { cast ->
-                val statusMap = statusResult.getOrNull()?.actors ?: emptyMap()
-
-                for ((name, actorElement) in cast.actors) {
-                    val actorObj = (actorElement as? JsonObject)?.jsonObject ?: continue
-                    val role = actorObj["role"]?.jsonPrimitive?.contentOrNull ?: ""
-                    val personality = actorObj["personality"]?.jsonPrimitive?.contentOrNull ?: ""
-                    val background = actorObj["background"]?.jsonPrimitive?.contentOrNull ?: ""
-                    val emotions = actorObj["emotions"]?.jsonPrimitive?.contentOrNull ?: "neutral"
-                    val memorySummary = buildMemorySummary(actorObj)
-
-                    val a2aData = statusMap[name]
-                    val isRunning = (a2aData as? JsonObject)?.get("running")?.jsonPrimitive?.booleanOrNull ?: false
-                    val port = (a2aData as? JsonObject)?.get("port")?.jsonPrimitive?.intOrNull ?: 0
-
-                    mergedActors.add(ActorInfo(
-                        name = name,
-                        role = role,
-                        personality = personality,
-                        background = background,
-                        emotions = emotions,
-                        memorySummary = memorySummary,
-                        isA2ARunning = isRunning,
-                        a2aPort = port,
-                    ))
+            dramaRepository.getMergedCast()
+                .onSuccess { actors ->
+                    _uiState.update { it.copy(actors = actors, isActorLoading = false) }
                 }
-            }
-
-            _uiState.update { it.copy(actors = mergedActors, isActorLoading = false) }
+                .onFailure {
+                    _uiState.update { it.copy(isActorLoading = false) }
+                }
         }
     }
 
-    /**
-     * ★ 预加载演员面板数据 — 在剧本切换成功后自动调用
-     * 与 loadActorPanel() 逻辑相同，但不修改 showActorDrawer/isActorLoading 状态。
-     * 这样用户打开抽屉时数据已就绪，无需等待网络请求。
-     */
     private fun preloadActorPanel() {
         viewModelScope.launch {
-            val castResult = dramaRepository.getCast()
-            val statusResult = dramaRepository.getCastStatus()
-
-            val mergedActors = mutableListOf<ActorInfo>()
-
-            castResult.onSuccess { cast ->
-                val statusMap = statusResult.getOrNull()?.actors ?: emptyMap()
-
-                for ((name, actorElement) in cast.actors) {
-                    val actorObj = (actorElement as? JsonObject)?.jsonObject ?: continue
-                    val role = actorObj["role"]?.jsonPrimitive?.contentOrNull ?: ""
-                    val personality = actorObj["personality"]?.jsonPrimitive?.contentOrNull ?: ""
-                    val background = actorObj["background"]?.jsonPrimitive?.contentOrNull ?: ""
-                    val emotions = actorObj["emotions"]?.jsonPrimitive?.contentOrNull ?: "neutral"
-                    val memorySummary = buildMemorySummary(actorObj)
-
-                    val a2aData = statusMap[name]
-                    val isRunning = (a2aData as? JsonObject)?.get("running")?.jsonPrimitive?.booleanOrNull ?: false
-                    val port = (a2aData as? JsonObject)?.get("port")?.jsonPrimitive?.intOrNull ?: 0
-
-                    mergedActors.add(ActorInfo(
-                        name = name,
-                        role = role,
-                        personality = personality,
-                        background = background,
-                        emotions = emotions,
-                        memorySummary = memorySummary,
-                        isA2ARunning = isRunning,
-                        a2aPort = port,
-                    ))
+            dramaRepository.getMergedCast()
+                .onSuccess { actors ->
+                    _uiState.update { it.copy(actors = actors) }
                 }
-            }
-
-            // 仅更新 actors 数据，不改变 drawer 显示状态
-            _uiState.update { it.copy(actors = mergedActors) }
         }
-    }
-
-    private fun buildMemorySummary(actorObj: JsonObject): String {
-        val memoryArray = actorObj["memory"]?.jsonArray ?: return ""
-        return memoryArray.mapNotNull { it.jsonPrimitive.contentOrNull }.joinToString(" ").take(500)
     }
 
     // ============================================================
@@ -761,13 +688,29 @@ class DramaDetailViewModel @Inject constructor(
         viewModelScope.launch {
             dramaRepository.getDramaStatus()
                 .onSuccess { status ->
+                    // ★ isWsConnected 由 connectionState Flow 驱动，不在此处设置
                     _uiState.update { it.copy(
                         currentScene = status.current_scene,
                         arcProgress = status.arc_progress,
                         timePeriod = status.time_period,
-                        isWsConnected = true,
                     ) }
                 }
+        }
+    }
+
+    /**
+     * WS 重连成功后自动同步：重新 switchToDrama 确保服务端状态一致，
+     * 然后刷新状态与气泡数据。
+     */
+    private fun onWsReconnected() {
+        viewModelScope.launch {
+            // 重新切换到当前剧本，确保服务端 session 一致
+            // 但从创建页进入时后端已是当前活跃剧本，无需 loadDrama
+            if (activeDramaId.isNotBlank() && !skipLoad) {
+                switchToDramaAndWait(activeDramaId)
+            }
+            // 刷新全量状态（主题、场次、弧线等）
+            loadInitialStatus()
         }
     }
 
@@ -775,117 +718,119 @@ class DramaDetailViewModel @Inject constructor(
     // 命令发送
     // ============================================================
 
+    /**
+     * 发送命令。
+     *
+     * ★ 核心修复：所有命令都在会话中显示用户指令气泡，确保消息可追溯。
+     * WS 已连接时，回复由 WS 事件驱动；WS 断连时，通过 REST 轮询降级。
+     */
     fun sendCommand(text: String) {
         val commandType = CommandType.fromInput(text)
-        _uiState.update { it.copy(isProcessing = true) }
+
+        // ★ 显示用户指令气泡（除 /next 和 /end 外，这些是控制命令）
+        val displayText = when (commandType) {
+            CommandType.NEXT -> "/next — 推进下一场"
+            CommandType.END -> "/end — 落幕"
+            CommandType.ACTION -> {
+                val desc = text.removePrefix("/action").trim()
+                if (desc.isBlank()) return
+                desc  // 只显示描述部分，不显示 /action 前缀
+            }
+            CommandType.SPEAK -> {
+                val parts = text.removePrefix("/speak").trim().split(" ", limit = 2)
+                if (parts.size < 2 || parts[0].isBlank()) return
+                "@${parts[0]} ${parts[1]}"  // 显示为 @角色 情境 格式
+            }
+            CommandType.FREE_TEXT -> text.trim()
+        }
+
+        val userBubble = SceneBubble.UserMessage(
+            id = "cmd_${bubbleCounter++}",
+            text = displayText,
+            mention = if (commandType == CommandType.SPEAK) {
+                text.removePrefix("/speak").trim().split(" ", limit = 2).getOrNull(0)
+            } else null,
+        )
+        _uiState.update { it.copy(
+            isProcessing = true,
+            isTyping = true,
+            typingText = "思考中...",
+            bubbles = it.bubbles + userBubble,
+        ) }
+
         viewModelScope.launch {
             val result = when (commandType) {
                 CommandType.NEXT -> dramaRepository.nextScene()
                 CommandType.END -> dramaRepository.endDrama()
-                CommandType.ACTION -> {
-                    val desc = text.removePrefix("/action").trim()
-                    if (desc.isBlank()) {
-                        _uiState.update { it.copy(isProcessing = false) }
-                        return@launch
-                    }
-                    dramaRepository.userAction(desc)
-                }
+                CommandType.ACTION -> dramaRepository.userAction(text.removePrefix("/action").trim())
                 CommandType.SPEAK -> {
                     val parts = text.removePrefix("/speak").trim().split(" ", limit = 2)
-                    if (parts.size < 2 || parts[0].isBlank()) {
-                        _uiState.update { it.copy(isProcessing = false) }
-                        return@launch
-                    }
                     dramaRepository.actorSpeak(parts[0], parts[1])
                 }
                 CommandType.FREE_TEXT -> dramaRepository.userAction(text.trim())
             }
-            _uiState.update { it.copy(isProcessing = false) }
+
+            if (_uiState.value.isWsConnected) {
+                // WS 已连接：回复由 WS 事件驱动，REST 仅确认请求成功
+                _uiState.update { it.copy(isProcessing = false) }
+            } else {
+                // WS 断连：尝试从 REST 响应提取气泡作为降级
+                result.onSuccess { resp ->
+                    val respBubbles = extractBubblesFromCommandResponse(resp)
+                    if (respBubbles.isNotEmpty()) {
+                        _uiState.update { it.copy(
+                            bubbles = it.bubbles + respBubbles,
+                            isTyping = false,
+                            isProcessing = false,
+                        ) }
+                    } else {
+                        startReplyPolling()
+                        _uiState.update { it.copy(isProcessing = false) }
+                    }
+                }
+            }
+
             result.onFailure { e ->
-                _uiState.update { it.copy(error = e.message) }
+                _uiState.update { it.copy(isTyping = false, isProcessing = false, error = e.message) }
                 _events.emit(DramaDetailEvent.ShowSnackbar("命令失败：${e.message}"))
             }
         }
     }
 
-    // ============================================================
-    // 群聊消息发送 — 核心入口
-    // ============================================================
-
-    fun sendChatMessage(text: String, mention: String?) {
-        if (text.isBlank()) return
-
-        // 立即进入思考状态
-        _uiState.update { it.copy(isProcessing = true, isTyping = true, typingText = "思考中...") }
-
-        // 即时显示用户消息气泡
-        val userBubble = SceneBubble.UserMessage(
-            id = "user_${bubbleCounter++}",
-            text = text,
-            mention = mention,
-        )
-        _uiState.update { it.copy(bubbles = it.bubbles + userBubble) }
-
-        // 调用 /drama/chat API
-        viewModelScope.launch {
-            val result = dramaRepository.sendChatMessage(text, mention)
-
-            result.onSuccess { cmdResp ->
-                val respBubbles = extractBubblesFromCommandResponse(cmdResp)
-                if (respBubbles.isNotEmpty()) {
-                    _uiState.update { it.copy(
-                        bubbles = it.bubbles + respBubbles,
-                        isTyping = false,
-                        isProcessing = false,
-                    ) }
-                } else {
-                    if (!_uiState.value.isWsConnected) {
-                        startReplyPolling()
-                    }
-                    _uiState.update { it.copy(isProcessing = false) }
-                }
-            }.onFailure { e ->
-                _uiState.update {
-                    it.copy(isTyping = false, isProcessing = false, error = e.message)
-                }
-                _events.emit(DramaDetailEvent.ShowSnackbar("发送失败：${e.message}"))
-            }
-        }
-    }
-
     /**
-     * 从 CommandResponseDto 提取可渲染的气泡
+     * ★ 新增：从 CommandResponse 提取可渲染的 SceneBubble 列表（WS 断连降级用）
      */
-    private fun extractBubblesFromCommandResponse(
-        resp: com.drama.app.data.remote.dto.CommandResponseDto,
-    ): List<SceneBubble> {
+    private fun extractBubblesFromCommandResponse(resp: CommandResponseDto): List<SceneBubble> {
         val bubbles = mutableListOf<SceneBubble>()
 
         if (resp.final_response.isNotBlank() && resp.final_response.length > 5) {
             bubbles.add(SceneBubble.Narration(
-                id = "api_resp_n_${bubbleCounter++}",
-                text = resp.final_response.trim(),
+                id = "resp_n_${bubbleCounter++}",
+                text = normalizeLineBreaks(resp.final_response.trim()),
+                avatarType = SceneBubble.AvatarType.DIRECTOR,
             ))
         }
 
         for (result in resp.tool_results) {
-            val actorName = result["actor_name"]?.toString()?.removeSurrounding("\"")
-            val narrationText = result["narration"]?.toString()?.removeSurrounding("\"")
-                ?: result["formatted_narration"]?.toString()?.removeSurrounding("\"")
-            val dialogueText = result["text"]?.toString()?.removeSurrounding("\"")
-            val emotion = result["emotion"]?.toString()?.removeSurrounding("\"") ?: ""
+            val actorName = result["actor_name"]?.jsonPrimitive?.contentOrNull ?: ""
+            val dialogueText = result["text"]?.jsonPrimitive?.contentOrNull ?: ""
+            val narrationText = result["narration"]?.jsonPrimitive?.contentOrNull
+                ?: result["formatted_narration"]?.jsonPrimitive?.contentOrNull
+            val emotion = result["emotion"]?.jsonPrimitive?.contentOrNull ?: ""
 
-            if (!actorName.isNullOrBlank() && !dialogueText.isNullOrBlank()) {
+            if (actorName.isNotBlank() && dialogueText.isNotBlank()) {
                 bubbles.add(SceneBubble.Dialogue(
-                    id = "api_resp_d_${bubbleCounter++}",
+                    id = "resp_d_${bubbleCounter++}",
                     actorName = actorName,
-                    text = dialogueText,
+                    text = normalizeLineBreaks(dialogueText),
                     emotion = emotion,
+                    avatarType = SceneBubble.AvatarType.ACTOR,
                 ))
             } else if (!narrationText.isNullOrBlank() && narrationText.length > 3) {
                 bubbles.add(SceneBubble.Narration(
-                    id = "api_resp_tool_n_${bubbleCounter++}",
-                    text = narrationText,
+                    id = "resp_n_${bubbleCounter++}",
+                    text = normalizeLineBreaks(narrationText),
+                    avatarType = SceneBubble.AvatarType.DIRECTOR,
                 ))
             }
         }
@@ -893,9 +838,64 @@ class DramaDetailViewModel @Inject constructor(
         return bubbles
     }
 
+    // ============================================================
+    // 群聊消息发送（委托 Repository 返回 SceneBubble 列表）
+    // ============================================================
+
     /**
-     * WS 断连降级轮询
+     * 发送群聊消息。
+     *
+     * ★ 核心修复：消息源唯一化，避免 WS + REST 双重来源导致重复气泡。
+     *
+     * 策略：
+     * - WS 已连接：仅通过 WS 事件接收回复气泡，REST 响应仅用于确认请求成功
+     * - WS 未连接：使用 REST 响应中的 respBubbles 作为降级方案，辅以轮询
      */
+    fun sendChatMessage(text: String, mention: String?) {
+        if (text.isBlank()) return
+
+        _uiState.update { it.copy(isProcessing = true, isTyping = true, typingText = "思考中...") }
+
+        val userBubble = SceneBubble.UserMessage(
+            id = "user_${bubbleCounter++}",
+            text = text,
+            mention = mention,
+        )
+        _uiState.update { it.copy(bubbles = it.bubbles + userBubble) }
+
+        viewModelScope.launch {
+            val isWsConnected = _uiState.value.isWsConnected
+            dramaRepository.sendChatMessageAsBubbles(text, mention)
+                .onSuccess { respBubbles ->
+                    if (isWsConnected) {
+                        // ★ WS 已连接：REST 响应气泡丢弃，由 WS 事件驱动 UI
+                        // REST 仅用于确认请求已被后端接收，回复内容由 WS 推送
+                        _uiState.update { it.copy(isProcessing = false) }
+                    } else {
+                        // ★ WS 未连接：降级使用 REST 响应气泡
+                        if (respBubbles.isNotEmpty()) {
+                            _uiState.update { it.copy(
+                                bubbles = it.bubbles + respBubbles,
+                                isTyping = false,
+                                isProcessing = false,
+                            ) }
+                        } else {
+                            startReplyPolling()
+                            _uiState.update { it.copy(isProcessing = false) }
+                        }
+                    }
+                }
+                .onFailure { e ->
+                    _uiState.update { it.copy(isTyping = false, isProcessing = false, error = e.message) }
+                    _events.emit(DramaDetailEvent.ShowSnackbar("发送失败：${e.message}"))
+                }
+        }
+    }
+
+    // ============================================================
+    // WS 断连降级轮询
+    // ============================================================
+
     private fun startReplyPolling() {
         replyPollJob?.cancel()
         replyPollJob = viewModelScope.launch {
@@ -909,24 +909,22 @@ class DramaDetailViewModel @Inject constructor(
                     .onSuccess { status ->
                         if (status.current_scene > lastKnownScene) {
                             lastKnownScene = status.current_scene
-                            loadNewSceneBubbles(status.current_scene)
+                            loadSceneBubbles(status.current_scene, "poll_")
                             return@launch
                         }
                     }
 
                 val currentScene = _uiState.value.currentScene
                 if (currentScene > 0) {
-                    dramaRepository.getSceneDetail(currentScene)
-                        .onSuccess { detail ->
+                    dramaRepository.getSceneBubbles(currentScene, "poll_reply_", includeDivider = false)
+                        .onSuccess { sceneBubbles ->
                             val lastDialogueIdx = _uiState.value.bubbles.indexOfLast {
                                 it is SceneBubble.Dialogue || it is SceneBubble.Narration
                             }
                             val existingCount = if (lastDialogueIdx >= 0) lastDialogueIdx + 1 else 0
-                            val totalExpected = 1 + (detail.dialogue.size) +
-                                (if (detail.narration.isNotBlank()) 1 else 0)
 
-                            if (totalExpected > existingCount) {
-                                loadNewSceneBubbles(currentScene)
+                            if (sceneBubbles.size > existingCount) {
+                                loadSceneBubbles(currentScene, "poll_")
                                 return@launch
                             }
                         }
@@ -944,8 +942,7 @@ class DramaDetailViewModel @Inject constructor(
         connectionStateJob?.cancel()
         pollingJob?.cancel()
         replyPollJob?.cancel()
-        disconnectWebSocketSafely()
-        // 注意：不调用 webSocketManager.disconnect()，因为它是全局单例，
-        // 其他屏幕可能仍在使用。只取消当前 ViewModel 的订阅即可。
+        // ★ 修复：onCleared 时必须完整断开 WS，否则单例 WebSocketManager 会保留断开的连接
+        webSocketManager.disconnect()
     }
 }

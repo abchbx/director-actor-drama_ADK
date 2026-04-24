@@ -39,6 +39,9 @@ def _restore_session_state(session_service: InMemorySessionService):
     all state. This function reads the last saved state.json back into memory
     so that GET /drama/status returns correct data immediately.
 
+    Uses _active_theme marker file to determine which drama was active before
+    the reload. Falls back to latest mtime if marker is missing (legacy compat).
+
     CRITICAL: InMemorySessionService.get_session() returns a copy.deepcopy of
     the session, so writing to session.state["drama"] only modifies the copy.
     We must write to session_service.sessions[app][user][session_id].state
@@ -47,19 +50,35 @@ def _restore_session_state(session_service: InMemorySessionService):
     import json as _json
     from pathlib import Path
 
-    # Find the most recent state.json under app/dramas/
     dramas_dir = Path(__file__).resolve().parent.parent / "dramas"
     if not dramas_dir.exists():
         return
 
-    # Look for any state.json files; pick the one with latest mtime
-    candidates = list(dramas_dir.glob("*/state.json"))
-    if not candidates:
-        return
+    # Priority 1: Read _active_theme marker file to find the correct drama
+    active_theme_file = dramas_dir / "_active_theme"
+    target_state_file = None
 
-    best = max(candidates, key=lambda p: p.stat().st_mtime)
+    if active_theme_file.exists():
+        try:
+            active_theme = active_theme_file.read_text(encoding="utf-8").strip()
+            if active_theme:
+                from app.state_manager import _sanitize_name
+                candidate = dramas_dir / _sanitize_name(active_theme) / "state.json"
+                if candidate.exists():
+                    target_state_file = candidate
+                    logger.info(f"🔄 Restoring from _active_theme marker: '{active_theme}'")
+        except Exception as e:
+            logger.warning(f"Failed to read _active_theme marker: {e}")
+
+    # Priority 2: Fallback to latest mtime (legacy compat)
+    if target_state_file is None:
+        candidates = list(dramas_dir.glob("*/state.json"))
+        if not candidates:
+            return
+        target_state_file = max(candidates, key=lambda p: p.stat().st_mtime)
+
     try:
-        with open(best, "r", encoding="utf-8") as f:
+        with open(target_state_file, "r", encoding="utf-8") as f:
             saved_state = _json.load(f)
         theme = saved_state.get("theme", "")
         if not theme:
@@ -81,7 +100,7 @@ def _restore_session_state(session_service: InMemorySessionService):
         else:
             logger.warning(f"Could not find internal session for state restore")
     except Exception as e:
-        logger.warning(f"Failed to restore state from {best}: {e}")
+        logger.warning(f"Failed to restore state from {target_state_file}: {e}")
 
 
 @asynccontextmanager

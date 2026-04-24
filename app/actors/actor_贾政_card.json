@@ -1,0 +1,26 @@
+{
+  "name": "actor_贾政",
+  "description": "演员 贾政，角色：严父 · 荣国府老爷",
+  "url": "http://localhost:9096/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_贾政",
+      "name": "扮演贾政",
+      "description": "以贾政的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

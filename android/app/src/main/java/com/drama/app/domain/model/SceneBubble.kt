@@ -9,14 +9,28 @@ package com.drama.app.domain.model
  * - [UserMessage]: 用户发送的消息（右对齐）
  * - [ActorInteraction]: ★ 角色间互动对话（A 对 B 说...）— 清晰呈现角色互动过程
  * - [SceneDivider]: 场景分隔线
+ *
+ * 头像类型 [AvatarType]：
+ * - Director: 导演/旁白专属头像（特殊图标）
+ * - Actor: 演员头像（根据名称生成颜色一致的占位头像）
  */
 sealed class SceneBubble {
     abstract val id: String
+
+    /** 头像类型枚举 */
+    enum class AvatarType {
+        DIRECTOR,   // 导演/旁白
+        ACTOR,      // 演员
+        USER,       // 用户
+        SYSTEM,     // 系统消息
+    }
 
     /** 旁白 — 系统或导演的叙述文本，居中或特殊样式显示 */
     data class Narration(
         override val id: String,
         val text: String,
+        val avatarType: AvatarType = AvatarType.DIRECTOR,  // ★ 添加头像类型
+        val avatarUrl: String? = null,                     // ★ 头像 URL（可选）
     ) : SceneBubble()
 
     /** 单个角色发言 — 左对齐气泡，带头像和情绪标签 */
@@ -24,14 +38,18 @@ sealed class SceneBubble {
         override val id: String,
         val actorName: String,
         val text: String,
-        val emotion: String = "",       // D-10: 情绪标签
+        val emotion: String = "",                           // D-10: 情绪标签
+        val avatarType: AvatarType = AvatarType.ACTOR,      // ★ 添加头像类型
+        val avatarUrl: String? = null,                      // ★ 头像 URL（可选）
     ) : SceneBubble()
 
     /** 用户在群聊中发送的消息 — 右对齐显示 */
     data class UserMessage(
         override val id: String,
         val text: String,
-        val mention: String? = null,    // @提及的角色名（可为null）
+        val mention: String? = null,                        // @提及的角色名（可为null）
+        val avatarType: AvatarType = AvatarType.USER,        // ★ 添加头像类型
+        val avatarUrl: String? = null,                      // ★ 头像 URL（可选）
     ) : SceneBubble()
 
     /**
@@ -63,6 +81,7 @@ sealed class SceneBubble {
         val interactionType: InteractionType = InteractionType.REPLY,
         /** 附加的回复引用文本（可选，用于展示"回复了某句话"） */
         val replyToText: String? = null,
+        val avatarType: AvatarType = AvatarType.ACTOR,  // ★ 添加头像类型
     ) : SceneBubble()
 
     /** 场景分隔线 — 显示"第 N 场 · 标题" */

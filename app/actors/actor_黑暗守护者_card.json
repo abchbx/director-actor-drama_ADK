@@ -1,0 +1,26 @@
+{
+  "name": "actor_黑暗守护者",
+  "description": "演员 黑暗守护者，角色：对立面/守护者",
+  "url": "http://localhost:9071/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_黑暗守护者",
+      "name": "扮演黑暗守护者",
+      "description": "以黑暗守护者的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

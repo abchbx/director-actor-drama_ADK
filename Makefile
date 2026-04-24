@@ -23,6 +23,18 @@ playground:
 	@echo "==============================================================================="
 	uv run adk web . --port 8501 --reload_agents
 
+# Launch REST API server (for Android client)
+# ★ --reload-exclude 排除 actors 目录：动态生成的 actor 文件不应触发服务重载
+api:
+	@echo "==============================================================================="
+	@echo "| 🎭 Starting Director-Actor Drama API server...                             |"
+	@echo "|                                                                             |"
+	@echo "| 📡 API: http://0.0.0.0:8000/api/v1                                         |"
+	@echo "| 🔌 WebSocket: ws://0.0.0.0:8000/api/v1/ws                                 |"
+	@echo "| ⚡ Hot reload enabled (excluding app/actors/)                               |"
+	@echo "==============================================================================="
+	uv run uvicorn app.api.app:create_app --factory --host 0.0.0.0 --port 8000 --reload --reload-exclude 'app/actors/*'
+
 # Launch CLI interactive mode
 cli:
 	@echo "==============================================================================="

@@ -1,0 +1,26 @@
+{
+  "name": "actor_隐士·姜婆婆",
+  "description": "演员 隐士·姜婆婆，角色：导师",
+  "url": "http://localhost:9040/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_隐士_姜婆婆",
+      "name": "扮演隐士·姜婆婆",
+      "description": "以隐士·姜婆婆的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

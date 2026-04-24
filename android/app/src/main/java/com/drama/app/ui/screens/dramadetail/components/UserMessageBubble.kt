@@ -21,6 +21,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.drama.app.domain.model.SceneBubble
+import com.drama.app.ui.components.MarkdownText
 
 /** 用户消息气泡 — 右对齐，渐变 primary 色背景，带微妙阴影 */
 @Composable
@@ -48,8 +49,7 @@ fun UserMessageBubble(bubble: SceneBubble.UserMessage) {
                 }
             }
 
-            // 消息气泡 — 右对齐，圆角，带微妙阴影和渐变感
-            // ★ 支持 \n 换行：Compose Text 默认不解析 \n
+            // 消息气泡 — 右对齐，圆角，带微妙阴影和渐变感，支持 Markdown 渲染
             Surface(
                 shape = RoundedCornerShape(
                     topStart = 18.dp,
@@ -61,17 +61,13 @@ fun UserMessageBubble(bubble: SceneBubble.UserMessage) {
                 shadowElevation = 1.dp,
                 tonalElevation = 2.dp,
             ) {
-                val textStyle = MaterialTheme.typography.bodyLarge.copy(
-                    lineHeight = 22.sp,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = buildAnnotatedString {
-                        bubble.text.split("\n").forEachIndexed { idx, line ->
-                            if (idx > 0) append("\n")
-                            withStyle(textStyle.toSpanStyle()) { append(line) }
-                        }
-                    },
+                // ★ Markdown 渲染：支持 **加粗**、*斜体*、`代码`、[链接](url) 等
+                MarkdownText(
+                    markdown = bubble.text,
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        lineHeight = 22.sp,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    ),
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 11.dp),
                 )
             }

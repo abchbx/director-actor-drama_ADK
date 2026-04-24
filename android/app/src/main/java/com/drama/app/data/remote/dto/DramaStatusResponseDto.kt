@@ -13,6 +13,8 @@ data class DramaStatusResponseDto(
     val drama_folder: String = "",
     val arc_progress: List<ArcProgressDto> = emptyList(),
     val time_period: String = "",
+    val has_outline: Boolean = false,
+    val outline_summary: String = "",
 )
 
 @Serializable

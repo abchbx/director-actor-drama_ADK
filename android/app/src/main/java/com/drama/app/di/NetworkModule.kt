@@ -1,10 +1,11 @@
 package com.drama.app.di
 
 import android.content.Context
-import com.drama.app.data.local.ServerPreferences
+import com.drama.app.data.local.SecureStorage
 import com.drama.app.data.remote.api.AuthApiService
 import com.drama.app.data.remote.api.DramaApiService
 import com.drama.app.data.remote.interceptor.AuthInterceptor
+import com.drama.app.data.remote.interceptor.NetworkExceptionInterceptor
 import com.drama.app.data.remote.ws.WebSocketManager
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import dagger.Module
@@ -36,20 +37,25 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideAuthInterceptor(serverPreferences: ServerPreferences): AuthInterceptor {
-        return AuthInterceptor(serverPreferences)
+    fun provideAuthInterceptor(secureStorage: SecureStorage): AuthInterceptor {
+        return AuthInterceptor(secureStorage)
     }
 
     @Provides
     @Singleton
     fun provideOkHttpClient(
         authInterceptor: AuthInterceptor,
+        networkExceptionInterceptor: NetworkExceptionInterceptor,
     ): OkHttpClient {
+        val loggingInterceptor = HttpLoggingInterceptor().apply {
+            level = HttpLoggingInterceptor.Level.BODY
+            // 安全加固：redact Authorization header，防止明文 token 泄露到日志
+            redactHeader("Authorization")
+        }
         return OkHttpClient.Builder()
             .addInterceptor(authInterceptor)
-            .addInterceptor(HttpLoggingInterceptor().apply {
-                level = HttpLoggingInterceptor.Level.BODY
-            })
+            .addInterceptor(networkExceptionInterceptor)
+            .addInterceptor(loggingInterceptor)
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(300, TimeUnit.SECONDS)  // LLM calls can take minutes
             .writeTimeout(30, TimeUnit.SECONDS)
@@ -64,7 +70,7 @@ object NetworkModule {
     fun provideRetrofit(
         okHttpClient: OkHttpClient,
         json: Json,
-        serverPreferences: ServerPreferences,
+        serverPreferences: com.drama.app.data.local.ServerPreferences,
     ): Retrofit {
         val config = runBlocking { serverPreferences.serverConfig.first() }
         val baseUrl = config?.toApiBaseUrl()

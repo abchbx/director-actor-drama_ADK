@@ -64,9 +64,20 @@ async def get_drama_scene_detail(
     if scene_number < 1 or scene_number > 999:
         raise HTTPException(status_code=400, detail="scene_number must be between 1 and 999")
     theme = tool_context.state.get("drama", {}).get("theme", "")
+    current_scene = tool_context.state.get("drama", {}).get("current_scene", 0)
     from app.state_manager import get_scene_detail
     result = get_scene_detail(theme, scene_number)
     if result.get("status") == "error":
+        # T-17-09: If requesting current_scene and not found, return default scene object
+        # This handles the race condition where scene file hasn't been generated yet
+        if scene_number == current_scene and current_scene > 0:
+            return SceneDetailResponse(
+                scene_number=scene_number,
+                title=f"第{scene_number}场",
+                narration="",
+                dialogue=[],
+                raw={"status": "pending", "message": "Scene content not yet generated"},
+            )
         raise HTTPException(status_code=404, detail=result["message"])
     return SceneDetailResponse(
         scene_number=scene_number,
@@ -159,6 +170,7 @@ async def list_all_dramas(_auth: bool = Depends(require_auth)):
 async def delete_drama(
     folder: str,
     _auth: bool = Depends(require_auth),
+    tool_context=Depends(get_tool_context),
 ):
     """Delete a drama by folder name."""
     # T-17-01: Validate folder name to prevent path traversal.
@@ -172,6 +184,24 @@ async def delete_drama(
     result = delete_drama_fn(folder)
     if result.get("status") == "error":
         raise HTTPException(status_code=404, detail=result["message"])
+
+    # ★ 修复：如果删除的是当前活跃剧本，清除 session 中的状态，
+    # 防止下次 GET /drama/status 仍返回已删除剧本的数据
+    drama_state = tool_context.state.get("drama", {})
+    if drama_state.get("theme"):
+        from app.state_manager import _sanitize_name
+        active_folder = _sanitize_name(drama_state["theme"])
+        if active_folder == folder:
+            tool_context.state["drama"] = {}
+            # 同时清除 _active_theme 标记文件
+            from pathlib import Path
+            active_theme_file = Path(__file__).resolve().parent.parent.parent / "dramas" / "_active_theme"
+            if active_theme_file.exists():
+                try:
+                    active_theme_file.unlink()
+                except OSError:
+                    pass
+
     return DeleteDramaResponse(**result)
 
 

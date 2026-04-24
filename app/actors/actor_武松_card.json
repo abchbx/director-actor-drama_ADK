@@ -1,0 +1,26 @@
+{
+  "name": "actor_武松",
+  "description": "演员 武松，角色：行者 / 都头",
+  "url": "http://localhost:9090/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_武松",
+      "name": "扮演武松",
+      "description": "以武松的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

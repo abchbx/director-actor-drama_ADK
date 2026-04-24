@@ -1,0 +1,26 @@
+{
+  "name": "actor_方青云",
+  "description": "演员 方青云，角色：对手 · 后起之秀",
+  "url": "http://localhost:9014/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_方青云",
+      "name": "扮演方青云",
+      "description": "以方青云的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

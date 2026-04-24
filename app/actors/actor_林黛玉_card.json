@@ -1,0 +1,26 @@
+{
+  "name": "actor_林黛玉",
+  "description": "演员 林黛玉，角色：女主 · 贾府表小姐",
+  "url": "http://localhost:9079/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_林黛玉",
+      "name": "扮演林黛玉",
+      "description": "以林黛玉的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

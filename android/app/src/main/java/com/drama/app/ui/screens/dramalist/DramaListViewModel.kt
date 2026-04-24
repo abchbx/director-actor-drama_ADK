@@ -60,15 +60,13 @@ class DramaListViewModel @Inject constructor(
         viewModelScope.launch {
             dramaRepository.deleteDrama(folder)
                 .onSuccess {
-                    _uiState.update { state ->
-                        state.copy(
-                            dramas = state.dramas.filter { d -> d.folder != folder },
-                            selectedFolders = state.selectedFolders - folder,
-                        )
-                    }
+                    // ★ 修复：从服务器重新刷新列表，确保前后端一致
+                    loadDramas()
                     _events.emit(DramaListEvent.ShowSnackbar("已删除：$folder"))
                 }
-                .onFailure { e -> _events.emit(DramaListEvent.ShowSnackbar("删除失败：${e.message}")) }
+                .onFailure { e ->
+                    _events.emit(DramaListEvent.ShowSnackbar("删除失败：${e.message}"))
+                }
         }
     }
 

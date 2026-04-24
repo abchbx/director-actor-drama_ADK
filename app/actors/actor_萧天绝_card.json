@@ -1,0 +1,26 @@
+{
+  "name": "actor_萧天绝",
+  "description": "演员 萧天绝，角色：主角 · 武林奇才",
+  "url": "http://localhost:9031/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_萧天绝",
+      "name": "扮演萧天绝",
+      "description": "以萧天绝的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

@@ -65,7 +65,11 @@ async def websocket_endpoint(websocket: WebSocket):
     _validate_ws_token(websocket)
 
     manager = websocket.app.state.connection_manager
-    accepted = await manager.connect(websocket)
+    try:
+        accepted = await manager.connect(websocket)
+    except Exception as e:
+        logger.error("WS accept/replay failed: %s", e, exc_info=True)
+        return
     if not accepted:
         return  # Connection rejected — limit exceeded
 
@@ -73,17 +77,38 @@ async def websocket_endpoint(websocket: WebSocket):
     heartbeat_task = asyncio.create_task(manager.heartbeat(websocket))
 
     try:
+        # ★ 修复：使用 while True 保持连接，配合心跳检测确保连接活性
+        # 当心跳超时时循环也会退出，确保异常情况下的资源清理
         while True:
-            data = await websocket.receive_json()
+            try:
+                # ★ 修复：添加 60s 接收超时，防止永远阻塞
+                # 结合心跳机制，客户端应该在 30s 内响应 ping
+                # 如果 60s 内没有任何消息（包括 pong），说明连接已死
+                data = await asyncio.wait_for(
+                    websocket.receive_json(),
+                    timeout=60.0
+                )
+            except asyncio.TimeoutError:
+                # 60s 无消息，检查是否超时（心跳 task 会处理 ping/pong）
+                # 此处仅记录日志，不主动断开
+                logger.debug("WS receive timeout (60s no message), waiting...")
+                continue
+            except (ValueError, KeyError) as e:
+                # ★ 修复：非 JSON 消息（如二进制帧、无效 JSON）不应导致连接断开
+                # ValueError: JSON 解析失败
+                # KeyError: receive_json() 收到二进制帧时 message["text"] 不存在
+                # 继续循环等待下一条消息，而不是断开连接
+                logger.warning("WS received non-JSON message, ignoring: %s", e)
+                continue
             msg_type = data.get("type", "")
             if msg_type == "pong":
                 manager.record_pong(websocket)
             # Ignore unknown message types — WS is pure receiver (D-11)
     except WebSocketDisconnect:
-        pass
-    except Exception:
+        logger.info("WS client disconnected normally")
+    except Exception as e:
         # Unexpected error — still clean up
-        pass
+        logger.warning("WS receive loop error: %s", e, exc_info=True)
     finally:
         heartbeat_task.cancel()
         try:

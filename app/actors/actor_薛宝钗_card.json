@@ -1,0 +1,26 @@
+{
+  "name": "actor_薛宝钗",
+  "description": "演员 薛宝钗，角色：女配 · 薛家千金",
+  "url": "http://localhost:9039/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_薛宝钗",
+      "name": "扮演薛宝钗",
+      "description": "以薛宝钗的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

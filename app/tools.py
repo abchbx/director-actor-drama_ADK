@@ -201,6 +201,16 @@ def start_drama(theme: str, tool_context: ToolContext) -> dict:
     if result["status"] == "success":
         set_drama_status("setup", tool_context)
 
+        # T-17-10: Initialize basic scene 1 record so Android clients don't get 404
+        from app.state_manager import update_script
+        update_script(
+            scene_number=1,
+            scene_title="序幕",
+            scene_description="戏剧开始",
+            content="",
+            tool_context=tool_context,
+        )
+
         # Initialize shared AsyncClient (lazy init — ensures first call creates it)
         get_shared_client()
 
@@ -489,8 +499,9 @@ async def actor_speak(
     formatted_lines = []
     formatted_lines.append(f"🎭 {actor_name}（{role_label} · {emotion_cn}）：")
 
-    # Check if dialogue is an error — format differently
-    if actor_dialogue.startswith("[ERROR:"):
+    # ★ 核心修复：检查对话是否为错误 — 错误时返回 status=error 而非 success
+    is_error = actor_dialogue.startswith("[ERROR:")
+    if is_error:
         formatted_lines.append(f"  ⚠️ {actor_dialogue}")
     else:
         # Split by newlines and indent each line as dialogue
@@ -503,7 +514,7 @@ async def actor_speak(
     formatted_dialogue = "\n".join(formatted_lines)
 
     return {
-        "status": "success",
+        "status": "error" if is_error else "success",
         "actor_name": actor_name,
         "role": role_label,
         "personality": actor_data.get("personality", ""),
@@ -733,6 +744,49 @@ def next_scene(tool_context: ToolContext) -> dict:
     Returns:
         dict with the new scene info, transition info, and format guidance.
     """
+    state = tool_context.state.get("drama", {})
+    scene_num = state.get("current_scene", 0)
+    scenes = state.get("scenes", [])
+
+    # Anti-skip guard: if current_scene > 0 but no recorded scene data,
+    # the previous run timed out before write_scene. Don't advance;
+    # return current scene info so the director can finish it.
+    if scene_num > 0:
+        current_recorded = any(s.get("scene_number") == scene_num for s in scenes)
+        if not current_recorded:
+            transition = _extract_scene_transition(state)
+            parts = []
+            if transition["last_ending"]:
+                parts.append(f"上一场结局：{transition['last_ending']}")
+            if transition["actor_emotions"]:
+                emotions_str = "、".join(
+                    f"{name}（{emo}）" for name, emo in transition["actor_emotions"].items()
+                )
+                parts.append(f"角色情绪：{emotions_str}")
+            if transition["unresolved"]:
+                parts.append(f"未决事件：{'；'.join(transition['unresolved'][:3])}")
+            transition_text = "【上一场衔接】\n" + "\n".join(parts)
+            actor_names = list(state.get("actors", {}).keys())
+            actor_list = "、".join(actor_names) if actor_names else "（尚无演员）"
+            director_ctx = build_director_context(tool_context)
+            return {
+                "status": "success",
+                "current_scene": scene_num,
+                "is_first_scene": False,
+                "transition": transition,
+                "transition_text": transition_text,
+                "actors_available": actor_names,
+                "director_context": director_ctx,
+                "message": (
+                    f"▶️ 继续完成第 {scene_num} 场。\n\n"
+                    f"该场景尚未完整记录，请继续演出流程：\n"
+                    f"  ① director_narrate —— 描述本场环境\n"
+                    f"  ② actor_speak —— 让角色对话\n"
+                    f"  ③ write_scene —— 记录本场\n\n"
+                    f"当前可用演员: {actor_list}"
+                ),
+            }
+
     result = advance_scene(tool_context)
     state = tool_context.state.get("drama", {})
     scene_num = state.get("current_scene", 1)

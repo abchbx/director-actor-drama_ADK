@@ -43,7 +43,8 @@ fun DramaNavHost(
         composable<DramaCreate> {
             DramaCreateScreen(
                 onNavigateToDetail = { dramaId ->
-                    navController.navigate(DramaDetail(dramaId)) {
+                    // 从创建页进入：skipLoad=true，后端已是当前活跃剧本无需 loadDrama
+                    navController.navigate(DramaDetail(dramaId, skipLoad = true)) {
                         popUpTo<DramaList> { inclusive = false }
                         launchSingleTop = true
                     }
@@ -55,7 +56,7 @@ fun DramaNavHost(
         }
         composable<DramaDetail> { backStackEntry ->
             val args = backStackEntry.toRoute<DramaDetail>()
-            DramaDetailScreen(dramaId = args.dramaId)
+            DramaDetailScreen(dramaId = args.dramaId, skipLoad = args.skipLoad)
         }
     }
 }

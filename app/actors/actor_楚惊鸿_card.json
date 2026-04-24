@@ -1,0 +1,26 @@
+{
+  "name": "actor_楚惊鸿",
+  "description": "演员 楚惊鸿，角色：主角",
+  "url": "http://localhost:9032/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_楚惊鸿",
+      "name": "扮演楚惊鸿",
+      "description": "以楚惊鸿的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

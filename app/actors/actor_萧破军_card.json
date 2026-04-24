@@ -1,0 +1,26 @@
+{
+  "name": "actor_萧破军",
+  "description": "演员 萧破军，角色：暧昧势力",
+  "url": "http://localhost:9059/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_萧破军",
+      "name": "扮演萧破军",
+      "description": "以萧破军的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

@@ -84,33 +84,37 @@ def _get_model():
 
 
 # ============================================================================
-# Setup Agent: One-shot /start → discover → synthesize → create actors
+# Setup Agent: Quick outline generation — actors created later after user confirmation
 # ============================================================================
 _setup_agent = Agent(
     name="setup_agent",
     model=_get_model(),
-    instruction="""你是戏剧设定专家——负责从多视角探索主题，深入研究，合成大纲，创建角色。
+    instruction="""你是戏剧设定专家——负责快速分析主题、生成创作大纲。
 
-## ⚠️ 最高优先级：5步顺序执行（绝对不可跳过）
+## ⚠️ 最高优先级：4步顺序执行（生成大纲后停止，等待用户确认）
 
 **步骤1: 调用 start_drama(theme)**
+- 初始化剧本状态
 
 **步骤2: 调用 storm_discover_perspectives(theme)**
+- 发现核心叙事视角
 
 **步骤3: 对每个视角调用 storm_research_perspective(perspective_name=XXX, theme=theme)**
-- 至少研究3~5个核心视角（如主角、反派、社会、伦理等）
+- 至少研究2~3个核心视角
 - 每个视角一次调用
 
 **步骤4: 调用 storm_synthesize_outline(theme)**
-- 此步骤会将 drama_status 从 setup 变为 acting
+- 合成故事大纲
 
-**步骤5: 为每个主要角色调用 create_actor**
-- create_actor(actor_name=名字, role=身份, personality=性格, background=背景, knowledge_scope=知识范围)
-- 至少创建2~4个角色
+⚠️ 完成后**必须**向用户输出一份清晰的大纲摘要，包括：
+- 故事主线
+- 主要角色列表（名字+身份，此时还不需要创建演员）
+- 核心冲突
+- 然后**停止**，等待用户确认后再继续创建演员和演出。
 
-⚠️ 必须连续完成全部5步。中途不可停止输出文本回复。所有create_actor完成后才给出总结。""",
-    description="Setup Agent — 发现→研究→大纲→角色",
-    tools=[start_drama, storm_discover_perspectives, storm_research_perspective, storm_synthesize_outline, create_actor],
+绝对不要调用 create_actor！演员创建留到用户确认方向之后。""",
+    description="Setup Agent — 快速大纲生成，用户确认后再创建演员",
+    tools=[start_drama, storm_discover_perspectives, storm_research_perspective, storm_synthesize_outline],
 )
 
 
@@ -139,6 +143,14 @@ _INSTRUCTION_CORE = """⚠️ 无终点声明（修订）
 5. 回顾局势 → 可选调用 get_director_context() 审视全局
 
 ⚠️ 手动模式下：完成上述步骤后等待用户指令，不要自动推进下一场。
+
+## §0 演员创建协议（大纲确认后首次进入）
+如果当前 drama 没有演员（actors 为空），但 storm.outline 已存在：
+1. 阅读 storm.outline 中的角色设定
+2. 为每个主要角色调用 create_actor(actor_name=名字, role=身份, personality=性格, background=背景, knowledge_scope=知识范围)
+3. 所有角色创建完成后，调用 next_scene() 开始第一场戏
+4. 然后按正常演出流程执行（director_narrate → actor_speak → write_scene）
+⚠️ 用户发送"继续"/"开始"/"确认"等词语时，即表示同意大纲方向，开始创建演员。
 
 ⚠️ 衔接信息使用规则（不重复）：next_scene() 返回的 transition_text 已包含上一场的结局、情绪、未决事件——这是你的主信息源。只有需要全局弧线、多视角等宏观信息时，才调用 get_director_context()。两者信息不重复。
 
@@ -391,6 +403,7 @@ _improv_director = Agent(
         repair_contradiction,    # Phase 10
         advance_time,            # Phase 11
         detect_timeline_jump,    # Phase 11
+        create_actor,            # ★ 允许在演出阶段创建演员（大纲确认后）
         # Phase 12: Letta-inspired memory enhancements
         update_actor_block,
         show_actor_blocks,
@@ -411,49 +424,77 @@ class DramaRouter(BaseAgent):
     - actors exist → improv_director
     - no actors → setup_agent
     - Fallback (D-03) → improv_director (safest default)
+
+    ★ 核心修复：添加 invocation 去重，避免同一上下文被多次处理。
+    在 _run_async_impl 中跟踪已处理的 invocation_id，防止 ADK
+    在多步执行中重复路由到同一个子 agent。
     """
+
+    # ★ 核心修复：类级别去重集合，跟踪正在处理的 invocation
+    _active_invocations: set[str] = set()
 
     async def _run_async_impl(
         self, ctx: InvocationContext
     ) -> AsyncGenerator[Event, None]:
-        drama = ctx.session.state.get("drama", {})
-        actors = drama.get("actors", {})
-
-        # Extract user message
+        # ★ 核心修复：基于 session_id + user_content 生成 invocation 指纹
+        # 防止同一个用户命令被多次路由处理
         user_message = ""
         if ctx.user_content and ctx.user_content.parts:
             for part in ctx.user_content.parts:
                 text = getattr(part, 'text', None) or ''
                 user_message += text.lower()
 
-        # D-02: Auto-interrupt safety net — any non-/auto input clears remaining_auto_scenes
-        if drama.get("remaining_auto_scenes", 0) > 0:
-            if "/auto" not in user_message:
-                # User sent non-auto input during auto-advance → interrupt
-                ctx.session.state["drama"]["remaining_auto_scenes"] = 0
+        invocation_key = f"{ctx.session.id}:{user_message[:100]}"
+        if invocation_key in self._active_invocations:
+            import logging
+            logging.getLogger(__name__).warning(
+                "[DEDUP] Skipping duplicate invocation: %s", invocation_key[:60]
+            )
+            return  # 丢弃重复调用
+        self._active_invocations.add(invocation_key)
 
-        # Route: utility commands + Phase 5 new commands → improv_director
-        utility_commands = [
-            "/save", "/load", "/export", "/cast", "/status", "/list",
-            "/auto", "/steer", "/end", "/storm",  # Phase 5 additions
-        ]
-        force_improvise = any(cmd in user_message for cmd in utility_commands)
+        try:
+            drama = ctx.session.state.get("drama", {})
+            actors = drama.get("actors", {})
 
-        if force_improvise or (actors and len(actors) > 0):
-            agent = self._sub_agents_map.get("improv_director")
-        else:
-            agent = self._sub_agents_map.get("setup_agent")
+            # D-02: Auto-interrupt safety net — any non-/auto input clears remaining_auto_scenes
+            if drama.get("remaining_auto_scenes", 0) > 0:
+                if "/auto" not in user_message:
+                    # User sent non-auto input during auto-advance → interrupt
+                    ctx.session.state["drama"]["remaining_auto_scenes"] = 0
 
-        # D-03: Fallback to improv_director (safest default)
-        if agent is None:
-            agent = self._sub_agents_map.get("improv_director")
+            # Route: utility commands + Phase 5 new commands → improv_director
+            # CRITICAL: /start must ALWAYS go to setup_agent to reset state for new drama
+            utility_commands = [
+                "/save", "/load", "/export", "/cast", "/status", "/list",
+                "/auto", "/steer", "/end", "/storm",  # Phase 5 additions
+            ]
+            force_improvise = any(cmd in user_message for cmd in utility_commands)
+            is_start_command = "/start" in user_message
+            has_outline = bool(drama.get("storm", {}).get("outline"))
 
-        # Token-optimized instruction: dynamically assemble layers before run
-        if agent is not None and agent.name == "improv_director":
-            agent.instruction = _build_improv_instruction(drama, user_message)
+            if is_start_command:
+                agent = self._sub_agents_map.get("setup_agent")
+            elif force_improvise or (actors and len(actors) > 0) or has_outline:
+                # ★ 关键：大纲已存在（has_outline）但演员未创建时，进入 improv_director
+                # improv_director 会负责在用户确认后创建演员并开场
+                agent = self._sub_agents_map.get("improv_director")
+            else:
+                agent = self._sub_agents_map.get("setup_agent")
 
-        async for event in agent.run_async(ctx):
-            yield event
+            # D-03: Fallback to improv_director (safest default)
+            if agent is None:
+                agent = self._sub_agents_map.get("improv_director")
+
+            # Token-optimized instruction: dynamically assemble layers before run
+            if agent is not None and agent.name == "improv_director":
+                agent.instruction = _build_improv_instruction(drama, user_message)
+
+            async for event in agent.run_async(ctx):
+                yield event
+        finally:
+            # ★ 清理：invocation 完成后移除指纹，允许后续相同命令
+            self._active_invocations.discard(invocation_key)
 
     @property
     def _sub_agents_map(self) -> dict:

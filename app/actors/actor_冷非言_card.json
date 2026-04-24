@@ -1,0 +1,26 @@
+{
+  "name": "actor_冷非言",
+  "description": "演员 冷非言，角色：宿敌 · 另一高手",
+  "url": "http://localhost:9017/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_冷非言",
+      "name": "扮演冷非言",
+      "description": "以冷非言的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

@@ -96,11 +96,16 @@ class DramaCreateViewModel @Inject constructor(
     @Volatile private var startTimeMs = 0L
     /** 用户请求创建的主题名，用于导航时作为 dramaId */
     @Volatile private var creatingTheme: String = ""
+    /** 是否已通过轮询确认后端主题与 creatingTheme 匹配 */
+    @Volatile private var hasConfirmedThemeMatch = false
+    /** WS 是否已连接且收到至少一个事件 — 收到后停止轮询以避免风暴 */
+    @Volatile private var wsActive = false
 
     fun createDrama(theme: String) {
         if (theme.isBlank()) return
         startTimeMs = System.currentTimeMillis()
         navigated = false
+        hasConfirmedThemeMatch = false
         creatingTheme = theme.trim()  // ★ 记录用户输入的主题，用于后续验证
         _uiState.update {
             it.copy(
@@ -123,9 +128,13 @@ class DramaCreateViewModel @Inject constructor(
             webSocketManager.connect(config.ip, config.port, config.token, config.baseUrl)
                 .catch { e ->
                     addLog("⚠️ WebSocket 连接失败: ${e.message}，降级为纯轮询模式")
+                    wsActive = false
                     // ★ 修复：WS 断连后不阻塞，轮询仍然可以触发导航
                 }
-                .collect { event -> handleStormEvent(event) }
+                .collect { event ->
+                    wsActive = true
+                    handleStormEvent(event)
+                }
         }
 
         // ── 2. REST API 调用：触发后端创建剧本（非阻塞） ──
@@ -144,6 +153,9 @@ class DramaCreateViewModel @Inject constructor(
                 }
                 .onFailure { e ->
                     addLog("创建请求失败：${e.message}")
+                    // ★ 关键：请求失败后必须停止所有后台任务，防止轮询/超时泄漏
+                    navigated = true
+                    cancelJobsOnly()
                     _uiState.update {
                         it.copy(
                             isCreating = false,
@@ -171,6 +183,19 @@ class DramaCreateViewModel @Inject constructor(
             delay(FORCE_NAVIGATE_TIMEOUT_SECONDS.toLong() * 1000L)
             if (!navigated) {
                 val elapsed = getElapsedSeconds()
+                // ★ 防护：如果从未确认主题匹配，说明后端可能仍未创建新会话，不允许强制导航
+                if (!hasConfirmedThemeMatch) {
+                    addLog("⏰ 已等待 ${formatElapsed(elapsed)}，但后端尚未确认新剧本主题")
+                    _uiState.update {
+                        it.copy(
+                            isCreating = false,
+                            error = "创建超时：后端未能在 ${FORCE_NAVIGATE_TIMEOUT_SECONDS} 秒内初始化新剧本，请检查后端日志后重试",
+                            stormPhase = null,
+                        )
+                    }
+                    cancelJobsOnly()
+                    return@launch
+                }
                 addLog("⏰ 已等待 ${formatElapsed(elapsed)}，强制进入详情页...")
                 _uiState.update { it.copy(stormPhase = "正在进入剧本...") }
                 // 使用 creatingTheme 作为导航 ID，与 navigateToDetail 一致
@@ -178,6 +203,16 @@ class DramaCreateViewModel @Inject constructor(
                 navigateToDetail(navTarget)
             }
         }
+    }
+
+    /** 仅取消后台任务，不设置 navigated（用于超时失败场景） */
+    private fun cancelJobsOnly() {
+        wsJob?.cancel()
+        createJob?.cancel()
+        pollingJob?.cancel()
+        timerJob?.cancel()
+        wsActive = false
+        webSocketManager.disconnect()
     }
 
     /**
@@ -192,7 +227,11 @@ class DramaCreateViewModel @Inject constructor(
             var firstPoll = true
 
             while (isActive && !navigated) {
-                if (firstPoll) {
+                // ★ 修复轮询风暴：WS 已连接并收到事件时，大幅降低轮询频率（10秒）
+                // WS 断连或未收到事件时，保持原有2秒快速轮询
+                if (wsActive) {
+                    delay(10_000L)  // WS 活跃时 10 秒轮询一次（仅作为兜底确认）
+                } else if (firstPoll) {
                     firstPoll = false
                     delay(500L)  // 首次快速探测（500ms），因为轮询已提前启动
                 } else {
@@ -263,10 +302,11 @@ class DramaCreateViewModel @Inject constructor(
         // 后端 /start 是阻塞式的，在 LLM 完成之前 /drama/status 仍返回旧剧本数据。
         // 如果旧剧本恰好满足 isComplete 条件，不加此检查就会错误导航到旧会话。
         val isThemeMatch = if (creatingTheme.isNotBlank() && status.theme.isNotBlank()) {
-            // 精确匹配或包含匹配（后端可能对 theme 做了格式调整）
-            status.theme.trim() == creatingTheme.trim() ||
-                status.theme.contains(creatingTheme.trim()) ||
-                creatingTheme.contains(status.theme.trim())
+            // ★ 严格匹配：只允许精确匹配或后端 theme 以 creatingTheme 开头（带后缀）
+            // 禁止使用双向 contains，避免 "南阳三子" 与 "南阳三子外传" 误判
+            val ct = creatingTheme.trim()
+            val st = status.theme.trim()
+            st == ct || st.startsWith(ct)
         } else {
             // 如果 creatingTheme 或 status.theme 为空，无法判断，保守放行
             // （空 theme 说明后端还在初始化，不会有 isComplete 的问题）
@@ -278,6 +318,9 @@ class DramaCreateViewModel @Inject constructor(
             // 后端还没开始处理（theme 为空说明 LLM 还没调用 start_drama 工具）
             status.theme.isBlank() -> "连接服务器..." to "导演已收到创作指令..."
             !isThemeMatch -> "等待新剧本初始化..." to "检测到旧剧本数据，等待新剧本就绪..."
+            // ★ 新增：大纲已就绪但演员未创建时，提示用户确认
+            ds == STATUS_SETUP && status.has_outline && status.num_actors == 0 ->
+                "大纲已就绪，等待确认..." to "故事大纲已生成，等待用户确认方向..."
             ds == STATUS_SETUP -> when {
                 status.num_actors == 0 -> "导演正在构思世界观..." to "正在构建世界观设定..."
                 else -> "正在生成角色..." to "正在生成演员阵容（${status.num_actors} 人）..."
@@ -303,19 +346,30 @@ class DramaCreateViewModel @Inject constructor(
             return
         }
 
+        // 标记已通过轮询确认主题匹配（scene_start 导航需要此标志）
+        hasConfirmedThemeMatch = true
+
         // ── 判定是否完成 ──
         // 条件说明（从严格到宽松）：
         //   A) 已有至少一场戏（无论什么状态）→ 可进入聊天
         //   B) acting 状态且演员已就绪 → 可进入聊天
         //   C) setup 状态但演员已创建完成（STORM cast 完成，等待 /next 推进首场）→ 允许进入
         //   D) 已落幕 → 进入查看结局
-        //   E) ★ 兜底：已等待超过60秒 且 状态非空(后端有响应) 且 有演员 → 说明STORM基本完成
+        //   E) ★ 大纲已就绪（无论有无演员）→ 进入详情页（improv_director 会在用户确认后创建演员）
+        //   F) ★ 兜底：已等待超过60秒 且 状态非空(后端有响应) 且 有演员 → 说明STORM基本完成
         val isComplete = when {
             status.current_scene >= 1 -> true
             ds == STATUS_ACTING && status.num_actors > 0 -> true
             ds == STATUS_SETUP && status.num_actors > 0 -> true
             ds == STATUS_ENDED -> true
-            // ★ 新增兜底条件：长时间等待 + 后端有数据 + 有演员 → 强制认为可进入
+            // ★ 核心修复：大纲已就绪（has_outline=true）时，即使无演员也允许进入详情页
+            // setup_agent 生成大纲后状态切换为 acting，但不创建演员（等待用户确认）
+            // 前端进入 DramaDetailScreen 后，用户发送确认消息，improv_director 会创建演员
+            status.has_outline -> {
+                addLog("📋 大纲已就绪，进入确认页面")
+                true
+            }
+            // ★ 兜底条件：长时间等待 + 后端有数据 + 有演员 → 强制认为可进入
             currentElapsed >= 60 && status.num_actors > 0 && ds.isNotBlank() -> {
                 addLog("⚡ 兜底导航: 已等待${currentElapsed}s, actors=${status.num_actors}, status=$ds")
                 true
@@ -356,6 +410,7 @@ class DramaCreateViewModel @Inject constructor(
         createJob?.cancel()
         pollingJob?.cancel()
         timerJob?.cancel()
+        wsActive = false
         webSocketManager.disconnect()
         navigated = true
         addLog("用户取消创作")
@@ -367,12 +422,15 @@ class DramaCreateViewModel @Inject constructor(
         navigated = true
         _uiState.update { it.copy(isCreating = false) }
 
-        // ★★★ 关键修复：导航到详情页之前，必须清理创建阶段的所有资源 ★★★
-        // 原因：
-        // 1. WebSocketManager 是全局单例，如果不断开，创建页的WS监听会继续运行
-        //    导致 STORM/scene_start 等事件泄漏到新的 DramaDetailViewModel
-        // 2. 轮询 job 不取消会持续消耗资源
-        // 3. DramaDetailScreen 会重新建立自己的 WS 连接和轮询
+        // ★★★ 核心修复：只取消本 VM 的事件收集 job，不断开 WS 物理连接 ★★★
+        // 原因：WebSocketManager 是全局单例，disconnect() 会关闭底层 TCP 连接。
+        // DramaDetailVM 初始化时再 connect() 需要重新握手，产生 1-3 秒的断连窗口，
+        // 导致 ConnectionBanner 闪烁"WebSocket 连接失败，已降级到 REST 轮询模式"。
+        //
+        // 新策略：
+        // 1. 只取消本 VM 的 collect job（wsJob），停止消费事件
+        // 2. 不断开 WS 物理连接，DramaDetailVM 可直接复用
+        // 3. DramaDetailVM.connectWebSocket() 会检测连接状态，已连接则直接开始 collect
         wsJob?.cancel()
         wsJob = null
         createJob?.cancel()
@@ -381,9 +439,8 @@ class DramaCreateViewModel @Inject constructor(
         pollingJob = null
         timerJob?.cancel()
         timerJob = null
-
-        // 断开 WebSocket 全局单例（DramaDetail 会重新 connect）
-        webSocketManager.disconnect()
+        wsActive = false
+        // ★ 不再调用 webSocketManager.disconnect()！
 
         viewModelScope.launch {
             _events.emit(DramaCreateEvent.NavigateToDetail(dramaId))
@@ -432,10 +489,22 @@ class DramaCreateViewModel @Inject constructor(
             // 同时更新当前状态文字
             _uiState.update { it.copy(stormPhase = logMsg) }
         }
+        // ★ 新增：storm_outline 事件表示大纲已生成，仅记录日志，不自动导航
+        // 导航由轮询的 isComplete 条件决定（需要演员已创建后才导航）
+        if (event.type == "storm_outline") {
+            addLog("📋 收到大纲完成信号，等待演员创建...")
+            return
+        }
+
         // scene_start 直接触发导航 — 使用记录的 theme 作为 navTarget
+        // ★ 防护：仅当后端状态已确认匹配当前创建主题时才导航，防止旧剧本事件误触发
         if (event.type == "scene_start") {
             addLog("收到首场演出信号")
-            // ★★★ 优先使用 creatingTheme，避免 "current" 导致 loadDrama 失败
+            // 强制等待一次状态确认：如果 creatingTheme 非空，则必须确认后端已切换到新主题
+            if (creatingTheme.isNotBlank() && !hasConfirmedThemeMatch) {
+                addLog("⚠️ 收到 scene_start 但尚未确认主题匹配，等待轮询验证...")
+                return
+            }
             val navTarget = creatingTheme.ifBlank { "current" }
             navigateToDetail(navTarget)
         }
@@ -458,6 +527,18 @@ class DramaCreateViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
-        cancelCreation()
+        // ★ 核心修复：如果已导航到详情页，不断开 WS（DetailVM 正在复用该连接）
+        // 只取消本 VM 的 collect job，WS 物理连接由 DetailVM 管理
+        if (navigated) {
+            wsJob?.cancel()
+            createJob?.cancel()
+            pollingJob?.cancel()
+            timerJob?.cancel()
+            wsActive = false
+            // ★ 不调用 webSocketManager.disconnect()！
+        } else {
+            // 用户手动退出或非导航场景，完整清理
+            cancelCreation()
+        }
     }
 }

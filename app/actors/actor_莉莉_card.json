@@ -1,0 +1,26 @@
+{
+  "name": "actor_莉莉",
+  "description": "演员 莉莉，角色：主角",
+  "url": "http://localhost:9057/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_莉莉",
+      "name": "扮演莉莉",
+      "description": "以莉莉的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

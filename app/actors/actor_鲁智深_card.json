@@ -1,0 +1,26 @@
+{
+  "name": "actor_鲁智深",
+  "description": "演员 鲁智深，角色：花和尚 / 提辖",
+  "url": "http://localhost:9068/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_鲁智深",
+      "name": "扮演鲁智深",
+      "description": "以鲁智深的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

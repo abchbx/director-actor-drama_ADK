@@ -1,0 +1,26 @@
+{
+  "name": "actor_林霜衣",
+  "description": "演员 林霜衣，角色：女主/医者",
+  "url": "http://localhost:9039/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_林霜衣",
+      "name": "扮演林霜衣",
+      "description": "以林霜衣的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}
