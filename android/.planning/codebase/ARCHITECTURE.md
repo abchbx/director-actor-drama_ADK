@@ -1,150 +1,140 @@
 # Architecture
 
-**Analysis Date:** 2026-04-24
+**Analysis Date:** 2026-04-25
 
 ## Pattern Overview
 
-**Overall:** Clean Architecture with MVVM (Model-View-ViewModel)
+**Overall:** Clean Architecture with MVVM (Model-ViewModel-View)
 
 **Key Characteristics:**
-- Unidirectional Data Flow: UI → ViewModel → Repository → API/WS → StateFlow → UI
-- Dual real-time strategy: WebSocket primary + REST polling fallback
-- Domain layer with repository interfaces (dependency inversion)
-- Hilt dependency injection throughout all layers
-- Jetpack Compose declarative UI with state hoisting
+- Unidirectional data flow: ViewModel emits `StateFlow<UiState>` → Compose UI collects and renders
+- Sealed class hierarchy for message types (`SceneBubble`) enables exhaustive `when` dispatch
+- Dual data source strategy: WebSocket (primary) + REST polling (fallback/degradation)
+- Repository layer maps DTOs → domain models, encapsulating business logic (bubble mapping, cast merging)
+- Single Activity, Compose Navigation with type-safe routes (`@Serializable` objects/data classes)
 
 ## Layers
 
-**UI Layer (Presentation):**
-- Purpose: Render UI state and capture user intent
+**UI Layer (Compose Screens + ViewModels):**
+- Purpose: Render UI state and handle user interactions
 - Location: `app/src/main/java/com/drama/app/ui/`
-- Contains: Composable screens, ViewModels, UI state classes, navigation
-- Depends on: Domain layer (repository interfaces, models, use cases)
-- Used by: Android framework (Activity)
+- Contains: Screen composables, ViewModels, UI state classes, event sealed classes
+- Depends on: Domain layer (models, repositories, use cases), Data layer (ConnectionState)
+- Used by: Nothing — this is the top layer
 
-**Domain Layer:**
-- Purpose: Define business models, repository contracts, and use cases
+**Domain Layer (Models + Repository Interfaces + Use Cases):**
+- Purpose: Define business models and contracts
 - Location: `app/src/main/java/com/drama/app/domain/`
-- Contains: Model classes (sealed classes, enums), repository interfaces, use case classes
+- Contains: `SceneBubble` sealed class, `ActorInfo`, `CommandType`, repository interfaces, `DetectActorInteractionUseCase`
 - Depends on: Nothing (pure Kotlin)
-- Used by: UI layer (ViewModels), Data layer (implementations)
+- Used by: UI layer, Data layer (implements interfaces)
 
-**Data Layer:**
-- Purpose: Implement repository interfaces, manage API/WS/network concerns
+**Data Layer (Repository Implementations + Remote/Local Data Sources):**
+- Purpose: Implement repository interfaces, manage API calls and local storage
 - Location: `app/src/main/java/com/drama/app/data/`
-- Contains: Repository implementations, API service interfaces, DTOs, WebSocket manager, interceptors, local storage
-- Depends on: Domain layer (repository interfaces), external libraries (Retrofit, OkHttp, DataStore)
-- Used by: UI layer (via Hilt-injected repository interfaces)
+- Contains: `DramaRepositoryImpl`, DTOs, `WebSocketManager`, `DramaSaveRepository`, API services
+- Depends on: Domain layer (implements interfaces), external libs (Retrofit, OkHttp, DataStore)
+- Used by: UI layer (via DI)
 
-**DI Layer:**
-- Purpose: Wire dependencies via Hilt modules
+**DI Layer (Hilt Modules):**
+- Purpose: Provide dependency injection bindings
 - Location: `app/src/main/java/com/drama/app/di/`
-- Contains: Hilt modules (NetworkModule, DataStoreModule, DramaModule)
-- Depends on: All layers
-- Used by: Hilt runtime
+- Contains: `NetworkModule`, `DramaModule`, `DataStoreModule`, `SavesDataStore`
+- Depends on: Data + Domain layers
 
 ## Data Flow
 
-**Script Creation Flow ("开始创作"):**
+**Chat Message Flow (WebSocket path — primary):**
 
-1. User types theme in `DramaCreateScreen` and taps "开始创作" button
-2. `DramaCreateViewModel.createDrama(theme)` invoked
-3. Three parallel operations launch:
-   - WebSocket connects via `WebSocketManager.connect()` → receives STORM progress events
-   - REST API call `dramaRepository.startDrama(theme)` → POST `/drama/start` (blocking, minutes-long)
-   - Polling loop starts: GET `/drama/status` every 2s (or 10s when WS active)
-4. Timer starts tracking elapsed seconds
-5. WS events (`storm_discover`, `storm_research`, `storm_outline`, `storm_cast`, `director_log`) update progress UI
-6. Polling checks theme match and completion conditions (has_outline, actors ready, scene started, acting status)
-7. On completion: `navigateToDetail()` emits event → UI navigates to `DramaDetailScreen`
-8. Before navigation: WS disconnected, all jobs cancelled, resources cleaned up
+1. User types message in `ChatInputBar` → calls `viewModel.sendChatMessage(text, mention)`
+2. ViewModel appends `SceneBubble.UserMessage` to `bubbles` list immediately (optimistic)
+3. ViewModel calls `dramaRepository.sendChatMessageAsBubbles(text, mention)` (REST POST)
+4. REST response bubbles are **discarded** when WS is connected (WS is the single source of truth)
+5. Server processes via ADK Runner → `event_mapper.py` maps tool calls to business events
+6. WebSocket pushes `WsEventDto` events (narration, dialogue, actor_chime_in, etc.)
+7. `WebSocketManager.events` Flow emits events → `handleWsEvent()` in ViewModel
+8. Each event type creates the appropriate `SceneBubble` subclass and appends to state
 
-**Chat/Conversation Flow:**
+**Chat Message Flow (REST fallback path — WS disconnected):**
 
-1. User types message in `ChatInputBar` (with optional @mention)
-2. `DramaDetailViewModel.sendChatMessage(text, mention)` invoked
-3. User message bubble immediately added to UI state
-4. REST API call `dramaRepository.sendChatMessageAsBubbles(text, mention)` → POST `/drama/chat`
-5. If response contains bubbles, they're appended to state
-6. If response empty (WS will deliver events), reply polling starts as fallback
-7. WS events (`dialogue`, `narration`, `actor_chime_in`, `tool_result`, `scene_end`) append bubbles in real-time
-8. `DetectActorInteractionUseCase` determines if consecutive actor dialogues should render as `ActorInteraction` bubbles
+1. Same steps 1-3 as above
+2. REST response bubbles are **used** when WS is disconnected
+3. If REST response is empty, `startReplyPolling()` begins polling `getDramaStatus()` + `getSceneBubbles()`
+4. Polling continues for up to 20 attempts (1s interval) until new data appears
 
-**Connection Flow:**
+**WS Event → Bubble Mapping:**
 
-1. App launch → `MainActivity` checks `ServerRepository.serverConfig` Flow
-2. If null → `ConnectionGuide` route shown (first-time setup)
-3. User enters IP:port or cloud URL → `ConnectionViewModel.connect()` → `AuthRepository.verifyServer()`
-4. Temp Retrofit instance hits GET `/auth/verify` → returns bypass/require_token
-5. If bypass → save config to DataStore → navigate to `DramaList`
-6. If require_token → show token input → save with config → navigate
+| WS Event Type | Bubble Created | Notes |
+|---|---|---|
+| `narration` (text non-empty) | `SceneBubble.Narration` | Call phase (text empty) → typing indicator only |
+| `dialogue` (text non-empty) | `SceneBubble.Dialogue` or `ActorInteraction` | `DetectActorInteractionUseCase` decides |
+| `actor_chime_in` (text non-empty) | `SceneBubble.Dialogue` or `ActorInteraction` | Same detection logic |
+| `end_narration` | `SceneBubble.Narration` | Drama ending narration |
+| `scene_end` | `SceneBubble.SceneDivider` | Shows "第 N 场 · 标题" |
+| `tension_update` | Updates `tensionScore` in UiState | No bubble |
+| `typing` | Updates `isTyping` + `typingText` | No bubble |
+| `error` | `SceneBubble.SystemError` + snackbar | Inline error + toast |
+| `director_log` | Updates `stormPhase` | Progress display, no bubble |
+| `command_echo` | Updates `stormPhase` | Confirmation only |
+| `user_message` | `SceneBubble.UserMessage` (deduped) | Backup channel |
 
 **State Management:**
-- Each ViewModel holds a `MutableStateFlow<UiState>` exposed as `StateFlow<UiState>`
-- UI collects via `collectAsStateWithLifecycle()`
-- One-time events use `SharedFlow<SealedEvent>` (navigation, snackbars)
-- No shared global state — each screen owns its own ViewModel
+- `MutableStateFlow<DramaDetailUiState>` in ViewModel — single source of truth
+- Compose UI collects via `collectAsStateWithLifecycle()`
+- No shared ViewModel state across screens — each screen has its own ViewModel
 
 ## Key Abstractions
 
 **SceneBubble (sealed class):**
-- Purpose: Represents all message types in the chat/conversation UI
+- Purpose: Represents all renderable message types in the chat interface
 - Examples: `app/src/main/java/com/drama/app/domain/model/SceneBubble.kt`
-- Pattern: Sealed class hierarchy with 5 subtypes: Narration, Dialogue, UserMessage, ActorInteraction, SceneDivider
-- Each subtype has an `id: String` for LazyColumn keys
+- Pattern: Type-safe discriminated union with `when` exhaustive matching
+- Subtypes: `Narration`, `Dialogue`, `UserMessage`, `ActorInteraction`, `SceneDivider`, `SystemError`
+- Each subtype carries: `id`, `avatarType`, `senderType`, `senderName` — enabling the three-party messaging system (director/actor/user)
 
-**DramaRepository (interface):**
-- Purpose: Abstraction over backend API, enables testing and implementation swapping
-- Examples: `app/src/main/java/com/drama/app/domain/repository/DramaRepository.kt`
-- Pattern: Interface in domain layer, implementation in data layer via `DramaRepositoryImpl`
-- Two tiers of methods: DTO-level (return raw DTOs) and domain-level (return `SceneBubble`, `ActorInfo`)
-
-**WebSocketManager:**
-- Purpose: Manage persistent WebSocket connection with auto-reconnect and REST fallback
-- Examples: `app/src/main/java/com/drama/app/data/remote/ws/WebSocketManager.kt`
-- Pattern: Singleton (Hilt), exposes `events: Flow<WsEventDto>` and `connectionState: StateFlow<Boolean>`
-- Features: exponential backoff reconnect, ConnectivityManager NetworkCallback, generation counter for stale callbacks, replay message support, permanent failure degradation
+**ConnectionState (sealed class):**
+- Purpose: Represent WebSocket connection lifecycle states
+- Examples: `app/src/main/java/com/drama/app/data/remote/ws/ConnectionState.kt`
+- Pattern: State machine: `Disconnected → Connecting → Connected`, `Connected → Reconnecting → Connected`
 
 **CommandType (enum):**
-- Purpose: Parse user input to determine which drama command to send
+- Purpose: Parse user input into command types for routing
 - Examples: `app/src/main/java/com/drama/app/domain/model/CommandType.kt`
-- Pattern: Enum with `fromInput()` factory, maps `/next`, `/action`, `/speak`, `/end` prefixes
+- Pattern: Prefix matching (`/next`, `/action`, `/speak`, etc.) with `FREE_TEXT` as default
 
 ## Entry Points
 
 **MainActivity:**
 - Location: `app/src/main/java/com/drama/app/MainActivity.kt`
-- Triggers: Android framework (launcher activity)
-- Responsibilities: Sets up `DramaApp` composable, determines start destination based on saved server config
+- Triggers: Android launcher
+- Responsibilities: Sets up `DramaTheme`, `NavController`, `DramaNavHost`, bottom navigation bar
 
-**DramaApplication:**
-- Location: `app/src/main/java/com/drama/app/DramaApplication.kt`
-- Triggers: Android framework (application start)
-- Responsibilities: `@HiltAndroidApp` annotation triggers Hilt code generation
-
-**DramaNavHost:**
-- Location: `app/src/main/java/com/drama/app/ui/navigation/DramaNavHost.kt`
-- Triggers: Compose recomposition from `DramaApp`
-- Responsibilities: Defines navigation graph with 5 routes, wires screens to navController
+**DramaDetailScreen:**
+- Location: `app/src/main/java/com/drama/app/ui/screens/dramadetail/DramaDetailScreen.kt`
+- Triggers: Navigation from DramaList or DramaCreate
+- Responsibilities: Orchestrates the drama chat interface — bubble list, input bar, actor drawer, connection status
 
 ## Error Handling
 
-**Strategy:** Result-based with graceful degradation
+**Strategy:** Multi-layer error handling with graceful degradation
 
 **Patterns:**
-- Repository methods return `Result<T>` (Kotlin stdlib), catching all exceptions
-- `NetworkExceptionInterceptor` catches OkHttp-level network errors and converts to HTTP error responses (504 timeout, 503 unreachable) so Retrofit doesn't throw
-- `AuthRepositoryImpl` maps specific exceptions to domain error types (`TIMEOUT`, `NETWORK_UNREACHABLE`, `AUTH_FAILED`)
-- WebSocket failures trigger exponential backoff reconnect; after 5 consecutive failures, `onPermanentFailure` callback degrades to REST-only mode
-- UI shows `ConnectionBanner` when WS is disconnected and not reconnecting
-- `DramaDetailScreen` shows init error with retry button when `switchToDrama` fails
+- **Inline error bubbles:** Server errors become `SceneBubble.SystemError` displayed in the chat flow
+- **Snackbar events:** User-facing errors emit `DramaDetailEvent.ShowSnackbar` via SharedFlow
+- **WS degradation:** On permanent WS failure, app falls back to REST polling with banner notification
+- **Init error blocking:** If `switchToDramaAndWait()` fails during init, `initError` blocks the UI with retry button
+- **Deduplication:** `addedErrorIds` set prevents the same error message from creating duplicate bubbles
 
 ## Cross-Cutting Concerns
 
-**Logging:** Android `Log` with TAG constants; OkHttp `HttpLoggingInterceptor` with `Authorization` header redacted
+**Logging:** Android `Log` with TAG constants (e.g., `TAG = "DramaDetailViewModel"`)
 
-**Validation:** Input validated in UI (theme blank check, command prefix parsing); backend validates via HTTP status codes
+**Validation:** Input validation in ViewModel (`text.isBlank()` checks before sending)
 
-**Authentication:** Token-based via `AuthInterceptor` (injects `Authorization: Bearer` header from `SecureStorage`); token stored encrypted via `EncryptedSharedPreferences`; WebSocket passes token as query parameter
+**Authentication:** Token-based via `AuthInterceptor`, stored in `SecureStorage`, passed through `ServerConfig.token`
 
-**Threading:** Coroutines throughout (`viewModelScope.launch`); WebSocket callbacks use `Dispatchers.IO` via `SupervisorJob` scope; Flow collection on Main for UI updates
+**Local Saves:** DataStore-based local save/load system (independent of server saves), with `/save`, `/load`, `/list`, `/delete` commands handled entirely client-side
+
+---
+
+*Architecture analysis: 2026-04-25*

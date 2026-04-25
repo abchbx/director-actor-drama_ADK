@@ -9,4 +9,5 @@ data class ActorInfo(
     val memorySummary: String = "",
     val isA2ARunning: Boolean = false,
     val a2aPort: Int = 0,
+    val thinkingProgress: Int = 0,
 )

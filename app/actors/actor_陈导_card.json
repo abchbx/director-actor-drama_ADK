@@ -1,0 +1,26 @@
+{
+  "name": "actor_陈导",
+  "description": "演员 陈导，角色：导演",
+  "url": "http://localhost:9019/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_陈导",
+      "name": "扮演陈导",
+      "description": "以陈导的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

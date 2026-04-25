@@ -1,0 +1,26 @@
+{
+  "name": "actor_向秀",
+  "description": "演员 向秀，角色：见证者/抉择者",
+  "url": "http://localhost:9073/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_向秀",
+      "name": "扮演向秀",
+      "description": "以向秀的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

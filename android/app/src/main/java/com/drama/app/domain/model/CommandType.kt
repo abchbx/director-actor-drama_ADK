@@ -5,6 +5,11 @@ enum class CommandType(val prefix: String, val needsArgument: Boolean) {
     ACTION("/action", true),
     SPEAK("/speak", true),
     END("/end", false),
+    CAST("/cast", false),
+    SAVE("/save", true),
+    LOAD("/load", true),
+    LIST("/list", false),
+    DELETE("/delete", true),
     FREE_TEXT("", false);
 
     companion object {

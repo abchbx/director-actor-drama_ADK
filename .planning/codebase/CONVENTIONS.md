@@ -1,137 +1,155 @@
 # Coding Conventions
 
-**Analysis Date:** 2026-04-22
+**Analysis Date:** 2026-04-25
 
 ## Naming Patterns
 
 **Files:**
-- PascalCase matching the primary class/object: `DramaCreateViewModel.kt`, `ChatInputBar.kt`, `Route.kt`
-- Screen files: `{Feature}Screen.kt` + `{Feature}ViewModel.kt` in same directory
-- DTO files: `{Name}Dto.kt` or `{Name}ResponseDto.kt`
-- Component files: `{ComponentName}.kt` in `components/` subdirectory
+- Python: `snake_case.py` — `state_manager.py`, `conflict_engine.py`, `actor_service.py`
+- Kotlin: `PascalCase.kt` — `SceneBubble.kt`, `DramaDetailViewModel.kt`, `WsEventDto.kt`
+- Test files: `test_<module>.py` — `test_state_manager.py`
 
 **Functions:**
-- camelCase: `createDrama()`, `sendChatMessage()`, `loadInitialStatus()`
-- Private helpers with descriptive names: `handleStormEvent()`, `tryDetectActorInteraction()`, `extractBubblesFromCommandResponse()`
-- Composable functions: PascalCase: `ChatInputBar()`, `DramaEmptyState()`, `LogEntryItem()`
+- Python tools: `snake_case` with descriptive names — `director_narrate()`, `actor_speak()`, `next_scene()`
+- Python helpers: Leading underscore for internal — `_extract_call_data()`, `_build_coref_annotations()`
+- Kotlin: `camelCase` — `handleWsEvent()`, `sendCommand()`, `sendChatMessage()`
 
 **Variables:**
-- camelCase for properties: `uiState`, `focusRequester`, `keyboardController`
-- Private mutable state with underscore prefix: `_uiState`, `_events`
-- Public immutable expose: `val uiState: StateFlow`, `val events: SharedFlow`
-- Constants in companion object: `POLL_INTERVAL_MS`, `MAX_CONSECUTIVE_ERRORS`, `STATUS_SETUP`
-- Volatile fields annotated: `@Volatile private var navigated = false`
+- Python: `snake_case` — `current_scene`, `actor_data`, `tool_context`
+- Kotlin: `camelCase` — `bubbleCounter`, `lastKnownScene`, `isTyping`
+- Constants: `UPPER_SNAKE_CASE` — `DRAMAS_DIR`, `MAX_CRASH_COUNT`, `DEBOUNCE_SECONDS`
 
 **Types:**
-- UiState data classes: `{Feature}UiState` (e.g., `DramaCreateUiState`, `DramaDetailUiState`)
-- Event sealed classes: `{Feature}Event` (e.g., `DramaCreateEvent`, `DramaDetailEvent`)
-- DTO data classes: `{Name}Dto` suffix (e.g., `ChatRequestDto`, `DramaStatusResponseDto`)
-- Domain models: Plain names (e.g., `Drama`, `ActorInfo`, `SceneBubble`)
+- Python: No type enforcement; function signatures use `dict` returns with documented keys
+- Kotlin: Strict typing; sealed classes for state hierarchies, data classes for DTOs
+- Pydantic models: `PascalCase` class names — `CommandResponse`, `ChatRequest`, `WsEvent`
 
 ## Code Style
 
 **Formatting:**
-- No Prettier/Ktlint config detected — follows Kotlin standard style
-- 4-space indentation
-- Trailing commas in parameter lists
+- Python: No formal formatter detected (no .prettierrc, no black config)
+- Kotlin: Standard Android Kotlin style
 
 **Linting:**
-- No linting config detected (no .editorconfig, no detekt, no ktlint)
-- Android Lint via Gradle (default rules)
+- Python: ruff (`.ruff_cache/` exists)
+- Kotlin: Android Studio default lint
 
 ## Import Organization
 
-**Order:**
-1. AndroidX / Jetpack imports (`androidx.compose.*`, `androidx.lifecycle.*`)
-2. Kotlin standard library (`kotlinx.coroutines.*`, `kotlinx.serialization.*`)
-3. Third-party (`dagger.*`, `okhttp3.*`, `retrofit2.*`)
-4. Project imports (`com.drama.app.*`)
+**Python Order:**
+1. Standard library (`os`, `json`, `logging`, `asyncio`)
+2. Third-party (`httpx`, `pydantic`, `fastapi`, `google.adk.*`)
+3. Local application (`from .tools import ...`, `from .state_manager import ...`)
+
+**Kotlin Order:**
+1. Android framework (`android.*`)
+2. Compose (`androidx.compose.*`, `androidx.lifecycle.*`)
+3. Third-party (`dagger.hilt.*`, `kotlinx.serialization.*`, `okhttp3.*`)
+4. Local application (`com.drama.app.domain.*`, `com.drama.app.data.*`)
 
 **Path Aliases:**
-- None used — all imports are fully qualified
+- None detected in Python
+- Kotlin: Standard package-based imports
 
 ## Error Handling
 
-**Patterns:**
-- Repository methods return `Result<T>` via `runCatching { }`:
-  ```kotlin
-  override suspend fun startDrama(theme: String): Result<CommandResponseDto> =
-      runCatching { dramaApiService.startDrama(StartDramaRequestDto(theme)) }
-  ```
-- ViewModel handles success/failure explicitly:
-  ```kotlin
-  dramaRepository.startDrama(theme)
-      .onSuccess { /* update state */ }
-      .onFailure { e -> /* show error */ }
-  ```
-- WebSocket errors caught via `.catch { }` on Flow:
-  ```kotlin
-  webSocketManager.connect(...)
-      .catch { e -> _uiState.update { it.copy(isWsConnected = false, error = e.message) } }
-      .collect { event -> handleWsEvent(event) }
-  ```
-- User-facing errors via Snackbar events:
-  ```kotlin
-  _events.emit(DramaDetailEvent.ShowSnackbar("发送失败：${e.message}"))
-  ```
+**Python Backend Patterns:**
+- Tool functions NEVER raise — always return `{status: "error", message: "..."}` dicts
+- API endpoints use HTTPException for infrastructure errors (404, 504)
+- Actor A2A failures: Try/except with auto-restart logic in `_restart_actor()`
+- State I/O: Atomic writes (tempfile + os.replace) to prevent corruption
+
+```python
+# Tool error pattern (from tools.py)
+if actor_info["status"] != "success":
+    return actor_info  # Returns error dict, never raises
+
+# API error pattern (from commands.py)
+def _require_active_drama(tool_context):
+    if not tool_context.state.get("drama", {}).get("theme"):
+        raise HTTPException(status_code=404, detail="No active drama session")
+```
+
+**Kotlin Android Patterns:**
+- `Result<T>` for all repository calls — `.onSuccess {}` / `.onFailure {}`
+- `SceneBubble.SystemError` for inline error display in chat
+- `MutableSharedFlow<DramaDetailEvent>` for transient UI events (snackbars)
+
+```kotlin
+// Repository call pattern
+dramaRepository.nextScene()
+    .onSuccess { resp -> /* handle success */ }
+    .onFailure { e -> addErrorBubble("[错误] ${e.message}") }
+```
 
 ## Logging
 
-**Framework:** No logging framework — console/Logcat only
+**Framework:** Python `logging` module (backend), Android `Log` (client)
 
 **Patterns:**
-- OkHttp `HttpLoggingInterceptor` at `Level.BODY` for network debugging
-- `addLog()` in DramaCreateViewModel for UI-visible "Director Log" panel
-- No structured logging, no crash reporting
+- Backend: `logger = logging.getLogger(__name__)` per module
+- Backend lifecycle: `[DIRECTOR-LOG]` prefix with emoji indicators (🎬✅❌💥⚠️)
+- Backend WS events: INFO level for every event processed
+- Android: TAG constant per class: `private const val TAG = "DramaDetailViewModel"`
 
 ## Comments
 
 **When to Comment:**
-- Bug fix explanations with ★ markers: `// ★★★ 关键修复：...★★★`
-- Architecture decisions with D-XX references (design doc cross-references): `// D-14/D-15: 首次启动检测`
-- Complex logic explanations: `// 不需要"主题匹配"防御 — 旧数据天然不满足导航条件`
-- Chinese comments are common (bilingual codebase)
+- Chinese comments are common — domain-specific terminology in Chinese (旁白, 对话, 导演)
+- `★ 核心修复` / `⚠️` markers for important design decisions and fixes
+- `D-XX` / `T-XX-XX` references to design ticket numbers throughout codebase
+- Phase markers: `# Phase 7`, `# Phase 12: Letta-inspired memory enhancements`
 
-**JSDoc/TSDoc:**
-- KDoc used sparingly, mainly for public ViewModel methods and sealed class docs
-- Example: `/** 切换服务端活跃剧本上下文 — 同步等待版本（带超时） */`
+**Docstrings:**
+- All Python tool functions have comprehensive docstrings (Google style)
+- All Kotlin public functions have KDoc
+- Docstrings often include "Args:", "Returns:" sections
 
 ## Function Design
 
-**Size:** ViewModel methods can be long (100+ lines for `handlePollResponse`, `handleWsEvent`). Screen composables are moderate (50-150 lines). Component composables are focused (20-80 lines).
+**Size:** Tool functions can be 50-150 lines (build context + call A2A + format result). Helper functions are shorter.
 
-**Parameters:** Use default values for optional params: `modifier: Modifier = Modifier`, `saveName: String = ""`
+**Parameters:**
+- Python tools: `(param1, param2, tool_context: ToolContext)` — `tool_context` always last
+- API endpoints: `(body: RequestModel, request: Request, _auth: bool = Depends(require_auth), ...)`
 
-**Return Values:** ViewModel methods return Unit (update StateFlow). Repository methods return `Result<T>`.
+**Return Values:**
+- Python tools: `dict` with `status`, `message`, and domain-specific fields
+- API endpoints: Pydantic response models
+- Kotlin repository: `Result<T>` wrapping DTOs or domain models
 
 ## Module Design
 
-**Exports:** Each public class/interface is in its own file. No barrel/index files.
+**Exports:**
+- Python: `__init__.py` exports public API — `from .agent import app`
+- Kotlin: Interface/implementation split — `DramaRepository` (interface) / `DramaRepositoryImpl` (impl)
 
-**Barrel Files:** Not used — direct imports by full path.
+**Barrel Files:**
+- `app/__init__.py` — single export (`app`)
+- `app/api/__init__.py` — minimal (imports create_app)
+- No Kotlin barrel files — direct imports per class
 
-## Architecture Patterns
+## Architecture Conventions
 
-**Unidirectional Data Flow:**
-```
-UI Event → ViewModel method → Repository call → State update → UI recomposition
-```
+**Tool Function Pattern (Backend):**
+Every tool function follows this structure:
+1. Get state from `tool_context`
+2. Validate inputs (return error dict if invalid)
+3. Execute business logic
+4. Update state via `_set_state()`
+5. Return result dict with `status` and formatted output
 
-**One-time Events:** Use `SharedFlow<Event>` collected in `LaunchedEffect`:
-```kotlin
-LaunchedEffect(Unit) {
-    viewModel.events.collect { event ->
-        when (event) {
-            is DramaCreateEvent.NavigateToDetail -> onNavigateToDetail(event.dramaId)
-        }
-    }
-}
-```
+**Event Mapping Pattern:**
+- Each tool maps to 1+ business event types via `TOOL_EVENT_MAP`
+- function_call = "typing" indicator + mapped event(s) with call data
+- function_response = mapped event(s) with response data + conditional events (tension, error)
 
-**Navigation:** Type-safe routes with `@Serializable` objects/data classes, passed to `navController.navigate()`
-
-**DI:** Hilt with `@AndroidEntryPoint` on Activity, `@HiltViewModel` on ViewModels, `@Inject constructor()` on repositories
+**Android ViewModel Pattern:**
+- `MutableStateFlow<UiState>` for all UI state
+- `MutableSharedFlow<Event>` for one-shot events (snackbars)
+- WS events processed in `handleWsEvent()` with `when(event.type)` dispatch
+- Commands processed in `sendCommand()` with `CommandType.fromInput()` routing
 
 ---
 
-*Convention analysis: 2026-04-22*
+*Convention analysis: 2026-04-25*

@@ -1,0 +1,698 @@
+{
+  "theme": "魏晋风骨",
+  "status": "acting",
+  "current_scene": 1,
+  "scenes": [
+    {
+      "scene_number": 1,
+      "title": "竹林雅集",
+      "description": "竹林七贤在山阳郊外的竹林中最后一次欢聚。山涛宣布明日将出仕司马氏，担任选曹郎。嵇康当众质问，气氛骤然紧张。",
+      "content": "【第一场：竹林雅集】(续)\n\n嵇康目光如刀，直视山涛。山涛酒杯悬在唇边，顿了一顿，缓缓放下。\n\n「……叔夜。」\n\n他目光平静地与嵇康对视，语气沉稳：\n\n「你的《广陵散》，我从未听腻过。只是这曲子再好，也终究是写给知音听的。」\n\n沉默片刻，山涛不再多言。\n\n远处，仿佛有暗影在竹林深处微微一笑，心中暗道：「嵇叔夜啊嵇叔夜，你以为清高就能独善其身？你身边的人，迟早都会——」\n\n而在朝堂之上，另一人听闻此事，微微一笑，心中暗忖：「嵇康果然不肯放过山涛，士人之间的裂痕，正好为我所用。」",
+      "updated_at": "2026-04-25T05:08:31.823630",
+      "time_label": "第一天",
+      "protagonist_contribution": {
+        "weight_level": "passive",
+        "narrative_impact": "主角暂无显著行动",
+        "key_choices": [],
+        "turning_points": [],
+        "arc_progress_snapshot": {
+          "arc_type": "",
+          "arc_stage": "",
+          "progress": 0,
+          "related_threads": []
+        }
+      }
+    }
+  ],
+  "actors": {
+    "你": {
+      "role": "主角（Protagonist）",
+      "personality": "由用户实时定义——导演应根据用户输入推断性格特征",
+      "background": "用户自己的故事——导演应根据剧情发展逐步揭示",
+      "knowledge_scope": "用户所知范围——导演应根据用户输入动态推断",
+      "control_type": "User-Controlled",
+      "memory": [],
+      "working_memory": [],
+      "scene_summaries": [],
+      "arc_summary": {
+        "structured": {
+          "theme": "",
+          "key_characters": [],
+          "unresolved": [],
+          "resolved": []
+        },
+        "narrative": ""
+      },
+      "critical_memories": [],
+      "memorySummary": "用户是本剧头号主角，行为由用户输入驱动。",
+      "emotions": "neutral",
+      "arc_progress": {
+        "arc_type": "",
+        "arc_stage": "",
+        "progress": 0,
+        "related_threads": []
+      },
+      "is_user_protagonist": true,
+      "created_at": "2026-04-25T05:05:57.056302"
+    },
+    "嵇康": {
+      "role": "主角原型",
+      "personality": "刚烈不屈，傲骨铮铮，追求精神自由，不慕权贵。说话直率，不喜虚与委蛇。对朋友真诚，但对背叛者绝不妥协。内心深处对乱世充满忧虑。",
+      "background": "竹林七贤之首，谯国铚县人，与魏宗室通婚，官至中散大夫。琴艺绝世，著有《琴赋》，书法亦是一绝。性情刚烈，不喜约束，拒不出仕司马氏，最终因卷入吕安案被钟会构陷，遭司马昭下令处死，临刑前奏《广陵散》。",
+      "knowledge_scope": "精通老庄玄学，琴棋书画皆通，了解魏晋政治局势，知道司马氏的野心，了解竹林七贤诸位成员的性格与处境。",
+      "memory": [],
+      "working_memory": [
+        {
+          "entry": "我说：（内心：向秀这厮，整日埋首经卷，也该让他松快松快了。《高山》之曲，正合今日心境。）\n\n怎么？哑巴了？方才问你《老》解得如何，你倒说句话来听听。难不成又在溪边发呆，忘了时辰？\n\n（微微一笑）我虽粗人一个，打铁的手，可也记得咱们说好的——你解《老》，我抚琴，这竹林间的日子，才算没白过。\n\n还愣着作甚？把那些草药暂且放下，过来坐下。 type=\"content_copy\">",
+          "importance": "normal",
+          "scene": 1
+        },
+        {
+          "entry": "面对情境: 山涛的话如同一块巨石投入平静的湖面。竹林间一时静默，连风声都似乎屏住了呼吸。阮籍停止了饮酒，向秀也停下了手中的动作。你感觉到众人的目光在山涛和嵇康之间来回游移。",
+          "importance": "normal",
+          "scene": 1
+        },
+        {
+          "entry": "我说：（目光如刀，直视山涛）\n\n山兄，你掷了什么话出来，倒让兄弟们都不作声了？说出来让听听，别藏在肚里憋着。",
+          "importance": "normal",
+          "scene": 1
+        },
+        {
+          "entry": "面对情境: 有人问嵇康：\"你会做什么呢？\"——请以嵇康的身份，用他的风格回答这个问题，展现他的性格和才华。",
+          "importance": "normal",
+          "scene": 1
+        },
+        {
+          "entry": "我说：（置锤于地，拂去掌中铁屑，微微一笑）\n\n问得好。我嵇康不过是个打铁的粗人，倒也會幾樣尋常把式——\n\n抚琴。天下琴艺，能入我眼的没几张。arium那张焦尾，倒还算件称心的物件。\n\n书法。那几个歪字，倒也还有人要。\n\n再就是这打铁的手艺——叮叮当当，锤的是铁，炼的是心。总强过在朝堂上阿谀奉承，点头哈腰。\n\n（目光一闪）\n\n怎么？阁下是想听琴，还是想求字？抑或只是想看看，这竹林中一个“不合时宜”的人，能",
+          "importance": "normal",
+          "scene": 1
+        }
+      ],
+      "scene_summaries": [],
+      "arc_summary": {
+        "structured": {
+          "theme": "",
+          "key_characters": [],
+          "unresolved": [],
+          "resolved": []
+        },
+        "narrative": ""
+      },
+      "critical_memories": [],
+      "memorySummary": "",
+      "emotions": "neutral",
+      "arc_progress": {
+        "arc_type": "",
+        "arc_stage": "",
+        "progress": 0,
+        "related_threads": []
+      },
+      "created_at": "2026-04-25T05:06:43.527332",
+      "port": 9038,
+      "_pending_compression": {
+        "working_to_scene": null,
+        "scene_to_arc": null,
+        "pending_entries": [
+          {
+            "entry": "面对情境: 你（向秀）在溪边洗草药，听到嵇康的打铁声节奏稍有变化。嵇康放下工具，擦了擦额上的汗水，对你微微一笑：「向秀，今日的《老》解得如何？来，与我弹一曲《高山》，清清这俗世的浊气。」",
+            "importance": "normal",
+            "scene": 1
+          }
+        ],
+        "result": null
+      },
+      "memory_blocks": {
+        "persona": {
+          "label": "persona",
+          "value": "性格：刚烈不屈，傲骨铮铮，追求精神自由，不慕权贵。说话直率，不喜虚与委蛇。对朋友真诚，但对背叛者绝不妥协。内心深处对乱世充满忧虑。\n背景：竹林七贤之首，谯国铚县人，与魏宗室通婚，官至中散大夫。琴艺绝世，著有《琴赋》，书法亦是一绝。性情刚烈，不喜约束，拒不出仕司马氏，最终因卷入吕安案被钟会构陷，遭司马昭下令处死，临刑前奏《广陵散》。",
+          "updated_scene": 0,
+          "source": "auto_init"
+        },
+        "relationship": {
+          "label": "relationship",
+          "value": "我了解的范围：精通老庄玄学，琴棋书画皆通，了解魏晋政治局势，知道司马氏的野心，了解竹林七贤诸位成员的性格与处境。",
+          "updated_scene": 0,
+          "source": "auto_init"
+        }
+      },
+      "crash_count": 0,
+      "restart_log": [
+        {
+          "time": "2026-04-25T05:10:11.777304",
+          "reason": "auto_restart_after_crash"
+        }
+      ]
+    },
+    "阮籍": {
+      "role": "挚友",
+      "personality": "放浪形骸，外表狂放，内心深沉。以酒避世，不愿直面冲突，但内心对挚友嵇康极为担忧。看似不羁，实则最重情义。",
+      "background": "竹林七贤之一，陈留尉氏人。魏晋名士，嗜酒如命，常以醉态避世。与嵇康最为知己，二人常同游于竹林。司马氏欲拉拢之，阮籍以酒为盾，得以保全。",
+      "knowledge_scope": "精通玄学，深谙乱世生存之道，了解司马氏与名士间的微妙关系。知道嵇康的处境和性格，了解山涛的选择。",
+      "memory": [],
+      "working_memory": [
+        {
+          "entry": "面对情境: 你（向秀）还没来得及回应，阮籍提着酒壶晃悠过来，脸上带着几分醉意，却眼神清明：「嵇兄好雅兴！独奏不如合奏，不如我以酒助兴，你们一个抚琴一个解《老》，岂不美哉？」",
+          "importance": "normal",
+          "scene": 1
+        },
+        {
+          "entry": "我说：（将酒壶往石桌上一搁，大咧咧地盘腿坐下）\n\n怎么，向兄不肯赏光？莫不是怕我这一壶浊酒，冲淡了你的清谈玄理？\n\n（斜睨一眼，目光却在嵇康与向秀之间来回一转，嘴角噙着几分意味不明的笑）\n\n唉，这世道，能在竹林里清谈《老》《庄》的日子，怕是过一日少一日了……来，今日且尽兴，明日的事，明日再说。\n\n（自顾自仰头灌了一口酒，眼底却掠过一丝不易察觉的忧色）",
+          "importance": "normal",
+          "scene": 1
+        }
+      ],
+      "scene_summaries": [],
+      "arc_summary": {
+        "structured": {
+          "theme": "",
+          "key_characters": [],
+          "unresolved": [],
+          "resolved": []
+        },
+        "narrative": ""
+      },
+      "critical_memories": [],
+      "memorySummary": "",
+      "emotions": "neutral",
+      "arc_progress": {
+        "arc_type": "",
+        "arc_stage": "",
+        "progress": 0,
+        "related_threads": []
+      },
+      "created_at": "2026-04-25T05:06:45.553743",
+      "port": 9083,
+      "_pending_compression": {
+        "working_to_scene": null,
+        "scene_to_arc": null,
+        "pending_entries": [],
+        "result": null
+      },
+      "memory_blocks": {
+        "persona": {
+          "label": "persona",
+          "value": "性格：放浪形骸，外表狂放，内心深沉。以酒避世，不愿直面冲突，但内心对挚友嵇康极为担忧。看似不羁，实则最重情义。\n背景：竹林七贤之一，陈留尉氏人。魏晋名士，嗜酒如命，常以醉态避世。与嵇康最为知己，二人常同游于竹林。司马氏欲拉拢之，阮籍以酒为盾，得以保全。",
+          "updated_scene": 0,
+          "source": "auto_init"
+        },
+        "relationship": {
+          "label": "relationship",
+          "value": "我了解的范围：精通玄学，深谙乱世生存之道，了解司马氏与名士间的微妙关系。知道嵇康的处境和性格，了解山涛的选择。",
+          "updated_scene": 0,
+          "source": "auto_init"
+        }
+      },
+      "crash_count": 0
+    },
+    "山涛": {
+      "role": "对立/抉择者",
+      "personality": "稳重持重，深谙人情世故。选择出仕是出于家族责任和对时局的判断。对嵇康既敬佩又无奈，内心深处仍视嵇康为知己。",
+      "background": "竹林七贤之一，河内怀县人。早年与嵇康、阮籍交游，后出仕司马氏，任选曹郎。因举荐嵇康，嵇康写《与山巨源绝交书》以明志，二人自此决裂。",
+      "knowledge_scope": "了解官场规则，知道司马氏对名士的态度，理解嵇康的志向，了解竹林旧友们的处境。",
+      "memory": [],
+      "working_memory": [
+        {
+          "entry": "面对情境: 你（向秀）正要回应嵇康的邀约，山涛端着酒杯缓缓走来，笑容温和却带着一丝不易察觉的沉重：「诸位好兴致。可惜……我怕是最后一次能与诸位如此欢聚了。」",
+          "importance": "normal",
+          "scene": 1
+        },
+        {
+          "entry": "我说：（端着酒杯，笑容温和却带着一丝不易察觉的沉重）\n\n诸位好兴致。可惜……我怕是最后一次能与诸位如此欢聚了。\n\n（目光轻轻扫过众人，最后在嵇康所在的方向停留片刻，又若无其事地移开）\n\n山涛我……明日便要去上任了。选曹郎的职责，说到底是替朝廷遴选人才。此一去，竹林清谈的日子，怕是再难有了。\n\n（举起酒杯）\n\n今日不提那些，来，我敬诸位一杯。论音律，嵇康的《广陵散》堪称当世一绝；论文章，阮籍的诗赋令人倾倒",
+          "importance": "normal",
+          "scene": 1
+        },
+        {
+          "entry": "[插话触发] 嵇康刚刚质问山涛关于出仕的决定，竹林间气氛骤然紧张。",
+          "importance": "normal",
+          "scene": 1
+        },
+        {
+          "entry": "[插话] 我说：（酒杯悬在唇边，顿了一顿，缓缓放下）\n\n……叔夜。\n\n（目光平静地与嵇康对视，语气沉稳）\n\n你的《广陵散》，我从未听腻过。只是这曲子再好，也终究是写给知音听的。\n\n（沉默片刻，不再多言）",
+          "importance": "normal",
+          "scene": 1
+        }
+      ],
+      "scene_summaries": [],
+      "arc_summary": {
+        "structured": {
+          "theme": "",
+          "key_characters": [],
+          "unresolved": [],
+          "resolved": []
+        },
+        "narrative": ""
+      },
+      "critical_memories": [],
+      "memorySummary": "",
+      "emotions": "neutral",
+      "arc_progress": {
+        "arc_type": "",
+        "arc_stage": "",
+        "progress": 0,
+        "related_threads": []
+      },
+      "created_at": "2026-04-25T05:06:47.580781",
+      "port": 9059,
+      "_pending_compression": {
+        "working_to_scene": null,
+        "scene_to_arc": null,
+        "pending_entries": [],
+        "result": null
+      },
+      "memory_blocks": {
+        "persona": {
+          "label": "persona",
+          "value": "性格：稳重持重，深谙人情世故。选择出仕是出于家族责任和对时局的判断。对嵇康既敬佩又无奈，内心深处仍视嵇康为知己。\n背景：竹林七贤之一，河内怀县人。早年与嵇康、阮籍交游，后出仕司马氏，任选曹郎。因举荐嵇康，嵇康写《与山巨源绝交书》以明志，二人自此决裂。",
+          "updated_scene": 0,
+          "source": "auto_init"
+        },
+        "relationship": {
+          "label": "relationship",
+          "value": "我了解的范围：了解官场规则，知道司马氏对名士的态度，理解嵇康的志向，了解竹林旧友们的处境。",
+          "updated_scene": 0,
+          "source": "auto_init"
+        }
+      },
+      "crash_count": 0
+    },
+    "钟会": {
+      "role": "反派/构陷者",
+      "personality": "聪明但狭隘，自负且嫉妒心强。表面恭敬，内心阴狠。对嵇康的冷落耿耿于怀，将个人恩怨包装成政治忠诚。",
+      "background": "魏国太傅钟繇之子，年轻名士，聪慧过人。因仰慕嵇康而求见，却被嵇康冷落怀恨。后投靠司马氏，成为其鹰犬，构陷嵇康致其死罪。",
+      "knowledge_scope": "精通玄学，了解司马氏政治需求，知道如何搜集证据构陷名士，对嵇康的社交圈了如指掌。",
+      "memory": [],
+      "working_memory": [
+        {
+          "entry": "[插话触发] 嵇康刚刚质问山涛关于出仕的决定，竹林间气氛骤然紧张。",
+          "importance": "normal",
+          "scene": 1
+        },
+        {
+          "entry": "[插话] 我说：（在暗处微微一笑，心中暗道：嵇叔夜啊嵇叔夜，你以为清高就能独善其身？你身边的人，迟早都会——）",
+          "importance": "normal",
+          "scene": 1
+        }
+      ],
+      "scene_summaries": [],
+      "arc_summary": {
+        "structured": {
+          "theme": "",
+          "key_characters": [],
+          "unresolved": [],
+          "resolved": []
+        },
+        "narrative": ""
+      },
+      "critical_memories": [],
+      "memorySummary": "",
+      "emotions": "neutral",
+      "arc_progress": {
+        "arc_type": "",
+        "arc_stage": "",
+        "progress": 0,
+        "related_threads": []
+      },
+      "created_at": "2026-04-25T05:06:49.607518",
+      "port": 9040,
+      "_pending_compression": {
+        "working_to_scene": null,
+        "scene_to_arc": null,
+        "pending_entries": [],
+        "result": null
+      },
+      "memory_blocks": {
+        "persona": {
+          "label": "persona",
+          "value": "性格：聪明但狭隘，自负且嫉妒心强。表面恭敬，内心阴狠。对嵇康的冷落耿耿于怀，将个人恩怨包装成政治忠诚。\n背景：魏国太傅钟繇之子，年轻名士，聪慧过人。因仰慕嵇康而求见，却被嵇康冷落怀恨。后投靠司马氏，成为其鹰犬，构陷嵇康致其死罪。",
+          "updated_scene": 0,
+          "source": "auto_init"
+        },
+        "relationship": {
+          "label": "relationship",
+          "value": "我了解的范围：精通玄学，了解司马氏政治需求，知道如何搜集证据构陷名士，对嵇康的社交圈了如指掌。",
+          "updated_scene": 0,
+          "source": "auto_init"
+        }
+      },
+      "crash_count": 0
+    },
+    "司马昭": {
+      "role": "权力者/裁决者",
+      "personality": "冷酷果决，城府极深。表面上礼贤下士，内心对威胁绝不手软。懂得利用矛盾，借刀杀人。",
+      "background": "魏国权臣，大将军司马懿之子。弑曹髦后专权朝政，欲代魏自立。对不肯归顺的士人采取强硬态度，嵇康案即由其最终裁决。",
+      "knowledge_scope": "掌控魏国朝政，了解名士们的态度，知道山涛、钟会等人的立场，对嵇康的声望有所忌惮。",
+      "memory": [],
+      "working_memory": [
+        {
+          "entry": "[插话触发] 嵇康刚刚质问山涛关于出仕的决定，竹林间气氛骤然紧张。",
+          "importance": "normal",
+          "scene": 1
+        },
+        {
+          "entry": "[插话] 我说：（听闻此事，微微一笑，心中暗忖：嵇康果然不肯放过山涛，士人之间的裂痕，正好为我所用。）",
+          "importance": "normal",
+          "scene": 1
+        }
+      ],
+      "scene_summaries": [],
+      "arc_summary": {
+        "structured": {
+          "theme": "",
+          "key_characters": [],
+          "unresolved": [],
+          "resolved": []
+        },
+        "narrative": ""
+      },
+      "critical_memories": [],
+      "memorySummary": "",
+      "emotions": "neutral",
+      "arc_progress": {
+        "arc_type": "",
+        "arc_stage": "",
+        "progress": 0,
+        "related_threads": []
+      },
+      "created_at": "2026-04-25T05:06:51.652027",
+      "port": 9035,
+      "_pending_compression": {
+        "working_to_scene": null,
+        "scene_to_arc": null,
+        "pending_entries": [],
+        "result": null
+      },
+      "memory_blocks": {
+        "persona": {
+          "label": "persona",
+          "value": "性格：冷酷果决，城府极深。表面上礼贤下士，内心对威胁绝不手软。懂得利用矛盾，借刀杀人。\n背景：魏国权臣，大将军司马懿之子。弑曹髦后专权朝政，欲代魏自立。对不肯归顺的士人采取强硬态度，嵇康案即由其最终裁决。",
+          "updated_scene": 0,
+          "source": "auto_init"
+        },
+        "relationship": {
+          "label": "relationship",
+          "value": "我了解的范围：掌控魏国朝政，了解名士们的态度，知道山涛、钟会等人的立场，对嵇康的声望有所忌惮。",
+          "updated_scene": 0,
+          "source": "auto_init"
+        }
+      },
+      "crash_count": 0
+    },
+    "向秀": {
+      "role": "见证者/抉择者",
+      "personality": "温和内敛，重情重义。面对挚友之死，内心充满痛苦与无奈。选择出仕是迫于形势，但内心从未真正释怀。",
+      "background": "竹林七贤之一，河内怀县人。与嵇康交厚，曾共同打铁为乐。嵇康死后，向秀被迫出仕，在官场中度过余生。",
+      "knowledge_scope": "了解嵇康的志向和处境，与山涛是同乡，理解他的选择。知道吕安案的始末。",
+      "memory": [],
+      "working_memory": [],
+      "scene_summaries": [],
+      "arc_summary": {
+        "structured": {
+          "theme": "",
+          "key_characters": [],
+          "unresolved": [],
+          "resolved": []
+        },
+        "narrative": ""
+      },
+      "critical_memories": [],
+      "memorySummary": "",
+      "emotions": "neutral",
+      "arc_progress": {
+        "arc_type": "",
+        "arc_stage": "",
+        "progress": 0,
+        "related_threads": []
+      },
+      "created_at": "2026-04-25T05:06:53.681859",
+      "port": 9073
+    }
+  },
+  "narration_log": [
+    {
+      "text": "【第一场：竹林雅集】\n\n曹魏正始年间，山阳郊外的竹林深处。\n\n夕阳西斜，金色的光芒穿透竹叶，在地上洒下斑驳的影子。清风徐来，竹叶沙沙作响，仿佛天地间最清雅的乐章。一泓清泉从山石间淌过，映着天光云影。\n\n竹林七贤常聚于此——他们不拘礼法，崇尚清谈，以酒会友，以琴书自娱。在这乱世之中，他们试图守护一片精神的净土。\n\n你（向秀）正蹲在溪边洗涤草药，师兄嵇康则在不远处专注地拉着风箱，打铁的锤声清脆而有节奏。远处传来阮籍低沉浑厚的吟诗声，山涛正含笑斟酒。\n\n然而，竹林之外的朝堂上，司马氏的阴影正在蔓延……",
+      "timestamp": "2026-04-25T05:07:04.855091"
+    }
+  ],
+  "remaining_auto_scenes": 0,
+  "steer_direction": null,
+  "storm": {
+    "last_review": {},
+    "perspectives": [
+      {
+        "name": "主角视角",
+        "description": "从主角的内心世界出发：魏晋风骨对主角意味着什么？主角最深的渴望和恐惧是什么？",
+        "questions": [
+          "在「魏晋风骨」中，主角最核心的矛盾是什么？",
+          "主角在魏晋风骨的情境下，最大的内心冲突是什么？",
+          "主角会如何面对魏晋风骨带来的挑战？"
+        ]
+      },
+      {
+        "name": "反派/对立面视角",
+        "description": "从对立面的立场出发：为什么魏晋风骨的另一面也有其合理性？对立力量的内在逻辑是什么？",
+        "questions": [
+          "站在魏晋风骨的对立面，什么动机是合理且令人同情的？",
+          "如果反派也有自己的正义，那会是什么样的正义？",
+          "对立力量如何从魏晋风骨中获得力量？"
+        ]
+      },
+      {
+        "name": "旁观者/社会视角",
+        "description": "从旁观者和社会的角度：魏晋风骨在更广阔的社会背景下意味着什么？对他人产生了什么影响？",
+        "questions": [
+          "魏晋风骨对旁观者或社会有什么深远影响？",
+          "社会如何看待和评判魏晋风骨中的事件？",
+          "有哪些不为人知的角落受到了魏晋风骨的波及？"
+        ]
+      },
+      {
+        "name": "伦理/哲学视角",
+        "description": "从伦理和哲学的高度：魏晋风骨触及了什么根本性的道德问题？存在怎样的价值冲突？",
+        "questions": [
+          "魏晋风骨触及了什么根本性的伦理困境？",
+          "在魏晋风骨的情境下，什么是\"对\"什么是\"错\"的边界？",
+          "如果从不同哲学流派的角度审视魏晋风骨，会有什么不同的结论？"
+        ]
+      },
+      {
+        "name": "时间/命运视角",
+        "description": "从时间和命运的维度：魏晋风骨的过去如何塑造了现在？未来可能如何演变？如果时间倒流会怎样？",
+        "questions": [
+          "魏晋风骨的根源可以追溯到什么过去的事件？",
+          "如果给魏晋风骨一个转折点，最戏剧性的变化会是什么？",
+          "十年后再回望魏晋风骨，什么才是真正重要的？"
+        ]
+      }
+    ],
+    "research_results": [
+      {
+        "perspective": "主角视角",
+        "questions": [
+          "在魏晋乱世中，一位名士（如嵇康或阮籍）如何在玄学理想与残酷现实间挣扎？他/她最深的渴望（追求自由、保持气节）与最大的恐惧（卷入政治漩涡、好友遭难）是什么？"
+        ],
+        "findings": {
+          "角色原型": "从主角视角的视角中浮现的角色原型",
+          "冲突模式": "主角视角视角下揭示的核心冲突模式",
+          "情感曲线": "主角视角维度中的情感走向和转折点",
+          "意象符号": "主角视角带来的独特意象和象征",
+          "跨视角联系": "主角视角与其他视角的共鸣或矛盾"
+        },
+        "timestamp": "2026-04-25T05:06:05.265966"
+      },
+      {
+        "perspective": "反派/对立面视角",
+        "questions": [
+          "司马氏政权为何必须铲除魏晋名士？钟会作为举报者，他的动机是什么？站在权力者的角度，这种\"清洗\"是否有其内在逻辑？"
+        ],
+        "findings": {
+          "角色原型": "从反派/对立面视角的视角中浮现的角色原型",
+          "冲突模式": "反派/对立面视角视角下揭示的核心冲突模式",
+          "情感曲线": "反派/对立面视角维度中的情感走向和转折点",
+          "意象符号": "反派/对立面视角带来的独特意象和象征",
+          "跨视角联系": "反派/对立面视角与其他视角的共鸣或矛盾"
+        },
+        "timestamp": "2026-04-25T05:06:05.266453"
+      },
+      {
+        "perspective": "伦理/哲学视角",
+        "questions": [
+          "嵇康的《与山巨源绝交书》背后体现了怎样的价值冲突？当玄学清谈与政治现实不可调和时，名士们如何做出道德选择？"
+        ],
+        "findings": {
+          "角色原型": "从伦理/哲学视角的视角中浮现的角色原型",
+          "冲突模式": "伦理/哲学视角视角下揭示的核心冲突模式",
+          "情感曲线": "伦理/哲学视角维度中的情感走向和转折点",
+          "意象符号": "伦理/哲学视角带来的独特意象和象征",
+          "跨视角联系": "伦理/哲学视角与其他视角的共鸣或矛盾"
+        },
+        "timestamp": "2026-04-25T05:06:05.266846"
+      }
+    ],
+    "outline": {
+      "theme": "魏晋风骨",
+      "synthesis_strategy": "多视角辩证融合",
+      "acts": [
+        {
+          "act_number": 1,
+          "title": "起——多视角的碰撞",
+          "description": "从主角视角, 反派/对立面视角, 伦理/哲学视角等视角展开魏晋风骨的初始面貌，呈现各视角的碰撞和火花。",
+          "key_conflict": "主角视角与反派/对立面视角的首次交锋",
+          "emotional_arc": "好奇 → 紧张 → 震撼"
+        },
+        {
+          "act_number": 2,
+          "title": "承——深层的挖掘",
+          "description": "深入魏晋风骨的深层结构，揭示隐藏在多视角背后的共同线索和根本矛盾。",
+          "key_conflict": "表面冲突升级为价值观的对抗",
+          "emotional_arc": "紧张 → 压抑 → 爆发"
+        },
+        {
+          "act_number": 3,
+          "title": "转——视角的颠覆",
+          "description": "颠覆初始认知——从意想不到的角度重新解读魏晋风骨，所有视角的发现在此汇聚为转折。",
+          "key_conflict": "认知框架的崩塌与重建",
+          "emotional_arc": "震惊 → 迷惘 → 觉醒"
+        },
+        {
+          "act_number": 4,
+          "title": "合——多视角的统一",
+          "description": "将所有视角的发现融合为对魏晋风骨的深层理解，在统一中保留张力，在和解中留下余韵。",
+          "key_conflict": "对立面的和解或永恒的悬置",
+          "emotional_arc": "释然 → 深沉 → 余韵"
+        }
+      ],
+      "core_tensions": [
+        "主角视角与其他视角的张力",
+        "反派/对立面视角与其他视角的张力",
+        "伦理/哲学视角与其他视角的张力"
+      ],
+      "thematic_layers": {
+        "表层": "魏晋风骨的直接呈现",
+        "中层": "人物之间的价值冲突",
+        "深层": "关于存在、选择与命运的思考"
+      },
+      "perspective_integration": {
+        "主角视角": "通过角色命运和场景设计体现主角视角的洞察",
+        "反派/对立面视角": "通过角色命运和场景设计体现反派/对立面视角的洞察",
+        "伦理/哲学视角": "通过角色命运和场景设计体现伦理/哲学视角的洞察"
+      }
+    }
+  },
+  "conflict_engine": {
+    "tension_score": 1,
+    "is_boring": true,
+    "tension_history": [
+      {
+        "scene": 1,
+        "score": 1,
+        "is_boring": true,
+        "signals": {
+          "emotion_variance": 0.0,
+          "unresolved_density": 0.0,
+          "dialogue_repetition": 0.0,
+          "scenes_since_inject": 0.0625
+        }
+      }
+    ],
+    "active_conflicts": [],
+    "used_conflict_types": [],
+    "last_inject_scene": 0,
+    "consecutive_low_tension": 1,
+    "resolved_conflicts": []
+  },
+  "plot_threads": [],
+  "dynamic_storm": {
+    "scenes_since_last_storm": 1,
+    "trigger_history": [],
+    "discovered_perspectives": []
+  },
+  "established_facts": [],
+  "coherence_checks": {
+    "last_check_scene": 0,
+    "last_result": null,
+    "check_history": [],
+    "total_contradictions": 0
+  },
+  "timeline": {
+    "current_time": "第一天",
+    "days_elapsed": 1,
+    "current_period": null,
+    "time_periods": [],
+    "last_jump_check": null
+  },
+  "created_at": "2026-04-25T05:05:57.056292",
+  "updated_at": "2026-04-25T05:08:31.823648",
+  "conversation_log": [
+    {
+      "speaker": "[系统]",
+      "content": "戏剧「魏晋风骨」已创建，数据保存路径: /workspace/director-actor-drama/app/dramas/魏晋风骨",
+      "type": "system",
+      "scene": 0,
+      "timestamp": "2026-04-25T05:05:57.069623"
+    },
+    {
+      "speaker": "导演",
+      "content": "【第一场：竹林雅集】\n\n曹魏正始年间，山阳郊外的竹林深处。\n\n夕阳西斜，金色的光芒穿透竹叶，在地上洒下斑驳的影子。清风徐来，竹叶沙沙作响，仿佛天地间最清雅的乐章。一泓清泉从山石间淌过，映着天光云影。\n\n竹林七贤常聚于此——他们不拘礼法，崇尚清谈，以酒会友，以琴书自娱。在这乱世之中，他们试图守护一片精神的净土。\n\n你（向秀）正蹲在溪边洗涤草药，师兄嵇康则在不远处专注地拉着风箱，打铁的锤声清脆而有节奏。远处传来阮籍低沉浑厚的吟诗声，山涛正含笑斟酒。\n\n然而，竹林之外的朝堂上，司马氏的阴影正在蔓延……",
+      "type": "narration",
+      "scene": 1,
+      "timestamp": "2026-04-25T05:07:04.855447"
+    },
+    {
+      "speaker": "嵇康",
+      "content": "（内心：向秀这厮，整日埋首经卷，也该让他松快松快了。《高山》之曲，正合今日心境。）\n\n怎么？哑巴了？方才问你《老》解得如何，你倒说句话来听听。难不成又在溪边发呆，忘了时辰？\n\n（微微一笑）我虽粗人一个，打铁的手，可也记得咱们说好的——你解《老》，我抚琴，这竹林间的日子，才算没白过。\n\n还愣着作甚？把那些草药暂且放下，过来坐下。 type=\"content_copy\">",
+      "type": "dialogue",
+      "scene": 1,
+      "timestamp": "2026-04-25T05:07:21.122698"
+    },
+    {
+      "speaker": "阮籍",
+      "content": "（将酒壶往石桌上一搁，大咧咧地盘腿坐下）\n\n怎么，向兄不肯赏光？莫不是怕我这一壶浊酒，冲淡了你的清谈玄理？\n\n（斜睨一眼，目光却在嵇康与向秀之间来回一转，嘴角噙着几分意味不明的笑）\n\n唉，这世道，能在竹林里清谈《老》《庄》的日子，怕是过一日少一日了……来，今日且尽兴，明日的事，明日再说。\n\n（自顾自仰头灌了一口酒，眼底却掠过一丝不易察觉的忧色）",
+      "type": "dialogue",
+      "scene": 1,
+      "timestamp": "2026-04-25T05:07:32.535688"
+    },
+    {
+      "speaker": "山涛",
+      "content": "（端着酒杯，笑容温和却带着一丝不易察觉的沉重）\n\n诸位好兴致。可惜……我怕是最后一次能与诸位如此欢聚了。\n\n（目光轻轻扫过众人，最后在嵇康所在的方向停留片刻，又若无其事地移开）\n\n山涛我……明日便要去上任了。选曹郎的职责，说到底是替朝廷遴选人才。此一去，竹林清谈的日子，怕是再难有了。\n\n（举起酒杯）\n\n今日不提那些，来，我敬诸位一杯。论音律，嵇康的《广陵散》堪称当世一绝；论文章，阮籍的诗赋令人倾倒；论学问，向秀的注《庄》之功，日后必传于世。能与诸位相识一场，是山涛之幸。\n\n（内心：终究还是要走的。家族的责任，司马氏的征召……我别无选择。只是不知日后，稽康会不会理解我的处境。）",
+      "type": "dialogue",
+      "scene": 1,
+      "timestamp": "2026-04-25T05:07:46.928461"
+    },
+    {
+      "speaker": "嵇康",
+      "content": "（目光如刀，直视山涛）\n\n山兄，你掷了什么话出来，倒让兄弟们都不作声了？说出来让听听，别藏在肚里憋着。",
+      "type": "dialogue",
+      "scene": 1,
+      "timestamp": "2026-04-25T05:07:59.924711"
+    },
+    {
+      "speaker": "山涛",
+      "content": "（酒杯悬在唇边，顿了一顿，缓缓放下）\n\n……叔夜。\n\n（目光平静地与嵇康对视，语气沉稳）\n\n你的《广陵散》，我从未听腻过。只是这曲子再好，也终究是写给知音听的。\n\n（沉默片刻，不再多言）",
+      "type": "dialogue",
+      "scene": 1,
+      "timestamp": "2026-04-25T05:08:12.229501"
+    },
+    {
+      "speaker": "司马昭",
+      "content": "（听闻此事，微微一笑，心中暗忖：嵇康果然不肯放过山涛，士人之间的裂痕，正好为我所用。）",
+      "type": "dialogue",
+      "scene": 1,
+      "timestamp": "2026-04-25T05:08:20.127286"
+    },
+    {
+      "speaker": "钟会",
+      "content": "（在暗处微微一笑，心中暗道：嵇叔夜啊嵇叔夜，你以为清高就能独善其身？你身边的人，迟早都会——）",
+      "type": "dialogue",
+      "scene": 1,
+      "timestamp": "2026-04-25T05:08:27.128352"
+    },
+    {
+      "speaker": "嵇康",
+      "content": "（置锤于地，拂去掌中铁屑，微微一笑）\n\n问得好。我嵇康不过是个打铁的粗人，倒也會幾樣尋常把式——\n\n抚琴。天下琴艺，能入我眼的没几张。arium那张焦尾，倒还算件称心的物件。\n\n书法。那几个歪字，倒也还有人要。\n\n再就是这打铁的手艺——叮叮当当，锤的是铁，炼的是心。总强过在朝堂上阿谀奉承，点头哈腰。\n\n（目光一闪）\n\n怎么？阁下是想听琴，还是想求字？抑或只是想看看，这竹林中一个“不合时宜”的人，能捣鼓出什么名堂？",
+      "type": "dialogue",
+      "scene": 1,
+      "timestamp": "2026-04-25T05:10:17.723478"
+    }
+  ],
+  "scene_context": {}
+}

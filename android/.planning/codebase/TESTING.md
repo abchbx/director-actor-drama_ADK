@@ -1,66 +1,55 @@
 # Testing Patterns
 
-**Analysis Date:** 2026-04-24
+**Analysis Date:** 2026-04-25
 
 ## Test Framework
 
 **Runner:**
-- None configured — no test dependencies found in `build.gradle.kts`
-- `testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"` declared in defaultConfig but no test libraries included
+- Not configured — no test runner detected in the codebase
+- No `jest.config.*`, `vitest.config.*`, or Android test configurations found
+- `app/build.gradle.kts` does not include test dependencies beyond default Android test runner
 
 **Assertion Library:**
-- Not applicable
+- Not detected
 
 **Run Commands:**
 ```bash
-# No test commands available — no tests exist
+# No test commands available — no test infrastructure set up
 ```
 
 ## Test File Organization
 
 **Location:**
-- Not applicable — no test source directories found
-- Expected locations (not yet created):
-  - `app/src/test/java/com/drama/app/` — Unit tests
-  - `app/src/androidTest/java/com/drama/app/` — Instrumentation tests
+- No test directories found (`src/test/`, `src/androidTest/` do not exist or are empty)
+- No `*.test.kt` or `*Test.kt` files found
 
 **Naming:**
-- Not established yet
+- Not applicable
 
 **Structure:**
 ```
-Not applicable — no test files exist
+# No test structure exists
 ```
 
 ## Test Structure
 
 **Suite Organization:**
-- Not applicable
+- No test suites exist
 
 **Patterns:**
-- Not applicable
+- No testing patterns established
 
 ## Mocking
 
-**Framework:** None configured
+**Framework:** None
 
-**What to Mock:**
-When tests are added, these should be mocked:
-- `DramaRepository` — interface, easy to mock with Mockito/MockK
-- `WebSocketManager` — singleton with complex lifecycle, mock or fake
-- `ServerPreferences` — DataStore wrapper, use InMemoryDataStore for testing
-- `AuthRepository` — interface, mock for connection flow tests
-- `OkHttpClient` — use MockWebServer for API service tests
-
-**What NOT to Mock:**
-- Domain models (`SceneBubble`, `CommandType`, etc.) — pure data classes, use real instances
-- DTOs — simple serializable data classes
-- `DetectActorInteractionUseCase` — pure logic, test with real instances
+**Patterns:**
+- No mocking patterns established
 
 ## Fixtures and Factories
 
 **Test Data:**
-- Not applicable
+- No test fixtures or factories
 
 **Location:**
 - Not applicable
@@ -71,60 +60,60 @@ When tests are added, these should be mocked:
 
 **View Coverage:**
 ```bash
-# Not available — no tests or coverage tools configured
+# Not available — no tests exist
 ```
 
 ## Test Types
 
 **Unit Tests:**
-- None exist
-- Recommended areas for unit testing:
-  - `DramaCreateViewModel` — script creation flow, polling logic, theme matching
-  - `DramaDetailViewModel` — WS event handling, command routing, chat flow
-  - `DramaRepositoryImpl` — DTO-to-domain mapping, bubble extraction
-  - `DetectActorInteractionUseCase` — interaction detection rules
-  - `CommandType.fromInput()` — command parsing
-  - `ServerConfig.toApiBaseUrl()` / `toWsUrl()` — URL construction
+- None
 
 **Integration Tests:**
-- None exist
-- Recommended areas:
-  - API service calls with MockWebServer
-  - WebSocket event flow with mock WebSocket server
-  - Full creation flow: ViewModel → Repository → API
+- None
 
 **E2E Tests:**
-- Not used
+- None
 
-## Common Patterns
+## Critical Areas Needing Tests
 
-**Async Testing:**
-- Not established — when adding tests, use `Turbine` for Flow testing and `runTest` for coroutines
+**ViewModel Logic (`DramaDetailViewModel.kt` — 1227 lines):**
+- `handleWsEvent()` — Complex event routing with 15+ event types, each creating different bubble types
+- `sendCommand()` — Command parsing and local save handling
+- `sendChatMessage()` — Dual-path (WS vs REST) response handling
+- Error deduplication via `addedErrorIds`
+- `performInitSync()` — Race condition handling between skipLoad and state drift
 
-**Error Testing:**
-- Not established — when adding tests, test `Result.failure` paths for network errors, timeouts, auth failures
+**Use Case (`DetectActorInteractionUseCase.kt`):**
+- Interaction type detection (REPLY, CHIME_IN, COUNTER, PROPOSE)
+- Keyword-based semantic analysis for counter/propose detection
+- Target actor inference from last bubble
 
-## Recommended Testing Setup
+**Repository (`DramaRepositoryImpl.kt`):**
+- `getSceneBubbles()` — DTO → SceneBubble mapping with prefix and divider logic
+- `sendChatMessageAsBubbles()` — CommandResponseDto → SceneBubble conversion
+- `getMergedCast()` — Cast + CastStatus → ActorInfo merging
 
-When tests are added, include these dependencies in `app/build.gradle.kts`:
+**WebSocket Manager (`WebSocketManager.kt` — 16KB):**
+- Auto-reconnect with exponential backoff
+- ConnectionState transitions
+- Event parsing from JSON frames
 
-```kotlin
-// Unit testing
-testImplementation("junit:junit:4.13.2")
-testImplementation("io.mockk:mockk:1.13.8")
-testImplementation("com.google.truth:truth:1.4.2")
-testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
-testImplementation("app.cash.turbine:turbine:1.1.0")
+## Recommended Testing Strategy
 
-// Instrumented testing
-androidTestImplementation("androidx.test.ext:junit:1.2.1")
-androidTestImplementation("androidx.compose.ui:ui-test-junit4")
-debugImplementation("androidx.compose.ui:ui-test-manifest")
+**Priority 1 — Unit Tests:**
+- `DetectActorInteractionUseCase` — Pure logic, easy to test, high value
+- `DramaDetailViewModel.handleWsEvent()` — Test each event type creates correct bubble
+- `DramaRepositoryImpl.getSceneBubbles()` — Test DTO mapping correctness
 
-// MockWebServer for API testing
-testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
-```
+**Priority 2 — Integration Tests:**
+- WebSocket connection lifecycle (connect → receive events → disconnect → reconnect)
+- REST API error handling and fallback
+
+**Priority 3 — UI Tests:**
+- Compose testing for `SceneBubbleList` rendering
+- Input bar command handling
+- Navigation flows
 
 ---
 
-*Testing analysis: 2026-04-24*
+*Testing analysis: 2026-04-25*

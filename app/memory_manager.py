@@ -1,11 +1,12 @@
-"""Memory manager for the 3-tier drama memory architecture.
+"""Memory manager for the 4-tier drama memory architecture.
 
-实现三层记忆管理：工作记忆（Tier 1）→ 场景摘要（Tier 2）→ 全局摘要（Tier 3）。
-包含关键记忆保护、异步LLM压缩、旧格式迁移功能。
+实现四层记忆管理：工作记忆（Tier 1）→ 场景摘要（Tier 2）→ 全局摘要（Tier 3）→ 向量长期记忆（Tier 4）。
+包含关键记忆保护、异步LLM压缩、向量语义检索、旧格式迁移功能。
 
 Architecture:
     working_memory (max 5) → async LLM compress → scene_summaries (max 10) → async LLM compress → arc_summary
     critical_memories: 独立存储，永不压缩
+    vector_memory (Tier 4): ChromaDB 向量存储，语义检索，与上述三层并行工作
 """
 
 import asyncio
@@ -714,6 +715,172 @@ def _merge_pending_compression(actor_name: str, actor_data: dict, tool_context) 
 
 
 # ============================================================================
+# Vector Memory Integration (Tier 4)
+# ============================================================================
+
+
+def _store_to_vector_memory(
+    actor_name: str,
+    content: str,
+    importance: str,
+    scene: int,
+    tool_context=None,
+) -> None:
+    """Best-effort store a memory entry to the vector memory (Tier 4).
+
+    非阻塞、尽力的向量记忆存储。失败不影响主流程。
+    """
+    try:
+        from .vector_memory import store_actor_memory
+        store_actor_memory(
+            actor_name=actor_name,
+            content=content,
+            metadata={
+                "scene": scene,
+                "importance": importance,
+                "type": "working_memory",
+            },
+            tool_context=tool_context,
+        )
+    except ImportError:
+        logger.debug("chromadb not installed, skipping vector memory store")
+    except Exception as e:
+        logger.warning(f"Vector memory store failed for {actor_name}: {e}")
+
+
+def search_vector_memory(
+    actor_name: str,
+    query: str,
+    n_results: int = 5,
+    tool_context=None,
+) -> list[dict]:
+    """Search an actor's vector memory (Tier 4) for semantically relevant entries.
+
+    基于语义相似度搜索演员的长期向量记忆。
+
+    Args:
+        actor_name: The actor's name.
+        query: The search query text.
+        n_results: Maximum number of results.
+        tool_context: Tool context for state access.
+
+    Returns:
+        List of memory dicts with content, metadata, and relevance score.
+    """
+    try:
+        from .vector_memory import search_actor_memory
+        return search_actor_memory(actor_name, query, n_results, tool_context)
+    except ImportError:
+        logger.debug("chromadb not installed, returning empty vector search results")
+        return []
+    except Exception as e:
+        logger.warning(f"Vector memory search failed for {actor_name}: {e}")
+        return []
+
+
+def build_vector_context(
+    actor_name: str,
+    current_scene: str | int = "",
+    n_results: int = 8,
+    query: str | None = None,
+    tool_context=None,
+) -> str:
+    """Build vector memory context text for an actor (Tier 4).
+
+    自动检索最相关的向量记忆，格式化为可注入 LLM 的上下文文本。
+
+    Args:
+        actor_name: The actor's name.
+        current_scene: Current scene for query generation.
+        n_results: Maximum number of results.
+        query: Optional explicit search query.
+        tool_context: Tool context for state access.
+
+    Returns:
+        Formatted context text. Empty string if vector memory unavailable.
+    """
+    try:
+        from .vector_memory import build_actor_vector_context
+        return build_actor_vector_context(
+            actor_name, current_scene, n_results, query, tool_context
+        )
+    except ImportError:
+        logger.debug("chromadb not installed, skipping vector context build")
+        return ""
+    except Exception as e:
+        logger.warning(f"Vector context build failed for {actor_name}: {e}")
+        return ""
+
+
+def update_memory_summary(actor_name: str, tool_context) -> dict:
+    """Update the memorySummary field for an actor based on current memory state.
+
+    在每次记忆变更后自动更新演员的"当前认知状态"摘要，
+    用于 Android 端 ActorInfo 的 memorySummary 字段。
+
+    Args:
+        actor_name: The actor's name.
+        tool_context: Tool context for state access.
+
+    Returns:
+        dict with status and summary.
+    """
+    state = _get_state(tool_context)
+    actors = state.get("actors", {})
+
+    if actor_name not in actors:
+        return {"status": "error", "message": f"演员「{actor_name}」不存在。"}
+
+    actor_data = actors[actor_name]
+
+    # Build summary from all tiers
+    parts = []
+
+    # Arc summary (most condensed)
+    arc = actor_data.get("arc_summary", {})
+    arc_narrative = arc.get("narrative", "")
+    if arc_narrative:
+        parts.append(arc_narrative[:150])
+
+    # Recent scene summaries
+    scene_summaries = actor_data.get("scene_summaries", [])
+    if scene_summaries:
+        latest_summary = scene_summaries[-1].get("summary", "")
+        if latest_summary:
+            parts.append(latest_summary[:100])
+
+    # Critical memories
+    critical = actor_data.get("critical_memories", [])
+    if critical:
+        critical_texts = [c.get("entry", "")[:40] for c in critical[-3:]]
+        parts.append("关键记忆：" + "；".join(critical_texts))
+
+    # Vector memory summary (Tier 4)
+    try:
+        from .vector_memory import generate_memory_summary
+        vector_summary = generate_memory_summary(actor_name, tool_context)
+        if vector_summary:
+            parts.append(vector_summary[:100])
+    except (ImportError, Exception):
+        pass
+
+    summary = "。".join(parts) if parts else "暂无记忆摘要。"
+    summary = summary[:300]  # Hard limit
+
+    # Update state
+    actor_data["memorySummary"] = summary
+    actors[actor_name] = actor_data
+    state["actors"] = actors
+    _set_state(state, tool_context)
+
+    return {
+        "status": "success",
+        "message": f"「{actor_name}」的记忆摘要已更新。",
+        "memorySummary": summary,
+    }
+
+
+# ============================================================================
 # Public Functions
 # ============================================================================
 
@@ -799,6 +966,9 @@ def add_working_memory(
 
     # Check if compression is needed
     compression_result = check_and_compress(actor_name, tool_context)
+
+    # Tier 4: Also store to vector memory (non-blocking, best-effort)
+    _store_to_vector_memory(actor_name, entry, importance, current_scene, tool_context)
 
     return {
         "status": "success",
@@ -965,6 +1135,9 @@ def mark_critical_memory(
     actors[actor_name] = actor_data
     state["actors"] = actors
     _set_state(state, tool_context)
+
+    # Update memorySummary after critical memory change
+    update_memory_summary(actor_name, tool_context)
 
     return {
         "status": "success",
@@ -1197,6 +1370,30 @@ def pre_reasoning_hook(
                 }
                 for r in recall_results
             ]
+
+    # Step 4: Vector memory recall (Tier 4) — semantic search in long-term memory
+    if enable_recall:
+        current_scene = state.get("current_scene", 0) if 'state' in dir() else 0
+        # Refresh state
+        state = _get_state(tool_context)
+        try:
+            vector_results = search_vector_memory(
+                actor_name=actor_name,
+                query=f"第{current_scene}场 最近的经历",
+                n_results=3,
+                tool_context=tool_context,
+            )
+            if vector_results:
+                result["vector_recall"] = [
+                    {
+                        "content": r.get("content", "")[:150],
+                        "relevance": r.get("relevance", 0),
+                        "scene": r.get("metadata", {}).get("scene", ""),
+                    }
+                    for r in vector_results
+                ]
+        except Exception as e:
+            logger.debug(f"Vector recall skipped for {actor_name}: {e}")
 
     return result
 

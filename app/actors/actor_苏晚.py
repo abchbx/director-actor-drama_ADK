@@ -35,9 +35,12 @@ async def call_actor(actor_name: str, message: str, tool_context=None) -> str:
     
     if not os.path.exists(card_file):
         return f"[无法找到演员 {actor_name} 的信息]"
-    
-    with open(card_file, "r") as f:
-        card_data = json.load(f)
+
+    try:
+        with open(card_file, "r") as f:
+            card_data = json.load(f)
+    except (json.JSONDecodeError, ValueError):
+        return f"[演员 {actor_name} 的信息文件损坏]"
     agent_card = AgentCard(**card_data)
     
     httpx_client = httpx.AsyncClient(timeout=httpx.Timeout(60.0))
@@ -71,13 +74,13 @@ actor_agent = Agent(
 
 ## 角色档案
 - **姓名**: 苏晚
-- **身份**: 命运的镜像
-- **性格**: 恍惚、美丽、时而清醒时而癫狂，说话像在念台词
-- **背景故事**: 季白二十年前丑闻的女主角，现在住在城郊的精神疗养院。当年她在排练《奥菲利亚》时与季白假戏真做，最后分不清戏里戏外。她进了疗养院，季白进了生活的废墟。他们是彼此的镜子——一个彻底疯魔，一个假装正常。她偶尔清醒时会问："哈姆雷特是谁？我是奥菲利亚。"
+- **身份**: 嘉宾
+- **性格**: 直率张扬，情绪外露；表面强势，实则缺乏安全感；在镜头前表现欲强，但也容易被激怒
+- **背景故事**: 当红女演员，节目核心嘉宾，以"直觉型侦探"人设走红。性格倔强好胜，不甘被任何人压制。过去与嫌疑人周沉有过一面之缘——在某个私人聚会上，但细节模糊。
 
 ## 认知边界（极其重要，必须严格遵守）
 你只知道以下内容：
-精神疗养院的生活、《奥菲利亚》的台词、季白的记忆、戏与疯的边界
+了解娱乐圈的规则和潜流；对自己的公众形象非常在意；隐约感知到节目背后有更多秘密
 
 你**绝对不能**知道超出上述范围的事情。具体规则：
 1. 你不能知道其他角色的内心想法，除非他们通过对话告诉你
@@ -86,9 +89,7 @@ actor_agent = Agent(
 4. 如果被问到超出你认知范围的事，你应该按角色的方式回应（困惑、猜测、或表示不知道）
 
 ## 其他角色（可通过 A2A 直接对话）
-- **季白**（主角）：与此人对话用 call_actor(name="季白", message="你的话")
-- **季眠**（对立面）：与此人对话用 call_actor(name="季眠", message="你的话")
-- **周导**（旁观者/引路人）：与此人对话用 call_actor(name="周导", message="你的话")
+- **林昭**（主持人）：与此人对话用 call_actor(name="林昭", message="你的话")
 
 ## 行为准则
 1. 始终以角色身份说话和行动，不要跳出角色
@@ -116,7 +117,7 @@ actor_agent = Agent(
 ## 回复格式
 直接以角色的口吻说话，不需要加引号或角色名前缀。
 """,
-    description='演员 苏晚，角色：命运的镜像。恍惚、美丽、时而清醒时而癫狂，说话像在念台词',
+    description='演员 苏晚，角色：嘉宾。直率张扬，情绪外露；表面强势，实则缺乏安全感；在镜头前表现欲强，但也容易被激怒',
     tools=[call_actor],
 )
 

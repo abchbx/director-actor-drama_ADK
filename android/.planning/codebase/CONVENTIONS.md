@@ -1,167 +1,139 @@
 # Coding Conventions
 
-**Analysis Date:** 2026-04-24
+**Analysis Date:** 2026-04-25
 
 ## Naming Patterns
 
 **Files:**
-- Screen composables: `{Feature}Screen.kt` — e.g., `DramaCreateScreen.kt`
-- ViewModels: `{Feature}ViewModel.kt` — e.g., `DramaCreateViewModel.kt`
-- DTOs: `{Entity}Dto.kt` or `{Entity}{Action}Dto.kt` — e.g., `WsEventDto.kt`, `StartDramaRequestDto`
-- Repository interfaces: `{Entity}Repository.kt`
-- Repository implementations: `{Entity}RepositoryImpl.kt`
-- API services: `{Entity}ApiService.kt`
-- DI modules: `{Concern}Module.kt` — e.g., `NetworkModule.kt`
-- Use cases: `{Verb}{Noun}UseCase.kt` — e.g., `DetectActorInteractionUseCase.kt`
-- Domain models: `{Noun}.kt` — e.g., `SceneBubble.kt`, `CommandType.kt`
+- PascalCase matching class/object name: `DramaDetailViewModel.kt`, `SceneBubble.kt`, `WebSocketManager.kt`
+- Suffix conventions:
+  - `*Dto.kt` — Data Transfer Objects (network layer)
+  - `*Repository.kt` — Repository interfaces and implementations
+  - `*Screen.kt` — Compose screen composables
+  - `*ViewModel.kt` — ViewModel classes
+  - `*Bubble.kt` — Chat bubble composables
+  - `*Bar.kt` — Input bar composables
+  - `*Indicator.kt` — Status/progress indicators
+  - `*Module.kt` — Hilt DI modules
+  - `*Interceptor.kt` — OkHttp interceptors
+  - `*UseCase.kt` — Domain use cases
 
 **Functions:**
-- ViewModel public methods: camelCase, verb-first — `createDrama()`, `sendChatMessage()`, `connectWebSocket()`
-- Repository methods: camelCase, verb-first — `startDrama()`, `listDramas()`, `getSceneBubbles()`
-- Composable functions: PascalCase — `DramaCreateScreen()`, `ChatInputBar()`, `MentionChip()`
-- Private helpers: camelCase — `handleStormEvent()`, `addLog()`, `normalizeLineBreaks()`
+- camelCase: `sendChatMessage()`, `handleWsEvent()`, `loadSceneBubbles()`
+- Private helper prefix with underscore conceptually: `_extract_call_data` (backend Python)
+- Composable functions are PascalCase: `DialogueBubble()`, `SceneBubbleList()`, `TypingIndicator()`
+- Boolean getters use `is` prefix: `isWsConnected`, `isReconnecting`, `isTyping`, `isProcessing`
 
 **Variables:**
-- StateFlow: underscore prefix for private mutable — `_uiState`, `_events`
-- Public immutable: no prefix — `uiState`, `events`
-- Local variables: camelCase — `navTarget`, `isThemeMatch`, `currentDelayMs`
-- Constants: SCREAMING_SNAKE_CASE — `POLL_INTERVAL_MS`, `MAX_CONSECUTIVE_ERRORS`, `TAG`
+- camelCase: `bubbleCounter`, `lastKnownScene`, `activeDramaId`
+- Private MutableStateFlow prefixed with underscore: `_uiState`, `_events`
+- Public StateFlow without underscore: `uiState`, `events`
+- Constants: `SCREAMING_SNAKE_CASE` in companion object: `TAG`, `TYPING_ROW_HEIGHT`
+- DTO fields: snake_case matching JSON: `current_scene`, `actor_name`, `tension_score`
 
 **Types:**
-- UI State: `{Feature}UiState` data class — e.g., `DramaCreateUiState`, `DramaDetailUiState`
-- Events: `{Feature}Event` sealed class — e.g., `DramaCreateEvent`, `DramaDetailEvent`
-- DTOs: `{Name}Dto` suffix — e.g., `WsEventDto`, `CommandResponseDto`
-- Domain models: No suffix — e.g., `SceneBubble`, `Drama`, `ActorInfo`
+- Sealed class for type hierarchies: `SceneBubble`, `ConnectionState`, `DramaDetailEvent`
+- Enum classes for fixed sets: `CommandType`, `InteractionType`, `SenderType`, `AvatarType`
+- Data classes for state and DTOs: `DramaDetailUiState`, `WsEventDto`, `ChatRequestDto`
+- `@Serializable` annotation on all DTOs and sealed class subtypes
+- `@SerialName("snake_case")` for sealed class polymorphic serialization
 
 ## Code Style
 
 **Formatting:**
-- No Prettier/Ktlint config detected
-- Kotlin standard formatting (4-space indent, trailing commas)
-- Compose functions with `Modifier` as first optional parameter
+- Kotlin standard formatting (4-space indent)
+- Trailing commas in parameter lists
+- Consistent use of `Modifier.` chain pattern in Compose
 
 **Linting:**
-- No dedicated lint config detected (relies on Android Studio defaults)
-- Comment annotations: `★` for important fixes/notes, `D-XX` for design spec references
+- Not detected — no `.eslintrc`, `detekt.yml`, or `ktlint` config found
 
 ## Import Organization
 
 **Order:**
 1. Android framework (`android.*`, `androidx.*`)
-2. Third-party libraries (`okhttp3.*`, `retrofit2.*`, `dagger.*`, `kotlinx.*`)
+2. Third-party libraries (`dagger.*`, `kotlinx.*`, `okhttp3.*`)
 3. Project imports (`com.drama.app.*`)
 
 **Path Aliases:**
-- None (full package paths used)
+- None used
 
 ## Error Handling
 
 **Patterns:**
-- Repository methods return `Result<T>` using `runCatching { }` — all exceptions caught
-- `NetworkExceptionInterceptor` converts OkHttp exceptions to HTTP error responses (prevents Retrofit crashes)
-- `AuthRepositoryImpl` maps exceptions to domain-specific error strings (`"TIMEOUT"`, `"NETWORK_UNREACHABLE"`)
-- WebSocket failures: exponential backoff reconnect, then REST degradation after threshold
-- ViewModel error state: `error: String?` field in UiState, shown in UI with dismiss/retry
-
-**Anti-patterns to avoid:**
-- Do NOT throw exceptions from Repository methods — always return `Result`
-- Do NOT let network exceptions propagate uncaught — `NetworkExceptionInterceptor` handles them
+- `Result<T>` from Kotlin stdlib for repository return types: `suspend fun getDramaStatus(): Result<DramaStatusResponseDto>`
+- `.onSuccess { }` / `.onFailure { }` chaining for result handling
+- Inline error bubbles via `SceneBubble.SystemError` for server errors in chat
+- `SharedFlow<DramaDetailEvent>` for one-time UI events (snackbars)
+- Error deduplication via `addedErrorIds` set to prevent duplicate error bubbles
+- WS permanent failure degrades to REST polling with user-visible banner
 
 ## Logging
 
 **Framework:** Android `android.util.Log`
 
 **Patterns:**
-- Each class defines `companion object { private const val TAG = "ClassName" }`
-- `Log.d()` for debug, `Log.i()` for info, `Log.w()` for warnings, `Log.e()` for errors with stack traces
-- OkHttp logging at `BODY` level with `Authorization` header redacted
-- Never log tokens or secrets
+- TAG defined in companion object: `companion object { private const val TAG = "DramaDetailViewModel" }`
+- `Log.i()` for info, `Log.w()` for warnings
+- Sparse logging — only in ViewModel and WebSocketManager
 
 ## Comments
 
 **When to Comment:**
-- Bug fixes: `★ 修复：` prefix explaining what was wrong and why the fix works
-- Design spec references: `D-XX` prefix linking to requirement IDs (e.g., `D-14`, `APP-14`)
-- Architecture decisions: Explain "why" not "what"
-- Pitfall documentation: `Pitfall N:` prefix for known gotchas
+- ★ markers for important design decisions and fixes: `// ★ 核心修复：...`
+- Section headers with `// ============================================================` dividers
+- KDoc on public APIs (inconsistent — mostly on key functions)
 
 **JSDoc/TSDoc:**
-- KDoc used sparingly, mainly on public domain model classes and key ViewModel methods
-- Most documentation is inline comments (Chinese) explaining business logic
+- KDoc used selectively on important classes and functions
+- Chinese comments for business logic explanations
+- `@Serializable` and `@SerialName` annotations serve as implicit documentation for DTOs
 
 ## Function Design
 
-**Size:** ViewModel methods can be 50-80 lines; repository mapping methods 20-40 lines; composable functions 20-60 lines
+**Size:** ViewModel methods range from 5 to 50 lines; `handleWsEvent()` is the largest at ~240 lines
 
-**Parameters:** ViewModel methods take minimal params (user input strings); composable functions follow Compose conventions (state + callbacks)
-
-**Return Values:** Repository returns `Result<T>`; ViewModel updates StateFlow; Composables are Unit
-
-## Module Design
-
-**Exports:** Each public class/interface is in its own file; no barrel files
-
-**Barrel Files:** Not used — direct imports from specific files
-
-## State Management Pattern
-
-**ViewModel:**
+**Parameters:** Named parameters with default values are standard pattern:
 ```kotlin
-private val _uiState = MutableStateFlow(FeatureUiState())
-val uiState: StateFlow<FeatureUiState> = _uiState.asStateFlow()
-
-private val _events = MutableSharedFlow<FeatureEvent>()
-val events: SharedFlow<FeatureEvent> = _events.asSharedFlow()
-```
-
-**UI Collection:**
-```kotlin
-val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-```
-
-**State Updates:**
-```kotlin
-_uiState.update { it.copy(field = newValue) }
-```
-
-**One-time Events:**
-```kotlin
-viewModelScope.launch { _events.emit(FeatureEvent.NavigateToDetail(id)) }
-```
-
-**Event Collection in UI:**
-```kotlin
-LaunchedEffect(Unit) {
-    viewModel.events.collect { event ->
-        when (event) {
-            is FeatureEvent.NavigateToDetail -> onNavigateToDetail(event.dramaId)
-        }
-    }
-}
-```
-
-## Compose Patterns
-
-**Screen signature:**
-```kotlin
-@Composable
-fun FeatureScreen(
-    onNavigateSomewhere: (String) -> Unit = {},
-    viewModel: FeatureViewModel = hiltViewModel(),
+fun SceneBubbleList(
+    bubbles: List<SceneBubble>,
+    isTyping: Boolean,
+    typingText: String = "AI 正在思考...",
+    modifier: Modifier = Modifier,
 )
 ```
 
-**Hilt ViewModel injection:** Always use `hiltViewModel()` default parameter
+**Return Values:**
+- Repository methods return `Result<T>`
+- ViewModel methods return Unit (update `_uiState` as side effect)
+- Composable functions return Unit
 
-**Navigation:** Type-safe routes with `@Serializable` objects/data classes in `Route.kt`
+## Module Design
 
-## Chinese/English Convention
+**Exports:**
+- Each screen exports a `*Screen` composable (public API)
+- ViewModel exposed via `uiState: StateFlow` and action methods (`sendCommand`, `sendChatMessage`, etc.)
+- Repository interfaces define public contracts; implementations are internal
 
-- UI text: Chinese (e.g., "开始创作", "戏剧", "设置")
-- Code identifiers: English (e.g., `createDrama`, `DramaListScreen`)
-- Comments: Mix of Chinese (business logic) and English (technical notes)
-- Design spec references: `D-XX` format
+**Barrel Files:**
+- Not used — imports reference specific files directly
+
+## Compose Patterns
+
+**State Hoisting:**
+- UI state hoisted to ViewModel via `StateFlow<UiState>`
+- Local UI state (menu expanded, input text) uses `remember`/`rememberSaveable`
+
+**Side Effects:**
+- `LaunchedEffect` for collecting flows and responding to state changes
+- `DisposableEffect` for WS lifecycle (connect on enter, disconnect on leave)
+- `SharedFlow` for one-time events (snackbars) — prevents re-consumption on recomposition
+
+**Animation:**
+- `AnimatedVisibility` for enter/exit transitions on bubbles
+- `rememberInfiniteTransition` for pulsing/typing indicators
+- Consistent easing: `FastOutSlowInEasing` for enter, `LinearOutSlowInEasing` for exit
 
 ---
 
-*Convention analysis: 2026-04-24*
+*Convention analysis: 2026-04-25*

@@ -1,64 +1,100 @@
 # Testing Patterns
 
-**Analysis Date:** 2026-04-22
+**Analysis Date:** 2026-04-25
 
 ## Test Framework
 
 **Runner:**
-- Not detected — no test framework configured for the Android app
-- No `junit`, `mockk`, `turbine`, or other test dependencies found in source
+- pytest (Python)
+- Config: `pyproject.toml` (test section)
 
 **Assertion Library:**
-- None
+- Standard pytest assertions
 
 **Run Commands:**
 ```bash
-# No test commands available
-./gradlew test           # Would run unit tests (none exist)
-./gradlew connectedTest  # Would run instrumented tests (none exist)
+pytest                          # Run all tests
+pytest tests/test_state_manager.py  # Run specific test file
 ```
 
 ## Test File Organization
 
 **Location:**
-- No test directories found under `android/app/src/test/` or `android/app/src/androidTest/`
-- The directory `android/app/src/` only contains `main/`
+- Separate `tests/` directory at project root
 
 **Naming:**
-- Not applicable (no test files)
+- `test_<module_name>.py`
 
 **Structure:**
-- Not applicable
+```
+tests/
+├── test_state_manager.py
+├── test_agent.py
+├── ... (other test files)
+```
 
 ## Test Structure
 
 **Suite Organization:**
-- No tests exist to analyze
+```python
+# Standard pytest class-based organization
+class TestStateManager:
+    def test_init_drama_state(self):
+        """Test drama state initialization."""
+        # Arrange
+        theme = "测试剧本"
+        # Act
+        result = init_drama_state(theme, tool_context)
+        # Assert
+        assert result["status"] == "success"
+```
 
 **Patterns:**
-- Not applicable
+- Setup: Tool context fixtures, mock session state
+- Teardown: Not commonly used (stateless tests preferred)
+- Assertion: Standard `assert` statements
 
 ## Mocking
 
-**Framework:** None
+**Framework:** `unittest.mock` (standard library)
 
 **Patterns:**
-- Not applicable
+```python
+# Mocking A2A calls in tests
+from unittest.mock import patch, AsyncMock
+
+@patch("app.tools._call_a2a_sdk", new_callable=AsyncMock)
+async def test_actor_speak_success(self, mock_a2a):
+    mock_a2a.return_value = "这是角色的对话"
+    result = await actor_speak("角色A", "情境描述", tool_context)
+    assert result["status"] == "success"
+    assert result["dialogue"] == "这是角色的对话"
+```
 
 **What to Mock:**
-- For future tests: `DramaRepository`, `WebSocketManager`, `ServerPreferences`, `DramaApiService`
+- A2A SDK calls (actor service responses)
+- LLM calls (expensive, non-deterministic)
+- File system operations (for state persistence tests)
 
 **What NOT to Mock:**
-- Domain models (pure data classes), DTOs, Route definitions
+- State management logic (test real behavior)
+- Event mapping logic (pure functions)
+- Data transformation functions
 
 ## Fixtures and Factories
 
 **Test Data:**
-- `app/dramas/南阳三子/state.json` exists in the Python backend as a sample drama fixture
-- No Android-specific test fixtures
+```python
+# Common fixture: mock tool context with drama state
+def make_tool_context(drama_state=None):
+    """Create a mock ToolContext with optional drama state."""
+    ctx = MagicMock()
+    ctx.state = {"drama": drama_state or {}}
+    return ctx
+```
 
 **Location:**
-- Not applicable
+- Inline in test files (no shared conftest.py detected)
 
 ## Coverage
 
@@ -66,86 +102,49 @@
 
 **View Coverage:**
 ```bash
-# No coverage tools configured
+pytest --cov=app tests/
 ```
 
 ## Test Types
 
 **Unit Tests:**
-- None — 0% coverage for ViewModels, Repositories, UseCases
+- Scope: Individual tool functions, state management, event mapping
+- Approach: Mock external dependencies, test pure logic
 
 **Integration Tests:**
-- None — no API integration tests, no database tests
+- Scope: Full command flow through Runner (less common)
+- Approach: Mock LLM responses, test tool call chains
 
 **E2E Tests:**
-- Not used
+- Not used in Python backend
+- Not detected in Android client
+
+## Android Testing
+
+**Status:** No Android test files detected in the codebase
+- No `androidTest/` directory found
+- No local unit test directory found
+- This is a significant gap for a production app
 
 ## Common Patterns
 
 **Async Testing:**
-- Not applicable (no tests)
-- Recommended: Use `Turbine` for Flow testing, `runTest` for coroutine tests
+```python
+# Tool functions are async when calling A2A
+async def test_actor_speak_calls_a2a():
+    result = await actor_speak("角色A", "情境", tool_context)
+    assert result["status"] in ("success", "error")
+```
 
 **Error Testing:**
-- Not applicable
-
-## Recommendations for Adding Tests
-
-**Priority 1 — ViewModel Unit Tests:**
-```kotlin
-// Example structure for DramaCreateViewModel
-@OptIn(ExperimentalCoroutinesApi::class)
-class DramaCreateViewModelTest {
-    @get:Rule val mainDispatcherRule = MainDispatcherRule()
-    
-    private val dramaRepository = mockk<DramaRepository>()
-    private val webSocketManager = mockk<WebSocketManager>()
-    private val serverPreferences = mockk<ServerPreferences>()
-    
-    private lateinit var viewModel: DramaCreateViewModel
-    
-    @Before
-    fun setup() {
-        viewModel = DramaCreateViewModel(dramaRepository, webSocketManager, serverPreferences)
-    }
-    
-    @Test
-    fun `createDrama with blank theme does nothing`() = runTest {
-        viewModel.createDrama("")
-        assertEquals(DramaCreateUiState(), viewModel.uiState.value)
-    }
-    
-    @Test
-    fun `createDrama sets isCreating true`() = runTest {
-        coEvery { serverPreferences.serverConfig } returns flowOf(ServerConfig("1.2.3.4", "8000", null, null))
-        coEvery { webSocketManager.connect(any(), any(), any(), any()) } returns flowOf()
-        coEvery { dramaRepository.startDrama(any()) } returns Result.success(CommandResponseDto())
-        
-        viewModel.createDrama("Test Theme")
-        assertTrue(viewModel.uiState.value.isCreating)
-    }
-}
+```python
+# Testing error responses (never exceptions)
+def test_actor_speak_unknown_actor():
+    result = await actor_speak("不存在的角色", "情境", tool_context)
+    assert result["status"] == "error"
+    assert "not found" in result["message"].lower()
 ```
-
-**Priority 2 — Repository Unit Tests:**
-```kotlin
-class DramaRepositoryImplTest {
-    private val apiService = mockk<DramaApiService>()
-    private val repository = DramaRepositoryImpl(apiService)
-    
-    @Test
-    fun `startDrama calls api with correct request`() = runTest {
-        coEvery { apiService.startDrama(any()) } returns CommandResponseDto()
-        repository.startDrama("Test")
-        coVerify { apiService.startDrama(StartDramaRequestDto("Test")) }
-    }
-}
-```
-
-**Priority 3 — Navigation Tests:**
-- Test that `DramaNavHost` navigates correctly between routes
-- Test that DramaCreate emits NavigateToDetail event on completion
 
 ---
 
-*Testing analysis: 2026-04-22*
+*Testing analysis: 2026-04-25*

@@ -1,0 +1,26 @@
+{
+  "name": "actor_阮籍",
+  "description": "演员 阮籍，角色：挚友",
+  "url": "http://localhost:9083/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_阮籍",
+      "name": "扮演阮籍",
+      "description": "以阮籍的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

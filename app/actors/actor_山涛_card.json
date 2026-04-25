@@ -1,0 +1,26 @@
+{
+  "name": "actor_山涛",
+  "description": "演员 山涛，角色：对立/抉择者",
+  "url": "http://localhost:9059/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_山涛",
+      "name": "扮演山涛",
+      "description": "以山涛的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

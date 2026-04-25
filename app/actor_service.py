@@ -54,6 +54,7 @@ def generate_actor_agent_code(
     port: int,
     other_actors: list[dict] | None = None,
     memory_entries: list[str] | None = None,
+    vector_context: str = "",
 ) -> str:
     """Generate the Python code for an actor's A2A agent service.
 
@@ -66,6 +67,7 @@ def generate_actor_agent_code(
         port: The port to run the A2A service on.
         other_actors: List of other actors' info for direct A2A communication.
         memory_entries: Prior memory strings to inject as historical context.
+        vector_context: Pre-built vector memory context text (Tier 4).
 
     Returns:
         Python source code string.
@@ -78,14 +80,28 @@ def generate_actor_agent_code(
     other_actors_section = ""
     if other_actors:
         actors_info = []
+        user_protagonist_info = None
         for actor in other_actors:
             if actor.get("name") != actor_name:
-                actors_info.append(
-                    f"- **{actor['name']}**（{actor['role']}）："
-                    f"与此人对话用 call_actor(name=\"{actor['name']}\", message=\"你的话\")"
-                )
-        if actors_info:
-            other_actors_section = "\n\n## 其他角色（可通过 A2A 直接对话）\n" + "\n".join(actors_info)
+                # ★ 用户主角特殊处理：不生成 call_actor 指令
+                if actor.get("is_user_protagonist") or actor.get("control_type") == "User-Controlled":
+                    user_protagonist_info = (
+                        f"- **{actor['name']}**（{actor['role']}，用户控制）："
+                        f"这是本剧的头号主角，由用户实时控制。你必须主动与「{actor['name']}」互动——"
+                        f"向其提问、挑战、寻求协作或回应其行为。不要等待，主动发起对话。"
+                    )
+                else:
+                    actors_info.append(
+                        f"- **{actor['name']}**（{actor['role']}）："
+                        f"与此人对话用 call_actor(name=\"{actor['name']}\", message=\"你的话\")"
+                    )
+        # ★ 用户主角信息始终置于最前
+        all_info = []
+        if user_protagonist_info:
+            all_info.append(user_protagonist_info)
+        all_info.extend(actors_info)
+        if all_info:
+            other_actors_section = "\n\n## 其他角色\n" + "\n".join(all_info)
 
     # Build memory section for historical context restoration
     memory_section = ""
@@ -95,6 +111,15 @@ def generate_actor_agent_code(
             "\n\n## 你的历史记忆（从存档恢复）\n"
             "以下是你之前的经历和记忆，请在回应时参考这些信息：\n"
             + "\n".join(memory_lines)
+        )
+
+    # Build vector memory context section (Tier 4)
+    vector_section = ""
+    if vector_context:
+        vector_section = (
+            "\n\n## 你的长期记忆（语义检索）\n"
+            "以下是从你的长期记忆库中检索出的最相关记忆，请在回应时优先参考：\n"
+            + vector_context
         )
     
     # Build the call_actor tool code
@@ -188,7 +213,7 @@ actor_agent = Agent(
 1. 你不能知道其他角色的内心想法，除非他们通过对话告诉你
 2. 你不能知道你没有亲历或被告知的事件
 3. 你不能知道"剧本"的存在——你是这个角色，不是演员
-4. 如果被问到超出你认知范围的事，你应该按角色的方式回应（困惑、猜测、或表示不知道）{other_actors_section}{memory_section}
+4. 如果被问到超出你认知范围的事，你应该按角色的方式回应（困惑、猜测、或表示不知道）{other_actors_section}{memory_section}{vector_section}
 
 ## 行为准则
 1. 始终以角色身份说话和行动，不要跳出角色
@@ -236,6 +261,7 @@ def create_actor_service(
     knowledge_scope: str,
     other_actors: list[dict] | None = None,
     memory_entries: list[str] | None = None,
+    tool_context=None,
 ) -> dict:
     """Create and launch an actor as an A2A service.
 
@@ -248,6 +274,7 @@ def create_actor_service(
         other_actors: List of other actors' info for direct A2A communication.
         memory_entries: List of prior memory strings to inject into the actor's
                         system prompt so historical context is preserved on reload.
+        tool_context: Tool context for state access (used for vector memory retrieval).
 
     Returns:
         dict with creation status and connection info.
@@ -255,10 +282,29 @@ def create_actor_service(
     actors_dir = _get_actor_dir()
     port = _get_actor_port(actor_name)
 
-    # Generate actor agent code with other actors info
+    # Build vector memory context (Tier 4) for injection into system prompt
+    vector_context = ""
+    if tool_context is not None:
+        try:
+            from .vector_memory import build_actor_vector_context
+            state = tool_context.state.get("drama", {})
+            current_scene = state.get("current_scene", 0)
+            vector_context = build_actor_vector_context(
+                actor_name=actor_name,
+                current_scene=current_scene,
+                n_results=8,
+                tool_context=tool_context,
+            )
+        except ImportError:
+            logger.debug("chromadb not installed, skipping vector context injection")
+        except Exception as e:
+            logger.warning(f"Vector context build failed for {actor_name}: {e}")
+
+    # Generate actor agent code with other actors info and vector context
     code = generate_actor_agent_code(
         actor_name, role, personality, background, knowledge_scope, port, other_actors,
         memory_entries=memory_entries,
+        vector_context=vector_context,
     )
 
     # Write actor file
@@ -315,6 +361,7 @@ def create_actor_service(
 
     return {
         "status": "success",
+        "id": f"create_actor_{actor_name}",  # ★ 唯一 ID，防止 REST 去重冲突
         "message": f"Actor '{actor_name}' A2A service started on port {port}",
         "actor_name": actor_name,
         "port": port,

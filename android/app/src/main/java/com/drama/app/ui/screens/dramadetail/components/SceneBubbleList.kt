@@ -3,9 +3,15 @@ package com.drama.app.ui.screens.dramadetail.components
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,38 +25,54 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import com.drama.app.domain.model.SceneBubble
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+
+/** ★ 剧情引导反馈颜色 */
+private val PlotGuidanceColor = Color(0xFF6A5ACD)  // 紫色系，与导演头像同色系
 
 /**
  * 场景气泡列表 — 带入场动画的对话流
  *
  * 优化特性：
+ * - reverseLayout = true：最新消息始终在底部，无需手动滚动
+ * - 数据反序 + reverseLayout：新消息自然追加到底部
  * - LazyColumn key = { it.id }，确保高效 diff & 稳定 recomposition
- * - 智能自动滚动：仅当用户接近底部时才自动跟随新消息
  * - "新消息提示"悬浮按钮：向上滚动后一键跳回最新消息
  * - TypingIndicator 固定高度占位，消除出现/消失时的跳动
  * - 每个气泡带淡入 + 位移动画
+ * - ★ 剧情引导反馈动画
  */
 @Composable
 fun SceneBubbleList(
@@ -62,30 +84,29 @@ fun SceneBubbleList(
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
-    // ── 是否接近底部的判断（最后可见项在倒数 3 以内）──
+    // reverseLayout + reversed data: index 0 = newest message, at the bottom of screen
+    val reversedBubbles = remember(bubbles) { bubbles.reversed() }
+
+    // ── 是否接近底部（最新消息区域）──
     val isNearBottom by remember {
         derivedStateOf {
-            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            val totalItems = listState.layoutInfo.totalItemsCount
-            totalItems == 0 || lastVisible >= totalItems - 3
+            val firstVisible = listState.layoutInfo.visibleItemsInfo.firstOrNull()?.index ?: 0
+            firstVisible <= 3
         }
     }
 
     // ── 是否显示"新消息"悬浮按钮 ──
-    // 当用户不在底部且有新消息到达时，显示悬浮按钮
     val showNewMessageButton by remember {
         derivedStateOf {
-            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            val totalItems = listState.layoutInfo.totalItemsCount
-            totalItems > 3 && lastVisible < totalItems - 3
+            val firstVisible = listState.layoutInfo.visibleItemsInfo.firstOrNull()?.index ?: 0
+            firstVisible > 3
         }
     }
 
-    // ── 自动滚动：仅当接近底部且有新消息/typing 变化时 ──
+    // ── 自动滚动：仅当接近底部且有新消息到达时 ──
     LaunchedEffect(bubbles.size, isTyping) {
         if (bubbles.isNotEmpty() && isNearBottom) {
-            val targetIndex = if (isTyping) bubbles.size else bubbles.lastIndex
-            listState.animateScrollToItem(targetIndex)
+            listState.animateScrollToItem(0)
         }
     }
 
@@ -95,15 +116,30 @@ fun SceneBubbleList(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 4.dp),
+            reverseLayout = true,
             verticalArrangement = Arrangement.spacedBy(4.dp),
-            // 底部留白：为 TypingIndicator 占位预留空间，避免列表跳动
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 8.dp),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 8.dp, bottom = 8.dp),
         ) {
-            itemsIndexed(
-                items = bubbles,
-                key = { _, bubble -> bubble.id },
-            ) { index, bubble ->
-                // 每个气泡带入场动画：淡入 + 从底部滑入
+            // 思考指示器 — 在 reverseLayout 中作为第一个 item，显示在最底部
+            item(key = "typing_indicator") {
+                Box(modifier = Modifier.height(TYPING_ROW_HEIGHT)) {
+                    AnimatedVisibility(
+                        visible = isTyping,
+                        enter = fadeIn(tween(300)) + slideInVertically(
+                            initialOffsetY = { it / 4 },
+                            animationSpec = tween(350, easing = LinearOutSlowInEasing),
+                        ),
+                    ) {
+                        TypingIndicator(typingText = typingText)
+                    }
+                }
+            }
+
+            // 消息列表（反序：newest first，配合 reverseLayout 最新消息在底部）
+            items(
+                items = reversedBubbles,
+                key = { bubble -> bubble.id },
+            ) { bubble ->
                 val enterAnimation = fadeIn(
                     animationSpec = tween(350, easing = FastOutSlowInEasing),
                 ) + slideInVertically(
@@ -118,25 +154,15 @@ fun SceneBubbleList(
                     when (bubble) {
                         is SceneBubble.Narration -> NarrationBubble(bubble)
                         is SceneBubble.Dialogue -> DialogueBubble(bubble)
-                        is SceneBubble.UserMessage -> UserMessageBubble(bubble)
+                        // ★ 交互语义区分：动作行为→居中斜体无气泡，直接对话→右侧聊天气泡
+                        is SceneBubble.UserMessage -> {
+                            if (bubble.isAction) UserActionBubble(bubble)
+                            else UserMessageBubble(bubble)
+                        }
                         is SceneBubble.ActorInteraction -> ActorInteractionBubble(bubble)
                         is SceneBubble.SceneDivider -> SceneDivider(bubble)
-                    }
-                }
-            }
-
-            // 思考指示器 — 始终保留固定高度空间，消除出现/消失时的跳动
-            item(key = "typing_indicator") {
-                // 固定高度容器，无论 typing 状态如何都占据相同空间
-                Box(modifier = Modifier.height(TYPING_ROW_HEIGHT)) {
-                    AnimatedVisibility(
-                        visible = isTyping,
-                        enter = fadeIn(tween(300)) + slideInVertically(
-                            initialOffsetY = { it / 4 },
-                            animationSpec = tween(350, easing = LinearOutSlowInEasing),
-                        ),
-                    ) {
-                        TypingIndicator(typingText = typingText)
+                        is SceneBubble.SystemError -> SystemErrorBubble(bubble)
+                        is SceneBubble.PlotGuidance -> PlotGuidanceBubble(bubble)
                     }
                 }
             }
@@ -149,7 +175,7 @@ fun SceneBubbleList(
                 initialOffsetY = { it },
                 animationSpec = tween(250, easing = FastOutSlowInEasing),
             ),
-            exit = androidx.compose.animation.fadeOut(tween(150)) + androidx.compose.animation.slideOutVertically(
+            exit = fadeOut(tween(150)) + slideOutVertically(
                 targetOffsetY = { it },
                 animationSpec = tween(200),
             ),
@@ -160,8 +186,7 @@ fun SceneBubbleList(
             FilledIconButton(
                 onClick = {
                     scope.launch {
-                        val targetIndex = if (isTyping) bubbles.size else bubbles.lastIndex
-                        listState.animateScrollToItem(targetIndex)
+                        listState.animateScrollToItem(0)
                     }
                 },
                 modifier = Modifier.padding(8.dp),
@@ -182,7 +207,6 @@ fun SceneBubbleList(
 }
 
 
-
 @Composable
 private fun SceneDivider(bubble: SceneBubble.SceneDivider) {
     Column(
@@ -191,7 +215,6 @@ private fun SceneDivider(bubble: SceneBubble.SceneDivider) {
             .padding(vertical = 12.dp, horizontal = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        // 装饰线 + 中心点
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth(),
@@ -233,5 +256,106 @@ private fun SceneDivider(bubble: SceneBubble.SceneDivider) {
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
         )
+    }
+}
+
+/**
+ * 系统错误气泡 — 左对齐，红色 Card 样式
+ */
+@Composable
+private fun SystemErrorBubble(bubble: SceneBubble.SystemError) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer,
+            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        ),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Error,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.error,
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = bubble.text,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+    }
+}
+
+/**
+ * ★ 剧情引导反馈气泡 — 短暂动画确认导演已接收到剧情变动
+ * 
+ * 设计要点：
+ * - 居中显示，半透明紫色渐变背景
+ * - 探索图标 + 脉冲动画
+ * - 3秒后自动淡出
+ */
+@Composable
+private fun PlotGuidanceBubble(bubble: SceneBubble.PlotGuidance) {
+    // ★ 脉冲动画：图标呼吸效果
+    val infiniteTransition = rememberInfiniteTransition(label = "plot_guidance_pulse")
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.6f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "pulse_alpha",
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = PlotGuidanceColor.copy(alpha = 0.08f),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                // ★ 脉冲探索图标
+                Icon(
+                    imageVector = Icons.Filled.Explore,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(18.dp)
+                        .graphicsLayer { alpha = pulseAlpha },
+                    tint = PlotGuidanceColor.copy(alpha = 0.8f),
+                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Text(
+                    text = bubble.text,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Medium,
+                    fontStyle = FontStyle.Italic,
+                    color = PlotGuidanceColor.copy(alpha = 0.75f),
+                )
+            }
+        }
     }
 }

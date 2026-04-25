@@ -526,7 +526,7 @@ def init_drama_state(theme: str, tool_context=None) -> dict:
     state["status"] = "setup"
     state["current_scene"] = 0
     state["scenes"] = []
-    state["actors"] = {}
+    # ★ actors 初始化移至下方（包含用户主角角色），此处不再设为空字典
     state["narration_log"] = []
     # Phase 5: Mixed Autonomy Mode fields (D-21/D-22/D-23)
     state["remaining_auto_scenes"] = 0
@@ -574,6 +574,40 @@ def init_drama_state(theme: str, tool_context=None) -> dict:
     # SceneContext: shared cognitive state for coreference resolution
     state["scene_context"] = {}
 
+    # ★ 用户即主角：将用户作为特殊角色加入 Cast，标记为 User-Controlled
+    state["actors"] = {
+        "你": {
+            "role": "主角（Protagonist）",
+            "personality": "由用户实时定义——导演应根据用户输入推断性格特征",
+            "background": "用户自己的故事——导演应根据剧情发展逐步揭示",
+            "knowledge_scope": "用户所知范围——导演应根据用户输入动态推断",
+            "control_type": "User-Controlled",  # ★ 标记为用户控制的角色
+            "memory": [],
+            "working_memory": [],
+            "scene_summaries": [],
+            "arc_summary": {
+                "structured": {
+                    "theme": "",
+                    "key_characters": [],
+                    "unresolved": [],
+                    "resolved": [],
+                },
+                "narrative": "",
+            },
+            "critical_memories": [],
+            "memorySummary": "用户是本剧头号主角，行为由用户输入驱动。",
+            "emotions": "neutral",
+            "arc_progress": {
+                "arc_type": "",
+                "arc_stage": "",
+                "progress": 0,
+                "related_threads": [],
+            },
+            "is_user_protagonist": True,  # ★ 标记此角色为用户主角，不可删除
+            "created_at": datetime.now().isoformat(),
+        }
+    }
+
     _set_state(state, tool_context)
     _save_state_to_file(theme, state)
     _write_active_theme(theme)
@@ -591,6 +625,8 @@ def save_progress(save_name: str = "", tool_context=None) -> dict:
     The save is stored in the drama's dedicated folder as state.json.
     Optional named snapshots can also be created.
 
+    Also backs up actor vector memory indices (Tier 4) to the drama folder.
+
     Args:
         save_name: Optional name for a named save snapshot.
                    If empty, just updates the main state.json.
@@ -605,6 +641,9 @@ def save_progress(save_name: str = "", tool_context=None) -> dict:
 
     # Ensure directories exist
     dirs = _ensure_drama_dirs(theme)
+
+    # Backup actor vector memory indices (Tier 4)
+    vector_backup_result = _backup_vector_memory(state, theme)
 
     # Always save main state
     state["updated_at"] = datetime.now().isoformat()
@@ -630,7 +669,174 @@ def save_progress(save_name: str = "", tool_context=None) -> dict:
         "drama_folder": dirs["root"],
         "state_file": _get_state_file(theme),
         "snapshot_path": snapshot_path,
+        "vector_backup": vector_backup_result,
     }
+
+
+def _backup_vector_memory(state: dict, theme: str) -> dict:
+    """Backup actor vector memory indices to JSON files in the drama folder.
+
+    将每个演员的 ChromaDB 向量记忆索引导出为 JSON 文件，
+    存储在 drama 文件夹的 actors/ 目录下。
+
+    Args:
+        state: The drama state dict.
+        theme: The drama theme.
+
+    Returns:
+        dict with backup status per actor.
+    """
+    actors = state.get("actors", {})
+    if not actors:
+        return {"status": "info", "message": "No actors to backup.", "backed_up": 0}
+
+    results = {}
+    backed_up = 0
+
+    try:
+        from .vector_memory import get_vector_store
+
+        store = get_vector_store(theme, DRAMAS_DIR)
+
+        for actor_name in actors:
+            try:
+                entries = store.export_actor_memory(actor_name)
+                if entries:
+                    # Write to actors directory
+                    actors_dir = os.path.join(_get_drama_folder(theme), "actors")
+                    os.makedirs(actors_dir, exist_ok=True)
+                    safe_name = _sanitize_name(actor_name)
+                    backup_file = os.path.join(actors_dir, f"vector_memory_{safe_name}.json")
+                    with open(backup_file, "w", encoding="utf-8") as f:
+                        json.dump(entries, f, ensure_ascii=False, indent=2)
+                    results[actor_name] = {"status": "success", "count": len(entries)}
+                    backed_up += 1
+                else:
+                    results[actor_name] = {"status": "skipped", "count": 0}
+            except Exception as e:
+                logger.warning(f"Vector memory backup failed for {actor_name}: {e}")
+                results[actor_name] = {"status": "error", "message": str(e)[:100]}
+
+    except ImportError:
+        return {"status": "info", "message": "chromadb not installed, skipping vector backup.", "backed_up": 0}
+    except Exception as e:
+        logger.error(f"Vector memory backup failed: {e}")
+        return {"status": "error", "message": str(e)[:200], "backed_up": backed_up}
+
+    return {"status": "success", "backed_up": backed_up, "details": results}
+
+
+def _restore_vector_memory(state: dict, theme: str) -> dict:
+    """Restore actor vector memory indices from JSON backup files.
+
+    从 drama 文件夹的 actors/ 目录下恢复每个演员的向量记忆索引。
+
+    Args:
+        state: The drama state dict.
+        theme: The drama theme.
+
+    Returns:
+        dict with restore status per actor.
+    """
+    actors = state.get("actors", {})
+    if not actors:
+        return {"status": "info", "message": "No actors to restore.", "restored": 0}
+
+    results = {}
+    restored = 0
+
+    try:
+        from .vector_memory import get_vector_store
+
+        store = get_vector_store(theme, DRAMAS_DIR)
+
+        for actor_name in actors:
+            try:
+                actors_dir = os.path.join(_get_drama_folder(theme), "actors")
+                safe_name = _sanitize_name(actor_name)
+                backup_file = os.path.join(actors_dir, f"vector_memory_{safe_name}.json")
+
+                if os.path.exists(backup_file):
+                    with open(backup_file, "r", encoding="utf-8") as f:
+                        entries = json.load(f)
+                    if entries:
+                        result = store.import_actor_memory(actor_name, entries)
+                        results[actor_name] = {
+                            "status": "success",
+                            "count": result.get("count", 0),
+                        }
+                        restored += 1
+                    else:
+                        results[actor_name] = {"status": "skipped", "count": 0}
+                else:
+                    results[actor_name] = {"status": "no_backup", "count": 0}
+
+            except Exception as e:
+                logger.warning(f"Vector memory restore failed for {actor_name}: {e}")
+                results[actor_name] = {"status": "error", "message": str(e)[:100]}
+
+    except ImportError:
+        return {"status": "info", "message": "chromadb not installed, skipping vector restore.", "restored": 0}
+    except Exception as e:
+        logger.error(f"Vector memory restore failed: {e}")
+        return {"status": "error", "message": str(e)[:200], "restored": restored}
+
+    return {"status": "success", "restored": restored, "details": results}
+
+
+def _update_all_memory_summaries(state: dict, tool_context=None) -> None:
+    """Update memorySummary for all actors after state changes.
+
+    在加载进度或恢复记忆后调用，确保每个演员的 memorySummary 字段
+    反映最新的认知状态。
+
+    Args:
+        state: The drama state dict (mutated in-place).
+        tool_context: Optional tool context for state persistence.
+    """
+    actors = state.get("actors", {})
+    if not actors:
+        return
+
+    for actor_name, actor_data in actors.items():
+        # Build summary from all memory tiers
+        parts = []
+
+        # Arc summary
+        arc = actor_data.get("arc_summary", {})
+        arc_narrative = arc.get("narrative", "")
+        if arc_narrative:
+            parts.append(arc_narrative[:150])
+
+        # Recent scene summaries
+        scene_summaries = actor_data.get("scene_summaries", [])
+        if scene_summaries:
+            latest_summary = scene_summaries[-1].get("summary", "")
+            if latest_summary:
+                parts.append(latest_summary[:100])
+
+        # Critical memories
+        critical = actor_data.get("critical_memories", [])
+        if critical:
+            critical_texts = [c.get("entry", "")[:40] for c in critical[-3:]]
+            parts.append("关键记忆：" + "；".join(critical_texts))
+
+        # Vector memory summary (Tier 4)
+        try:
+            from .vector_memory import generate_memory_summary
+            if tool_context is not None:
+                vector_summary = generate_memory_summary(actor_name, tool_context)
+                if vector_summary:
+                    parts.append(vector_summary[:100])
+        except (ImportError, Exception):
+            pass
+
+        summary = "。".join(parts) if parts else "暂无记忆摘要。"
+        actor_data["memorySummary"] = summary[:300]
+
+    state["actors"] = actors
+    if tool_context is not None:
+        _set_state(state, tool_context)
 
 
 def _migrate_legacy_status(state: dict) -> dict:
@@ -794,6 +1000,37 @@ def load_progress(save_name: str, tool_context=None) -> dict:
     # SceneContext backward compatibility
     state.setdefault("scene_context", {})
 
+    # ★ 用户即主角：向后兼容——旧存档若无用户主角，自动注入
+    actors = state.get("actors", {})
+    if "你" not in actors or not actors.get("你", {}).get("is_user_protagonist"):
+        actors["你"] = {
+            "role": "主角（Protagonist）",
+            "personality": "由用户实时定义——导演应根据用户输入推断性格特征",
+            "background": "用户自己的故事——导演应根据剧情发展逐步揭示",
+            "knowledge_scope": "用户所知范围——导演应根据用户输入动态推断",
+            "control_type": "User-Controlled",
+            "memory": [],
+            "working_memory": [],
+            "scene_summaries": [],
+            "arc_summary": {
+                "structured": {"theme": "", "key_characters": [], "unresolved": [], "resolved": []},
+                "narrative": "",
+            },
+            "critical_memories": [],
+            "memorySummary": "用户是本剧头号主角，行为由用户输入驱动。",
+            "emotions": "neutral",
+            "arc_progress": {"arc_type": "", "arc_stage": "", "progress": 0, "related_threads": []},
+            "is_user_protagonist": True,
+            "created_at": datetime.now().isoformat(),
+        }
+        state["actors"] = actors
+
+    # Tier 4: Restore actor vector memory from backup files
+    vector_restore_result = _restore_vector_memory(state, theme)
+
+    # Update memorySummary for all actors after load
+    _update_all_memory_summaries(state, tool_context)
+
     _set_state(state, tool_context)
     _write_active_theme(state.get("theme", ""))
 
@@ -807,6 +1044,7 @@ def load_progress(save_name: str, tool_context=None) -> dict:
         "num_scenes": len(state.get("scenes", [])),
         "actors_list": list(state.get("actors", {}).keys()),
         "drama_folder": os.path.dirname(state_file),
+        "vector_restore": vector_restore_result,
     }
 
 
@@ -979,8 +1217,14 @@ def register_actor(
     state = _get_state(tool_context)
     actors = state.get("actors", {})
 
-    if len(actors) >= 10:
+    # ★ 排除用户主角，仅计算 AI 演员数量
+    ai_actor_count = sum(1 for a in actors.values() if not a.get("is_user_protagonist"))
+    if ai_actor_count >= 10:
         return {"status": "error", "message": "Maximum number of actors (10) reached."}
+
+    # ★ 禁止覆盖用户主角
+    if actor_name == "你" and actors.get("你", {}).get("is_user_protagonist"):
+        return {"status": "error", "message": "无法覆盖用户主角角色'你'。"}
 
     actor_data = {
         "role": role,
@@ -1000,6 +1244,7 @@ def register_actor(
             "narrative": "",
         },
         "critical_memories": [],  # D-07: 关键记忆（独立存储）
+        "memorySummary": "",  # Tier 4: 当前认知状态摘要
         "emotions": "neutral",
         "arc_progress": {  # Phase 7 (D-05/D-08)
             "arc_type": "",
@@ -1114,6 +1359,9 @@ def get_all_actors(tool_context=None) -> dict:
             "scene_summaries_count": len(info.get("scene_summaries", [])),
             "critical_memories_count": len(info.get("critical_memories", [])),
             "has_arc_summary": bool(info.get("arc_summary", {}).get("narrative", "")),
+            "memorySummary": info.get("memorySummary", ""),
+            "is_user_protagonist": info.get("is_user_protagonist", False),  # ★ 标记用户主角
+            "control_type": info.get("control_type", "AI-Controlled"),  # ★ 控制类型
         }
 
     return {"status": "success", "actors": summary}

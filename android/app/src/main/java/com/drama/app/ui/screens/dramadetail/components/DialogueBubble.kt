@@ -43,11 +43,16 @@ fun actorColor(name: String): Color {
  * 微信群聊风格角色对话气泡
  * - 左侧显示角色头像（根据名称生成颜色一致的占位头像）
  * - 角色名称和情绪标签
+ * - ★ 若对话针对主角（emotion 含"→主角"），显示特殊标记
  * - 聊天气泡样式
  */
 @Composable
 fun DialogueBubble(bubble: SceneBubble.Dialogue) {
     val color = actorColor(bubble.actorName)
+    val displayName = bubble.senderName.ifBlank { bubble.actorName }
+    // ★ 增强识别：若 emotion 含"→主角"，标记此对话针对主角
+    val isDirectedAtProtagonist = bubble.emotion.contains("→主角")
+    val cleanEmotion = bubble.emotion.replace("→主角", "").trim()
 
     Row(
         modifier = Modifier
@@ -69,7 +74,7 @@ fun DialogueBubble(bubble: SceneBubble.Dialogue) {
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                text = bubble.actorName.firstOrNull()?.uppercase() ?: "?",
+                text = displayName.firstOrNull()?.uppercase() ?: "?",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
@@ -82,25 +87,25 @@ fun DialogueBubble(bubble: SceneBubble.Dialogue) {
         Column(
             modifier = Modifier.weight(1f),
         ) {
-            // 角色名称 + 情绪标签
+            // ★ 角色名称 + 情绪标签 + 主角标记 — 使用 senderName
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(bottom = 2.dp),
             ) {
                 Text(
-                    text = bubble.actorName,
+                    text = displayName,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = color,
                 )
-                if (bubble.emotion.isNotBlank()) {
+                if (cleanEmotion.isNotBlank()) {
                     Spacer(modifier = Modifier.width(6.dp))
                     Surface(
                         shape = RoundedCornerShape(10.dp),
                         color = color.copy(alpha = 0.12f),
                     ) {
                         Text(
-                            text = bubble.emotion,
+                            text = cleanEmotion,
                             style = MaterialTheme.typography.labelSmall,
                             fontStyle = FontStyle.Italic,
                             color = color,
@@ -108,9 +113,31 @@ fun DialogueBubble(bubble: SceneBubble.Dialogue) {
                         )
                     }
                 }
+                // ★ 针对主角的标记
+                if (isDirectedAtProtagonist) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = Color(0xFFB71C1C).copy(alpha = 0.1f),
+                    ) {
+                        Text(
+                            text = "→ 主角",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFFB71C1C).copy(alpha = 0.7f),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                        )
+                    }
+                }
             }
 
             // ★ 聊天气泡 - 微信风格圆角，支持 Markdown 渲染
+            // ★ 针对主角的对话，使用更明显的背景色
+            val bubbleColor = if (isDirectedAtProtagonist) {
+                color.copy(alpha = 0.12f)
+            } else {
+                color.copy(alpha = 0.08f)
+            }
             Surface(
                 shape = RoundedCornerShape(
                     topStart = 4.dp,   // 头像侧小圆角
@@ -118,8 +145,8 @@ fun DialogueBubble(bubble: SceneBubble.Dialogue) {
                     bottomStart = 16.dp,
                     bottomEnd = 16.dp,
                 ),
-                color = color.copy(alpha = 0.08f),
-                shadowElevation = 1.dp,
+                color = bubbleColor,
+                shadowElevation = if (isDirectedAtProtagonist) 2.dp else 1.dp,
             ) {
                 // ★ Markdown 渲染：支持 **加粗**、*斜体*、`代码`、[链接](url) 等
                 // 使用 MarkdownConfig 配置角色强调色和段落间距

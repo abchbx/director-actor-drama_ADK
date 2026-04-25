@@ -99,7 +99,7 @@ fun ActorDrawerContent(
                         verticalArrangement = Arrangement.Center,
                     ) {
                         Text(
-                            text = "暂无演员",
+                            text = "暂无演员，输入 /cast 加载",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -128,7 +128,7 @@ fun ActorDrawerContent(
 @Composable
 private fun ActorListWithStagger(actors: List<ActorInfo>) {
     LazyColumn(
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         itemsIndexed(actors, key = { _, actor -> actor.name }) { index, actor ->
             StaggerItem(index = index) {

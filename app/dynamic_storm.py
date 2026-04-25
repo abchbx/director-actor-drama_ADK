@@ -9,6 +9,8 @@ Core components:
 - Conflict type suggestion from perspective description (D-21)
 - LLM response parsing
 - State management for dynamic_storm sub-dict (D-27/D-28)
+- Protagonist behavior weight evaluation (P-01)
+- Key choice detection & arc progress update (P-02/P-03)
 """
 
 import json
@@ -33,6 +35,54 @@ CONFLICT_KEYWORD_MAP = {
     "威胁": "external_threat", "外部": "external_threat",
     "两难": "dilemma", "抉择": "dilemma",
     "新角色": "new_character", "登场": "new_character",
+}
+
+# ============================================================================
+# Protagonist Behavior Weight / 主角行为权重常量 (P-01)
+# ============================================================================
+
+# 关键行为权重等级
+PROTAGONIST_WEIGHT = {
+    "critical": 3,    # 决定性选择：反叛、缔结盟约、重大牺牲
+    "major": 2,       # 重要行动：改变立场、揭露秘密、关键对话
+    "minor": 1,       # 普通行动：日常对话、观察、小决定
+    "passive": 0,     # 被动行为：旁观、沉默
+}
+
+# 关键选择关键词 → 行为权重 + 弧线影响映射 (P-02)
+KEY_CHOICE_PATTERNS = {
+    # 反叛类
+    "反叛": {"weight": "critical", "arc_delta": 25, "arc_stage_hint": "climax", "narrative_tag": "反叛"},
+    "背叛": {"weight": "critical", "arc_delta": 25, "arc_stage_hint": "climax", "narrative_tag": "背叛"},
+    "反抗": {"weight": "critical", "arc_delta": 20, "arc_stage_hint": "development", "narrative_tag": "反抗"},
+    "决裂": {"weight": "critical", "arc_delta": 25, "arc_stage_hint": "climax", "narrative_tag": "决裂"},
+    # 盟约类
+    "接受盟约": {"weight": "critical", "arc_delta": 20, "arc_stage_hint": "development", "narrative_tag": "结盟"},
+    "结盟": {"weight": "critical", "arc_delta": 20, "arc_stage_hint": "development", "narrative_tag": "结盟"},
+    "联盟": {"weight": "major", "arc_delta": 15, "arc_stage_hint": "development", "narrative_tag": "结盟"},
+    "拒绝": {"weight": "major", "arc_delta": 15, "arc_stage_hint": "development", "narrative_tag": "拒绝"},
+    # 抉择类
+    "选择": {"weight": "major", "arc_delta": 10, "arc_stage_hint": "development", "narrative_tag": "抉择"},
+    "决定": {"weight": "major", "arc_delta": 10, "arc_stage_hint": "development", "narrative_tag": "决定"},
+    "牺牲": {"weight": "critical", "arc_delta": 25, "arc_stage_hint": "climax", "narrative_tag": "牺牲"},
+    "放弃": {"weight": "major", "arc_delta": 15, "arc_stage_hint": "development", "narrative_tag": "放弃"},
+    # 揭示类
+    "揭露": {"weight": "major", "arc_delta": 15, "arc_stage_hint": "climax", "narrative_tag": "揭露"},
+    "真相": {"weight": "major", "arc_delta": 10, "arc_stage_hint": "climax", "narrative_tag": "真相揭示"},
+    "坦白": {"weight": "major", "arc_delta": 10, "arc_stage_hint": "development", "narrative_tag": "坦白"},
+    # 转变类
+    "转变": {"weight": "major", "arc_delta": 15, "arc_stage_hint": "climax", "narrative_tag": "转变"},
+    "觉醒": {"weight": "major", "arc_delta": 15, "arc_stage_hint": "climax", "narrative_tag": "觉醒"},
+    "成长": {"weight": "major", "arc_delta": 10, "arc_stage_hint": "development", "narrative_tag": "成长"},
+    "顿悟": {"weight": "major", "arc_delta": 10, "arc_stage_hint": "climax", "narrative_tag": "顿悟"},
+}
+
+# 弧线类型推断规则 (P-03)
+ARC_TYPE_INFERENCE = {
+    "反叛": "transformation", "背叛": "fall", "反抗": "transformation",
+    "决裂": "transformation", "结盟": "growth", "拒绝": "growth",
+    "牺牲": "redemption", "揭露": "transformation", "觉醒": "growth",
+    "成长": "growth", "顿悟": "growth", "转变": "transformation",
 }
 
 
@@ -109,6 +159,29 @@ def discover_perspectives_prompt(state: dict, focus_area: str = "") -> str:
             arc_infos.append(f"{name}（{arc['arc_type']}，进展{arc['progress']}%）")
     if arc_infos:
         sections.append(f"角色弧线进展：{'、'.join(arc_infos)}")
+
+    # ★ 主角行为权重评估 (P-01)：在视角发现 prompt 中体现主角影响力
+    protagonist_weight = evaluate_protagonist_weight(state)
+    if protagonist_weight["weight_level"] != "passive":
+        weight_desc = (
+            f"主角行为权重：{protagonist_weight['weight_level']}"
+            f"（分数{protagonist_weight['weight_score']}）"
+        )
+        if protagonist_weight["is_pivotal"]:
+            weight_desc += "⚠️ 关键转折"
+        weight_desc += f"\n{protagonist_weight['narrative_impact']}"
+        # 列出关键行动
+        pivotal_actions = [
+            d for d in protagonist_weight["action_details"]
+            if d["weight"] in ("critical", "major")
+        ]
+        if pivotal_actions:
+            action_strs = [
+                f"「{a['action'][:40]}」({a['weight']})"
+                for a in pivotal_actions[:3]
+            ]
+            weight_desc += f"\n关键行动：{'；'.join(action_strs)}"
+        sections.append(weight_desc)
 
     # 近期场景 (last 3)
     recent_scenes = scenes[-3:] if len(scenes) >= 3 else scenes
@@ -349,3 +422,365 @@ def update_dynamic_storm_state(
         dynamic_storm["discovered_perspectives"].extend(new_perspectives)
 
     return dynamic_storm
+
+
+# ============================================================================
+# Protagonist Behavior Weight / 主角行为权重评估 (P-01)
+# ============================================================================
+
+
+def evaluate_protagonist_weight(state: dict, recent_actions: list[str] | None = None) -> dict:
+    """Evaluate the protagonist's behavior weight in recent scenes.
+
+    评估主角（用户）在近期场景中的行为权重，量化主角对剧情的影响力。
+    权重越高，主角对剧情走向的决定性越强，导演应更加重视主角的意图。
+
+    Args:
+        state: Drama state dict with actors, dynamic_storm, scenes, conversation_log.
+        recent_actions: Optional explicit list of recent action descriptions.
+            If None, extracted from conversation_log of the current scene.
+
+    Returns:
+        dict with:
+        - weight_level: "critical"|"major"|"minor"|"passive"
+        - weight_score: Integer score (sum of action weights)
+        - action_details: List of {action, weight, matched_keyword} dicts
+        - narrative_impact: Description of protagonist's narrative influence
+        - is_pivotal: True if any critical action was detected
+    """
+    # Extract recent actions if not provided
+    if recent_actions is None:
+        recent_actions = _extract_protagonist_actions(state)
+
+    if not recent_actions:
+        return {
+            "weight_level": "passive",
+            "weight_score": 0,
+            "action_details": [],
+            "narrative_impact": "主角暂无显著行动",
+            "is_pivotal": False,
+        }
+
+    # Evaluate each action
+    action_details = []
+    total_score = 0
+    has_critical = False
+
+    for action_text in recent_actions:
+        matched = _match_key_choice(action_text)
+        if matched:
+            weight_val = PROTAGONIST_WEIGHT[matched["weight"]]
+            total_score += weight_val
+            if matched["weight"] == "critical":
+                has_critical = True
+            action_details.append({
+                "action": action_text[:100],
+                "weight": matched["weight"],
+                "matched_keyword": matched["keyword"],
+                "narrative_tag": matched.get("narrative_tag", ""),
+            })
+        else:
+            # Default to minor for unmatched actions
+            total_score += PROTAGONIST_WEIGHT["minor"]
+            action_details.append({
+                "action": action_text[:100],
+                "weight": "minor",
+                "matched_keyword": None,
+                "narrative_tag": "",
+            })
+
+    # Determine overall weight level
+    if has_critical or total_score >= PROTAGONIST_WEIGHT["critical"]:
+        weight_level = "critical"
+    elif total_score >= PROTAGONIST_WEIGHT["major"]:
+        weight_level = "major"
+    elif total_score > 0:
+        weight_level = "minor"
+    else:
+        weight_level = "passive"
+
+    # Generate narrative impact description
+    narrative_impact = _generate_narrative_impact(weight_level, action_details)
+
+    return {
+        "weight_level": weight_level,
+        "weight_score": total_score,
+        "action_details": action_details,
+        "narrative_impact": narrative_impact,
+        "is_pivotal": has_critical,
+    }
+
+
+def _extract_protagonist_actions(state: dict) -> list[str]:
+    """Extract protagonist (user) action descriptions from conversation log.
+
+    从对话记录中提取主角的行动描述。
+    """
+    conversation_log = state.get("conversation_log", [])
+    current_scene = state.get("current_scene", 0)
+
+    actions = []
+    for entry in conversation_log:
+        # Only look at current scene and user actions
+        if entry.get("scene") != current_scene:
+            continue
+        if entry.get("speaker") == "主角" or entry.get("type") == "action":
+            content = entry.get("content", "").strip()
+            if content:
+                actions.append(content)
+
+    return actions
+
+
+def _match_key_choice(action_text: str) -> dict | None:
+    """Check if an action text matches any key choice pattern.
+
+    检测行动文本是否匹配关键选择模式。
+    返回第一个匹配的关键选择配置，或 None。
+    """
+    for keyword, config in KEY_CHOICE_PATTERNS.items():
+        if keyword in action_text:
+            return {"keyword": keyword, **config}
+    return None
+
+
+def _generate_narrative_impact(weight_level: str, action_details: list[dict]) -> str:
+    """Generate a narrative impact description based on weight evaluation.
+
+    根据权重评估生成主角叙事影响力的描述。
+    """
+    if weight_level == "critical":
+        tags = [d["narrative_tag"] for d in action_details if d.get("narrative_tag")]
+        tag_str = "、".join(set(tags)) if tags else "关键抉择"
+        return f"主角做出了决定性行动（{tag_str}），剧情走向将因此发生重大转折。"
+    elif weight_level == "major":
+        tags = [d["narrative_tag"] for d in action_details if d.get("narrative_tag")]
+        tag_str = "、".join(set(tags)) if tags else "重要行动"
+        return f"主角采取了重要行动（{tag_str}），对剧情发展产生显著影响。"
+    elif weight_level == "minor":
+        return "主角有参与行动，但对剧情走向影响有限。"
+    else:
+        return "主角暂无显著行动，剧情主要由其他角色推动。"
+
+
+# ============================================================================
+# Key Choice Detection & Arc Progress Update / 关键选择检测与弧线更新 (P-02/P-03)
+# ============================================================================
+
+
+def detect_key_choice_and_update_arc(
+    action_description: str,
+    state: dict,
+    auto_update: bool = True,
+) -> dict:
+    """Detect if a user action is a key choice and optionally update arc progress.
+
+    检测用户行动是否为关键性选择，并可选地立即更新主角的 Arc Progress。
+    关键选择包括：反叛、接受盟约、重大牺牲、决定性抉择等。
+
+    当检测到关键选择时：
+    1. 识别匹配的关键选择模式
+    2. 计算弧线进展增量
+    3. 推断弧线类型（如尚未设定）
+    4. 更新弧线阶段提示
+    5. 记录剧情转折标记
+
+    Args:
+        action_description: The user's action description text.
+        state: Drama state dict with actors.
+        auto_update: If True, immediately update the protagonist's arc_progress in state.
+
+    Returns:
+        dict with:
+        - is_key_choice: Whether a key choice was detected
+        - matched_patterns: List of matched {keyword, config} dicts
+        - arc_update: The arc progress update applied (or would be applied)
+        - narrative_tag: Combined narrative tag for the choice
+        - protagonist_arc_after: Arc progress state after update (if auto_update)
+    """
+    matched_patterns = []
+
+    # Scan for key choice keywords
+    for keyword, config in KEY_CHOICE_PATTERNS.items():
+        if keyword in action_description:
+            matched_patterns.append({"keyword": keyword, **config})
+
+    if not matched_patterns:
+        return {
+            "is_key_choice": False,
+            "matched_patterns": [],
+            "arc_update": None,
+            "narrative_tag": "",
+            "protagonist_arc_after": None,
+        }
+
+    # Calculate combined arc delta
+    total_arc_delta = sum(p["arc_delta"] for p in matched_patterns)
+    # Cap at 100
+    total_arc_delta = min(total_arc_delta, 100)
+
+    # Determine the dominant (highest delta) pattern for stage/type inference
+    dominant = max(matched_patterns, key=lambda p: p["arc_delta"])
+    arc_stage_hint = dominant["arc_stage_hint"]
+    narrative_tags = list(dict.fromkeys(p["narrative_tag"] for p in matched_patterns if p.get("narrative_tag")))
+    narrative_tag = "、".join(narrative_tags)
+
+    # Infer arc_type from dominant keyword
+    arc_type_hint = ARC_TYPE_INFERENCE.get(dominant["keyword"], "")
+
+    # Build arc update specification
+    arc_update = {
+        "progress_delta": total_arc_delta,
+        "arc_stage_hint": arc_stage_hint,
+        "arc_type_hint": arc_type_hint,
+        "narrative_tag": narrative_tag,
+    }
+
+    # Apply update to protagonist's arc_progress if auto_update
+    protagonist_arc_after = None
+    if auto_update:
+        protagonist_arc_after = _apply_arc_update_to_protagonist(state, arc_update, action_description)
+
+    return {
+        "is_key_choice": True,
+        "matched_patterns": matched_patterns,
+        "arc_update": arc_update,
+        "narrative_tag": narrative_tag,
+        "protagonist_arc_after": protagonist_arc_after,
+    }
+
+
+def _apply_arc_update_to_protagonist(state: dict, arc_update: dict, action_description: str) -> dict | None:
+    """Apply arc progress update to the protagonist ("你") in state.
+
+    将弧线进展更新应用到主角"你"的 arc_progress。
+    仅在字段为空或进度更低时更新，不会降级已有设定。
+
+    Args:
+        state: Drama state dict with actors (mutated in-place).
+        arc_update: Arc update specification from detect_key_choice_and_update_arc.
+        action_description: The original action text (for related_threads context).
+
+    Returns:
+        Updated arc_progress dict, or None if protagonist not found.
+    """
+    actors = state.get("actors", {})
+    protagonist = actors.get("你")
+    if not protagonist:
+        return None
+
+    arc_progress = protagonist.get("arc_progress", {})
+    if not arc_progress:
+        arc_progress = {
+            "arc_type": "",
+            "arc_stage": "",
+            "progress": 0,
+            "related_threads": [],
+        }
+
+    # Update progress (additive, capped at 100)
+    current_progress = arc_progress.get("progress", 0)
+    new_progress = min(100, current_progress + arc_update["progress_delta"])
+    arc_progress["progress"] = new_progress
+
+    # Set arc_type only if currently empty
+    if not arc_progress.get("arc_type") and arc_update.get("arc_type_hint"):
+        arc_progress["arc_type"] = arc_update["arc_type_hint"]
+
+    # Update arc_stage to hint if progress warrants advancement
+    if arc_update.get("arc_stage_hint"):
+        stage_order = ["setup", "development", "climax", "resolution"]
+        current_stage = arc_progress.get("arc_stage", "")
+        hint_stage = arc_update["arc_stage_hint"]
+        # Only advance, never regress
+        if not current_stage or (
+            hint_stage in stage_order
+            and stage_order.index(hint_stage) > stage_order.index(current_stage)
+            if current_stage in stage_order else True
+        ):
+            arc_progress["arc_stage"] = hint_stage
+
+    # Add action to related_threads as a narrative marker
+    related = arc_progress.get("related_threads", [])
+    marker = f"[转折] {action_description[:60]}"
+    if marker not in related:
+        related.append(marker)
+        # Keep within reasonable bounds
+        arc_progress["related_threads"] = related[-10:]
+
+    # Write back
+    protagonist["arc_progress"] = arc_progress
+    state["actors"] = actors
+
+    return arc_progress
+
+
+# ============================================================================
+# Scene Summary Protagonist Tracking / 场景总结主角追踪 (P-04)
+# ============================================================================
+
+
+def build_protagonist_contribution_summary(state: dict) -> dict:
+    """Build a summary of the protagonist's contributions and plot turning points for the current scene.
+
+    构建当前场景中主角的贡献和剧情重大转折的摘要。
+    供 write_scene 调用，确保每次场景结束时准确记录主角的贡献。
+
+    Args:
+        state: Drama state dict with actors, conversation_log, current_scene.
+
+    Returns:
+        dict with:
+        - protagonist_actions: List of protagonist actions in this scene
+        - key_choices: List of key choices detected
+        - weight_level: Overall protagonist weight level
+        - narrative_impact: Description of protagonist's narrative influence
+        - turning_points: List of plot turning points caused by protagonist
+        - arc_progress_snapshot: Current arc progress of the protagonist
+    """
+    # Evaluate protagonist weight
+    weight_result = evaluate_protagonist_weight(state)
+
+    # Extract protagonist actions
+    actions = _extract_protagonist_actions(state)
+
+    # Detect key choices from actions
+    key_choices = []
+    turning_points = []
+    for action_text in actions:
+        match = _match_key_choice(action_text)
+        if match:
+            key_choices.append({
+                "action": action_text[:100],
+                "keyword": match["keyword"],
+                "weight": match["weight"],
+                "narrative_tag": match.get("narrative_tag", ""),
+            })
+            if match["weight"] == "critical":
+                turning_points.append({
+                    "type": "major_turning_point",
+                    "description": action_text[:100],
+                    "keyword": match["keyword"],
+                    "narrative_tag": match.get("narrative_tag", ""),
+                })
+            elif match["weight"] == "major":
+                turning_points.append({
+                    "type": "minor_turning_point",
+                    "description": action_text[:100],
+                    "keyword": match["keyword"],
+                    "narrative_tag": match.get("narrative_tag", ""),
+                })
+
+    # Get protagonist arc progress snapshot
+    actors = state.get("actors", {})
+    protagonist = actors.get("你", {})
+    arc_snapshot = protagonist.get("arc_progress", {})
+
+    return {
+        "protagonist_actions": actions,
+        "key_choices": key_choices,
+        "weight_level": weight_result["weight_level"],
+        "narrative_impact": weight_result["narrative_impact"],
+        "turning_points": turning_points,
+        "arc_progress_snapshot": arc_snapshot,
+    }

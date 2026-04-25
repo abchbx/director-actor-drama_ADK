@@ -1,0 +1,26 @@
+{
+  "name": "actor_嵇康",
+  "description": "演员 嵇康，角色：主角原型",
+  "url": "http://localhost:9038/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_嵇康",
+      "name": "扮演嵇康",
+      "description": "以嵇康的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "name": "actor_林昭",
+  "description": "演员 林昭，角色：主持人",
+  "url": "http://localhost:9094/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_林昭",
+      "name": "扮演林昭",
+      "description": "以林昭的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

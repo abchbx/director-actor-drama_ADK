@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
@@ -40,43 +41,60 @@ class WebSocketManager @Inject constructor(
     private var currentToken: String? = null
     private var currentBaseUrl: String? = null
 
-    // D-14: Exponential backoff state
-    private var currentDelayMs = 1000L  // Initial 1s
-    private val maxDelayMs = 30_000L    // Cap at 30s
+    // === 重连策略 ===
+    private var currentDelayMs = INITIAL_DELAY_MS
     private val reconnectScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var reconnectJob: Job? = null
     private var isIntentionalDisconnect = false
-    // ★ 修复竞态：连接代数计数器，每次 connectInternal() 递增
-    // 回调中比对代数，忽略旧代数的回调
+
+    // 连接代数计数器，每次 connectInternal() 递增，回调中比对，忽略旧代数的回调
     @Volatile private var connectGeneration = 0L
 
-    // D-15: ConnectivityManager NetworkCallback
+    // === 重连计数 ===
+    private var consecutiveFailures = 0
+    private val maxConsecutiveFailures = MAX_RETRIES  // 重连耗尽时降级到 REST
+    var onPermanentFailure: (() -> Unit)? = null
+
+    // === 心跳 ===
+    private var heartbeatJob: Job? = null
+    private var useCustomHeartbeat = false  // 根据是否支持 Ping/Pong 帧自动切换
+
+    // === ConnectivityManager NetworkCallback ===
     private val connectivityManager by lazy {
         context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
     }
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
     private var isNetworkCallbackRegistered = false
 
-    // ★ 修复：重连失败计数器，用于判断是否需要降级到 REST
-    private var consecutiveFailures = 0
-    private val maxConsecutiveFailures = 5  // 连续失败 5 次后降级
-    var onPermanentFailure: (() -> Unit)? = null  // 回调通知 UI 降级
-
-    // Event flow for reconnection-aware consumption
+    // === 事件流 ===
     private val _events = MutableSharedFlow<WsEventDto>(extraBufferCapacity = 64)
     val events: Flow<WsEventDto> = _events.asSharedFlow()
 
-    // Connection state tracking for UI indicator
-    private val _connectionState = MutableStateFlow(false)
-    val connectionState: StateFlow<Boolean> = _connectionState.asStateFlow()
+    // === 连接状态（密封类，替代 Boolean + Boolean 双状态） ===
+    private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected)
+    val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
 
-    // ★ 修复：添加 isReconnecting 状态，区分"正在重连"和"已降级到 REST"
-    private val _isReconnecting = MutableStateFlow(false)
-    val isReconnecting: StateFlow<Boolean> = _isReconnecting.asStateFlow()
+    // === 向后兼容的便捷属性 ===
+    @Deprecated("Use connectionState instead", replaceWith = ReplaceWith("connectionState"))
+    val isConnected: StateFlow<Boolean> get() {
+        // 保留旧代码兼容：映射 ConnectionState → Boolean
+        val mapped = MutableStateFlow(_connectionState.value == ConnectionState.Connected)
+        reconnectScope.launch {
+            _connectionState.collect { mapped.value = it == ConnectionState.Connected }
+        }
+        return mapped
+    }
 
-    // ★ 修复竞态：在 WebSocketManager 内部追踪是否是首次连接
-    // onOpen 时 isFirstConnection=true → 不回调 onReconnected
-    // 后续 onOpen（重连）时 isFirstConnection=false → 回调 onReconnected
+    @Deprecated("Use connectionState instead", replaceWith = ReplaceWith("connectionState"))
+    val isReconnecting: StateFlow<Boolean> get() {
+        val mapped = MutableStateFlow(_connectionState.value is ConnectionState.Reconnecting)
+        reconnectScope.launch {
+            _connectionState.collect { mapped.value = it is ConnectionState.Reconnecting }
+        }
+        return mapped
+    }
+
+    // 首次连接标志：onOpen 时 isFirstConnection=true → 不回调 onReconnected
     private var isFirstConnection = true
 
     // Callback for reconnect success
@@ -88,23 +106,23 @@ class WebSocketManager @Inject constructor(
         currentToken = token
         currentBaseUrl = baseUrl
         isIntentionalDisconnect = false
-        currentDelayMs = 1000L  // D-14: Reset on new connect
-        isFirstConnection = true  // ★ 重置首次连接标志
-        consecutiveFailures = 0  // ★ 修复：重置失败计数
+        currentDelayMs = INITIAL_DELAY_MS
+        isFirstConnection = true
+        consecutiveFailures = 0
 
+        _connectionState.value = ConnectionState.Connecting
         Log.d(TAG, "WS connect: host=$host port=$port baseUrl=$baseUrl hasToken=${token != null}")
-        registerNetworkCallback()  // D-15
+        registerNetworkCallback()
         connectInternal()
 
         return _events.asSharedFlow()
     }
 
     private fun connectInternal() {
-        // Close existing connection before creating a new one to prevent resource leaks
+        // Close existing connection before creating a new one
         webSocket?.close(1000, "Replacing with new connection")
         webSocket = null
 
-        // ★ 修复竞态：递增连接代数，回调中比对，忽略旧代数回调
         val thisGeneration = ++connectGeneration
 
         val baseUrl = currentBaseUrl
@@ -121,21 +139,22 @@ class WebSocketManager @Inject constructor(
         Log.d(TAG, "WS connectInternal: url=$url, generation=$thisGeneration")
         val request = Request.Builder().url(url).build()
 
-        // ★ 修复竞态：记录当前 WS 实例，在回调中比对，忽略旧连接的回调
         val newWebSocket = okHttpClient.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 if (thisGeneration != connectGeneration) {
                     Log.w(TAG, "WS onOpen: ignored stale callback, generation=$thisGeneration, current=$connectGeneration")
-                    return  // 忽略旧代数回调
+                    return
                 }
-                currentDelayMs = 1000L  // D-14: Reset backoff on successful connect
-                consecutiveFailures = 0  // ★ 修复：重置失败计数器
-                _connectionState.value = true
-                _isReconnecting.value = false  // ★ 清除重连状态
-                Log.i(TAG, "WS onOpen: CONNECTED, generation=$thisGeneration, isFirstConnection=$isFirstConnection, " +
-                        "url=${webSocket.request().url}, responseCode=${response.code}")
-                // ★ 修复竞态：使用 WebSocketManager 内部的 isFirstConnection 标志
-                // 首次连接时不触发 onReconnected，仅重连时触发
+                currentDelayMs = INITIAL_DELAY_MS
+                consecutiveFailures = 0
+                _connectionState.value = ConnectionState.Connected
+                Log.i(TAG, "WS onOpen: CONNECTED, generation=$thisGeneration, isFirstConnection=$isFirstConnection")
+
+                // 检测是否需要自定义心跳
+                // OkHttp pingInterval 仅对 WS Ping/Pong 帧生效
+                // 如果服务端不响应 Ping 帧，则启动自定义文本心跳
+                startHeartbeat(webSocket)
+
                 if (isFirstConnection) {
                     isFirstConnection = false
                     Log.d(TAG, "WS onOpen: first connection established")
@@ -146,14 +165,15 @@ class WebSocketManager @Inject constructor(
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
-                if (thisGeneration != connectGeneration) return  // 忽略旧代数回调
-                // D-14: Respond to server application-level heartbeat ping
+                if (thisGeneration != connectGeneration) return
+
+                // 响应服务端应用层 heartbeat ping
                 if (text.contains("\"type\"") && text.contains("\"ping\"")) {
                     webSocket.send("""{"type":"pong"}""")
                     return
                 }
-                // ★ 修复：处理 replay 消息，将事件逐个投递到 Flow
-                // 之前直接丢弃 replay 消息，导致重连后丢失断连期间的历史事件
+
+                // 处理 replay 消息
                 if (text.contains("\"type\"") && text.contains("\"replay\"")) {
                     try {
                         val replayMsg = json.decodeFromString<ReplayMessageDto>(text)
@@ -165,6 +185,14 @@ class WebSocketManager @Inject constructor(
                     }
                     return
                 }
+
+                // 响应服务端 pong（确认自定义心跳收到回复）
+                if (text.contains("\"type\"") && text.contains("\"pong\"")) {
+                    // 服务端响应了我们的自定义心跳，标记为使用自定义心跳模式
+                    useCustomHeartbeat = true
+                    return
+                }
+
                 try {
                     val event = json.decodeFromString<WsEventDto>(text)
                     _events.tryEmit(event)
@@ -176,7 +204,7 @@ class WebSocketManager @Inject constructor(
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
                 if (thisGeneration != connectGeneration) {
                     Log.w(TAG, "WS onClosing: ignored stale callback, generation=$thisGeneration")
-                    return  // 忽略旧代数回调
+                    return
                 }
                 Log.d(TAG, "WS onClosing: code=$code reason=$reason, generation=$thisGeneration")
                 webSocket.close(1000, "Ack closing")
@@ -185,23 +213,30 @@ class WebSocketManager @Inject constructor(
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
                 if (thisGeneration != connectGeneration) {
                     Log.w(TAG, "WS onClosed: ignored stale callback, generation=$thisGeneration")
-                    return  // 忽略旧代数回调
+                    return
                 }
                 Log.w(TAG, "WS onClosed: code=$code reason=$reason, generation=$thisGeneration, isIntentional=$isIntentionalDisconnect")
-                _connectionState.value = false
-                _isReconnecting.value = false  // ★ 清除重连状态
+                stopHeartbeat()
+
                 if (!isIntentionalDisconnect) {
-                    consecutiveFailures++  // ★ 修复：服务器关闭连接也计入失败
-                    scheduleReconnect()  // Server closed connection, auto-reconnect
+                    consecutiveFailures++
+                    if (consecutiveFailures >= maxConsecutiveFailures) {
+                        _connectionState.value = ConnectionState.Disconnected
+                        Log.e(TAG, "WS onClosed: MAX_RETRIES reached, degrading to REST mode")
+                        onPermanentFailure?.invoke()
+                    } else {
+                        scheduleReconnect()
+                    }
+                } else {
+                    _connectionState.value = ConnectionState.Disconnected
                 }
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 if (thisGeneration != connectGeneration) {
                     Log.w(TAG, "WS onFailure: ignored stale callback, generation=$thisGeneration")
-                    return  // 忽略旧代数回调
+                    return
                 }
-                // ★ 修复：增强 onFailure 日志，输出完整的 Throwable 堆栈
                 Log.e(TAG, """
                     |WS onFailure: ${t.message}
                     |  generation=$thisGeneration
@@ -209,52 +244,92 @@ class WebSocketManager @Inject constructor(
                     |  responseBody=${response?.body?.string()?.take(200)}
                     |  url=${webSocket.request().url}
                 """.trimMargin(), t)
-                _connectionState.value = false
-                _isReconnecting.value = false  // ★ 清除重连状态
+                stopHeartbeat()
 
                 if (!isIntentionalDisconnect) {
                     consecutiveFailures++
                     Log.w(TAG, "WS onFailure: consecutiveFailures=$consecutiveFailures/$maxConsecutiveFailures")
 
-                    // ★ 修复：连续失败超过阈值时降级到 REST，不继续重连
                     if (consecutiveFailures >= maxConsecutiveFailures) {
-                        Log.e(TAG, "WS onFailure: MAX_CONSECUTIVE_FAILURES reached, degrading to REST mode")
+                        _connectionState.value = ConnectionState.Disconnected
+                        Log.e(TAG, "WS onFailure: MAX_RETRIES reached, degrading to REST mode")
                         onPermanentFailure?.invoke()
-                        return
+                    } else {
+                        scheduleReconnect()
                     }
-                    scheduleReconnect()  // D-14: Exponential backoff
+                } else {
+                    _connectionState.value = ConnectionState.Disconnected
                 }
             }
         })
         this.webSocket = newWebSocket
     }
 
+    // === 心跳管理 ===
+
+    /**
+     * 启动心跳保活。
+     *
+     * 策略：
+     * - OkHttp 已配置 pingInterval（通过 NetworkModule），会自动发送 WS Ping 帧
+     * - 如果服务端不支持 Ping/Pong 帧（onFailure 回调），则切换为自定义文本心跳
+     * - 自定义心跳每 30 秒发送一条 {"type":"heartbeat"} 消息
+     */
+    private fun startHeartbeat(ws: WebSocket) {
+        stopHeartbeat()
+        heartbeatJob = reconnectScope.launch {
+            while (isActive) {
+                delay(HEARTBEAT_INTERVAL_MS)
+                if (useCustomHeartbeat) {
+                    // 服务端已确认支持自定义心跳，发送文本心跳
+                    try {
+                        val sent = ws.send("""{"type":"heartbeat"}""")
+                        if (!sent) {
+                            Log.w(TAG, "WS heartbeat: send failed, connection may be dead")
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "WS heartbeat: send threw exception", e)
+                    }
+                }
+                // 如果 useCustomHeartbeat=false，说明依赖 OkHttp 的 pingInterval
+                // 不需要发送自定义心跳
+            }
+        }
+    }
+
+    private fun stopHeartbeat() {
+        heartbeatJob?.cancel()
+        heartbeatJob = null
+    }
+
+    // === 重连策略（指数退避） ===
+
     private fun scheduleReconnect() {
-        // Pitfall 3: Cancel existing reconnect job to prevent duplicate connections
         reconnectJob?.cancel()
+        val retryCount = consecutiveFailures
+        _connectionState.value = ConnectionState.Reconnecting(
+            retry = retryCount,
+            maxRetry = maxConsecutiveFailures,
+        )
         reconnectJob = reconnectScope.launch {
-            Log.d(TAG, "WS scheduleReconnect: delay=${currentDelayMs}ms, consecutiveFailures=$consecutiveFailures")
-            _isReconnecting.value = true  // ★ 标记正在重连
+            Log.d(TAG, "WS scheduleReconnect: delay=${currentDelayMs}ms, retry=$retryCount/$maxConsecutiveFailures")
             delay(currentDelayMs)
-            currentDelayMs = (currentDelayMs * 2).coerceAtMost(maxDelayMs)  // D-14: Double delay, cap at 30s
+            currentDelayMs = (currentDelayMs * 2).coerceAtMost(MAX_DELAY_MS)
             Log.d(TAG, "WS scheduleReconnect: attempting connect, nextDelay=${currentDelayMs}ms")
             connectInternal()
         }
     }
 
-    // D-15: Register NetworkCallback for immediate reconnect on network restore
+    // === 网络回调 ===
+
     private fun registerNetworkCallback() {
         if (isNetworkCallbackRegistered) return
         networkCallback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
-                // ★ 修复：仅在 WS 已断连时才触发重连
-                // 原因：registerNetworkCallback() 注册后，onAvailable 会立即为当前活跃网络触发一次
-                // 如果 WS 已经连接（onOpen 已触发），这会导致 connectInternal() 被错误地再次调用
-                // 关闭刚建立的连接再重建，造成短暂断连闪烁
-                if (_connectionState.value) return
-                // Pitfall 3: Cancel pending backoff reconnect to prevent race
+                if (_connectionState.value == ConnectionState.Connected) return
+                // Cancel pending backoff reconnect to prevent race
                 reconnectJob?.cancel()
-                currentDelayMs = 1000L  // Reset backoff
+                currentDelayMs = INITIAL_DELAY_MS
                 connectInternal()
             }
         }
@@ -277,14 +352,16 @@ class WebSocketManager @Inject constructor(
         }
     }
 
+    // === 主动断开 ===
+
     fun disconnect() {
         isIntentionalDisconnect = true
         reconnectJob?.cancel()
         reconnectJob = null
-        currentDelayMs = 1000L
-        consecutiveFailures = 0  // ★ 修复：断开时重置失败计数
-        _connectionState.value = false
-        _isReconnecting.value = false  // ★ 清除重连状态
+        stopHeartbeat()
+        currentDelayMs = INITIAL_DELAY_MS
+        consecutiveFailures = 0
+        _connectionState.value = ConnectionState.Disconnected
         Log.d(TAG, "WS disconnect: intentional, resetting state")
         webSocket?.close(1000, "User disconnect")
         webSocket = null
@@ -297,7 +374,23 @@ class WebSocketManager @Inject constructor(
         unregisterNetworkCallback()
     }
 
+    /**
+     * 主动发起重连（用户点击"重试"按钮时调用）。
+     * 重置失败计数，从初始延迟重新开始。
+     */
+    fun retry() {
+        consecutiveFailures = 0
+        currentDelayMs = INITIAL_DELAY_MS
+        isIntentionalDisconnect = false
+        _connectionState.value = ConnectionState.Connecting
+        connectInternal()
+    }
+
     companion object {
         private const val TAG = "WebSocketManager"
+        private const val INITIAL_DELAY_MS = 2000L       // 初始退避 2 秒
+        private const val MAX_DELAY_MS = 30_000L         // 最大退避 30 秒
+        private const val MAX_RETRIES = 10               // 最多重试 10 次
+        private const val HEARTBEAT_INTERVAL_MS = 30_000L // 心跳间隔 30 秒
     }
 }

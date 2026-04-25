@@ -33,7 +33,7 @@ api:
 	@echo "| 🔌 WebSocket: ws://0.0.0.0:8000/api/v1/ws                                 |"
 	@echo "| ⚡ Hot reload enabled (excluding app/actors/)                               |"
 	@echo "==============================================================================="
-	uv run uvicorn app.api.app:create_app --factory --host 0.0.0.0 --port 8000 --reload --reload-exclude 'app/actors/*'
+	uv run uvicorn app.api.app:create_app --factory --host 0.0.0.0 --port 8000 --reload --reload-exclude 'app/actors' --reload-exclude 'app/actors/**'
 
 # Launch CLI interactive mode
 cli:

@@ -33,8 +33,11 @@ interface DramaRepository {
     /**
      * 发送群聊消息并直接返回可渲染的 SceneBubble 列表。
      * 将 CommandResponseDto → SceneBubble 的转换逻辑封装在 Repository 层。
+     * @param message 消息内容
+     * @param mention @提及角色名
+     * @param senderName 发送者名称（主角名），附带到请求体中
      */
-    suspend fun sendChatMessageAsBubbles(message: String, mention: String? = null): Result<List<SceneBubble>>
+    suspend fun sendChatMessageAsBubbles(message: String, mention: String? = null, senderName: String = "主角"): Result<List<SceneBubble>>
 
     /**
      * 获取场景详情并转换为可渲染的 SceneBubble 列表。

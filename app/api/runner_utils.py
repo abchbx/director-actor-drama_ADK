@@ -144,7 +144,19 @@ async def run_command_and_collect(
 
                         # ★ 核心修复：基于 (tool_name, id) 去重 tool_results
                         # ADK 有时会对同一个工具调用产生重复的 function_response 事件
+                        # ★ 修复去重键冲突：actor_speak/director_narrate/create_actor 等工具
+                        # 没有 "id" 或 "scene_number" 字段，导致所有同类结果被错误去重。
+                        # 使用 ADK function_response 自带的 id（每次调用唯一）作为首选去重键。
                         resp_id = resp.get("id", resp.get("scene_number", ""))
+                        # 如果返回值没有唯一标识，使用 ADK 分配的 function_response.id
+                        # 该 id 在每次工具调用时由 ADK 自动生成，保证全局唯一
+                        if not resp_id and part.function_response.id:
+                            resp_id = part.function_response.id
+                        # 最终兜底：用 actor_name + situation 哈希生成唯一键
+                        if not resp_id:
+                            actor = resp.get("actor_name", "")
+                            msg = str(resp.get("message", resp.get("situation", "")))[:50]
+                            resp_id = f"{actor}:{msg}"
                         dedup_key = (tool_name, str(resp_id))
 
                         if dedup_key in seen_tool_results:

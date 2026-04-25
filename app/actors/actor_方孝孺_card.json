@@ -1,0 +1,26 @@
+{
+  "name": "actor_方孝孺",
+  "description": "演员 方孝孺，角色：反派/对立面",
+  "url": "http://localhost:9056/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_方孝孺",
+      "name": "扮演方孝孺",
+      "description": "以方孝孺的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

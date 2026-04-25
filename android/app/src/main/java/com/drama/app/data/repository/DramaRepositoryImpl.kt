@@ -114,9 +114,9 @@ class DramaRepositoryImpl @Inject constructor(
 
     // ===== 业务逻辑下沉：领域模型级方法 =====
 
-    override suspend fun sendChatMessageAsBubbles(message: String, mention: String?): Result<List<SceneBubble>> =
+    override suspend fun sendChatMessageAsBubbles(message: String, mention: String?, senderName: String): Result<List<SceneBubble>> =
         runCatching {
-            val resp = dramaApiService.chatMessage(ChatRequestDto(message, mention))
+            val resp = dramaApiService.chatMessage(ChatRequestDto(message, mention, senderType = "user", senderName = senderName))
             extractBubblesFromCommandResponse(resp)
         }
 
@@ -253,8 +253,13 @@ class DramaRepositoryImpl @Inject constructor(
             val memorySummary = buildMemorySummary(actorObj)
 
             val a2aData = statusMap[name]
-            val isRunning = (a2aData as? JsonObject)?.get("running")?.jsonPrimitive?.booleanOrNull ?: false
-            val port = (a2aData as? JsonObject)?.get("port")?.jsonPrimitive?.intOrNull ?: 0
+            val a2aObj = a2aData as? JsonObject
+            val isRunning = a2aObj?.get("running")?.jsonPrimitive?.booleanOrNull ?: false
+            val port = a2aObj?.get("port")?.jsonPrimitive?.intOrNull ?: 0
+            val thinkingSteps = a2aObj?.get("thinking_steps")?.jsonPrimitive?.intOrNull
+                ?: a2aObj?.get("steps")?.jsonPrimitive?.intOrNull
+                ?: a2aObj?.get("progress")?.jsonPrimitive?.intOrNull
+                ?: 0
 
             mergedActors.add(ActorInfo(
                 name = name,
@@ -265,6 +270,7 @@ class DramaRepositoryImpl @Inject constructor(
                 memorySummary = memorySummary,
                 isA2ARunning = isRunning,
                 a2aPort = port,
+                thinkingProgress = thinkingSteps,
             ))
         }
 

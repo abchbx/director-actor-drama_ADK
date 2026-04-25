@@ -49,14 +49,17 @@ import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -84,8 +87,11 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.TheaterComedy
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalView
+import android.view.HapticFeedbackConstants
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.runtime.CompositionLocalProvider
+import com.drama.app.data.remote.ws.ConnectionState
 import com.drama.app.ui.screens.dramadetail.components.ActorDrawerContent
 import com.drama.app.ui.screens.dramadetail.components.ChatInputBar
 import com.drama.app.ui.screens.dramadetail.components.SceneBubbleList
@@ -105,12 +111,41 @@ fun DramaDetailScreen(
     val scope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
 
+    // === WebSocket 生命周期：进入时连接，离开时断开 ===
+    DisposableEffect(Unit) {
+        viewModel.connectWebSocket()
+        onDispose {
+            viewModel.disconnectWebSocket()
+        }
+    }
+
+    // === 断连时显示 Snackbar 提示"重试" ===
+    LaunchedEffect(uiState.connectionState) {
+        if (uiState.connectionState is ConnectionState.Disconnected
+            && !uiState.initialSyncing
+            && uiState.initError == null
+        ) {
+            val result = snackbarHostState.showSnackbar(
+                message = "连接已断开，请重新进入或检查网络",
+                actionLabel = "重试",
+                duration = androidx.compose.material3.SnackbarDuration.Indefinite,
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                viewModel.retryConnection()
+            }
+        }
+    }
+
     // 收集一次性事件
+    val view = LocalView.current
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
                 is DramaDetailEvent.ShowSnackbar ->
                     snackbarHostState.showSnackbar(event.message)
+                // ★ AI 回合开始时触发触觉反馈
+                is DramaDetailEvent.HapticFeedback ->
+                    view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
             }
         }
     }
@@ -126,6 +161,7 @@ fun DramaDetailScreen(
 
     var showOverflowMenu by remember { mutableStateOf(false) }
 
+    Box(Modifier.fillMaxSize()) {
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
@@ -145,7 +181,7 @@ fun DramaDetailScreen(
             }
         },
         content = {
-            // === 初始化同步中的全屏加载 ===
+            // === 初始化同步中的全屏加载（冷启动恢复） ===
             if (uiState.initialSyncing) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -155,8 +191,8 @@ fun DramaDetailScreen(
                         CircularProgressIndicator()
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            "正在同步剧本数据...",
-                            style = MaterialTheme.typography.bodyMedium,
+                            "正在恢复会话...",
+                            style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -201,6 +237,8 @@ fun DramaDetailScreen(
                     // 仅消费状态栏 insets，防止 TopAppBar 被遮挡
                     // 导航栏 insets 不在这里消费，避免 imePadding() 计算时被扣除
                     .consumeWindowInsets(WindowInsets.statusBars)
+                    // ★ imePadding：整个内容区避让键盘，消息列表自动收缩
+                    .imePadding()
             ) {
                 TopAppBar(
                     title = {
@@ -257,12 +295,9 @@ fun DramaDetailScreen(
                     },
                 )
 
-                // 离线断连横幅
-                // ★ 修复：初始同步期间不显示横幅（WS 可能还在复用连接的过渡期）
-                // 只在真正降级到 REST 模式（未连接且未在重连且初始化已完成）时显示横幅
-                ConnectionBanner(
-                    isConnected = uiState.isWsConnected,
-                    isReconnecting = uiState.isReconnecting,
+                // 连接状态指示器：Connecting/Reconnecting → 进度条，Disconnected → 横幅
+                ConnectionStateIndicator(
+                    connectionState = uiState.connectionState,
                     isInitialSyncing = uiState.initialSyncing,
                 )
 
@@ -300,10 +335,9 @@ fun DramaDetailScreen(
                 }
 
                 // 底部聊天输入栏 — 浮动玻璃态，带平滑的键盘跟随和入场动画
-                // ★ imePadding() 必须应用在 AnimatedVisibility 外侧，避免动画容器阻断 insets 传递
+                // ★ imePadding() 已移至外层 Column，此处不再重复
                 androidx.compose.animation.AnimatedVisibility(
                     visible = true,
-                    modifier = Modifier.imePadding(),
                     enter = slideInVertically(
                         initialOffsetY = { it },
                         animationSpec = tween(450, easing = FastOutSlowInEasing),
@@ -318,6 +352,7 @@ fun DramaDetailScreen(
                         onSend = viewModel::sendChatMessage,
                         onCommand = viewModel::sendCommand,
                         isProcessing = uiState.isProcessing,
+                        isTyping = uiState.isTyping,
                         isWsConnected = uiState.isWsConnected,
                         isReconnecting = uiState.isReconnecting,
                     )
@@ -326,6 +361,13 @@ fun DramaDetailScreen(
             } // end else (not initialSyncing, not initError)
         },
     )
+
+    // SnackbarHost 用于断连提示
+    SnackbarHost(
+        hostState = snackbarHostState,
+        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 80.dp),
+    )
+    } // end Box
 
     // D-18/D-19: 场景历史 BottomSheet
     if (uiState.showHistorySheet) {
@@ -458,9 +500,8 @@ private fun DramaEmptyState() {
 
             // 主标题
             Text(
-                text = "等待戏剧开始...",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Medium,
+                text = "开始一段新的戏剧体验！",
+                style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
@@ -469,8 +510,8 @@ private fun DramaEmptyState() {
 
             // 副标题引导
             Text(
-                text = "使用下方命令推进剧情",
-                style = MaterialTheme.typography.bodySmall,
+                text = "输入 /start <主题> 或以主角身份发送消息",
+                style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                 textAlign = TextAlign.Center,
             )
@@ -479,20 +520,63 @@ private fun DramaEmptyState() {
 }
 
 // ============================================================
-// ConnectionBanner — 离线断连横幅
+// ConnectionStateIndicator — 连接状态指示器
 // ============================================================
 
-/** 断连横幅：在 TopAppBar 下方显示"连接已断开，正在尝试重连..." */
+/**
+ * 连接状态指示器：根据 ConnectionState 显示不同 UI。
+ *
+ * - Connecting/Reconnecting：顶部线性进度条 + 文字"正在连接..."
+ * - Disconnected（非初始同步期）：红色横幅提示降级
+ * - Connected：不显示
+ */
 @Composable
-private fun ConnectionBanner(
-    isConnected: Boolean,
-    isReconnecting: Boolean = false,
+private fun ConnectionStateIndicator(
+    connectionState: ConnectionState,
     isInitialSyncing: Boolean = false,
 ) {
-    // ★ 修复：初始同步期间不显示横幅（避免 WS 复用过渡期的闪烁）
-    // 只在真正降级到 REST 模式（未连接且未在重连且初始化已完成）时显示
+    // === Connecting / Reconnecting：进度条 + 文字 ===
     AnimatedVisibility(
-        visible = !isConnected && !isReconnecting && !isInitialSyncing,
+        visible = connectionState is ConnectionState.Connecting
+                || connectionState is ConnectionState.Reconnecting,
+        enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(tween(200)),
+        exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut(tween(200)),
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            LinearProgressIndicator(
+                modifier = Modifier.fillMaxWidth().height(2.dp),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+            )
+            Surface(
+                color = MaterialTheme.colorScheme.tertiaryContainer,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .wrapContentHeight()
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                ) {
+                    Text(
+                        text = when (connectionState) {
+                            is ConnectionState.Connecting -> "正在连接..."
+                            is ConnectionState.Reconnecting -> "正在重连... (${connectionState.retry}/${connectionState.maxRetry})"
+                            else -> ""
+                        },
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    )
+                }
+            }
+        }
+    }
+
+    // === Disconnected：降级横幅（仅在初始同步完成后显示） ===
+    AnimatedVisibility(
+        visible = connectionState is ConnectionState.Disconnected && !isInitialSyncing,
         enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(tween(200)),
         exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut(tween(200)),
     ) {

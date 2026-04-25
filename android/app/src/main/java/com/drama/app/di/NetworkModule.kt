@@ -59,6 +59,7 @@ object NetworkModule {
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(300, TimeUnit.SECONDS)  // LLM calls can take minutes
             .writeTimeout(30, TimeUnit.SECONDS)
+            .pingInterval(30, TimeUnit.SECONDS)  // WebSocket Ping/Pong 心跳保活
             .build()
     }
 

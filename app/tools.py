@@ -9,6 +9,7 @@ drama creation: Discovery → Research → Outline → Directing.
 """
 
 import os
+import uuid
 from datetime import datetime
 
 import httpx
@@ -172,6 +173,7 @@ async def _restart_actor(actor_name: str, tool_context) -> dict:
         background=actor_data.get("background", ""),
         knowledge_scope=actor_data.get("knowledge_scope", ""),
         memory_entries=memory_entries,
+        tool_context=tool_context,
     )
 
     # Update state: increment crash count + log
@@ -263,6 +265,14 @@ def create_actor(
     Returns:
         dict with creation status and A2A connection info.
     """
+    # ★ 用户主角保护：禁止通过 create_actor 创建名为"你"的 AI 演员
+    existing = get_actor_info(actor_name, tool_context)
+    if existing["status"] == "success" and existing["actor"].get("is_user_protagonist"):
+        return {
+            "status": "error",
+            "message": f"角色名'{actor_name}'为用户主角保留，不可创建同名 AI 演员。请使用其他角色名。",
+        }
+
     # Get other actors info FIRST (before creating the new actor)
     # This is needed so the new actor knows about existing actors for direct A2A communication
     actors_info = get_all_actors(tool_context)
@@ -275,6 +285,8 @@ def create_actor(
                 "role": info.get("role", ""),
                 "personality": info.get("personality", ""),
                 "background": info.get("background", ""),
+                "is_user_protagonist": info.get("is_user_protagonist", False),  # ★ 传递用户主角标记
+                "control_type": info.get("control_type", "AI-Controlled"),  # ★ 传递控制类型
             })
             other_names.append(f"{name}({info['role']})")
     
@@ -282,7 +294,8 @@ def create_actor(
     
     # Now create the actor service with other actors info
     service_result = create_actor_service(
-        actor_name, role, personality, background, knowledge_scope, other_actors_list
+        actor_name, role, personality, background, knowledge_scope, other_actors_list,
+        tool_context=tool_context,
     )
     if service_result["status"] != "success":
         return service_result
@@ -375,6 +388,16 @@ async def actor_speak(
         return actor_info
 
     actor_data = actor_info["actor"]
+
+    # ★ 用户主角特殊处理：用户不由 A2A Agent 驱动，返回提示
+    if actor_data.get("is_user_protagonist") or actor_data.get("control_type") == "User-Controlled":
+        return {
+            "status": "info",
+            "message": f"'{actor_name}' 是用户控制的主角，不由 AI 演员系统驱动。用户的行动通过 /action 命令或自然对话输入。",
+            "actor_name": actor_name,
+            "role": actor_data.get("role", ""),
+            "emotions": actor_data.get("emotions", "neutral"),
+        }
 
     # Get A2A connection config (pass saved_port for robustness)
     saved_port = actor_data.get("port")
@@ -513,8 +536,12 @@ async def actor_speak(
 
     formatted_dialogue = "\n".join(formatted_lines)
 
+    # ★ 生成唯一 ID，用于 REST 去重（避免同一场戏中多次 actor_speak 被错误合并）
+    result_id = f"{actor_name}_{uuid.uuid4().hex[:8]}"
+
     return {
         "status": "error" if is_error else "success",
+        "id": result_id,
         "actor_name": actor_name,
         "role": role_label,
         "personality": actor_data.get("personality", ""),
@@ -530,6 +557,264 @@ async def actor_speak(
         "a2a_card_url": config["card_url"],
         "a2a_rpc_url": config["rpc_url"],
         "port": config["port"],
+        "sender_type": "actor",
+        "sender_name": actor_name,
+    }
+
+
+async def actor_speak_batch(
+    actors: list[dict],
+    tool_context: ToolContext,
+) -> dict:
+    """Make multiple actors speak in PARALLEL — all A2A calls concurrent.
+
+    ★ 性能优化：将多次串行 actor_speak 合并为一次并行调用。
+    4 个演员串行需要 4 × (5~30s) = 20~120 秒，
+    并行只需 max(5~30s) ≈ 10~30 秒，提速 3~4 倍。
+
+    每个演员的 situation 相互独立（都基于当前场景上下文），
+    因此并行不会破坏逻辑一致性。
+
+    Args:
+        actors: List of dicts, each with:
+            - actor_name: Name of the actor
+            - situation: The situation/prompt for this actor
+        tool_context: Tool context for state access.
+
+    Returns:
+        dict with 'results' list (one per actor), parallel execution time,
+        and comparison with estimated serial time.
+    """
+    import asyncio
+    import time as _time
+
+    if not actors:
+        return {"status": "info", "message": "没有演员需要发言", "results": []}
+
+    start = _time.monotonic()
+
+    # ── Phase 1: 为每个演员准备上下文（同步，快） ──
+    prep_list = []
+    for entry in actors:
+        actor_name = entry.get("actor_name", "")
+        situation = entry.get("situation", "")
+        if not actor_name or not situation:
+            continue
+
+        actor_info = get_actor_info(actor_name, tool_context)
+        if actor_info["status"] != "success":
+            prep_list.append({
+                "actor_name": actor_name,
+                "skip": True,
+                "skip_reason": actor_info.get("message", "actor not found"),
+            })
+            continue
+
+        actor_data = actor_info["actor"]
+
+        # Skip user protagonist
+        if actor_data.get("is_user_protagonist") or actor_data.get("control_type") == "User-Controlled":
+            prep_list.append({
+                "actor_name": actor_name,
+                "skip": True,
+                "skip_reason": "用户主角不由 AI 驱动",
+            })
+            continue
+
+        saved_port = actor_data.get("port")
+        config = get_actor_remote_config(actor_name, saved_port=saved_port)
+        if not config:
+            prep_list.append({
+                "actor_name": actor_name,
+                "skip": True,
+                "skip_reason": f"A2A service not found",
+            })
+            continue
+
+        # Pre-reasoning hook
+        from .memory_manager import pre_reasoning_hook
+        pre_reasoning_hook(actor_name, tool_context)
+
+        # Build memory context
+        memory_context = build_actor_context(actor_name, tool_context)
+
+        # Coreference resolution
+        resolved_situation = resolve_coreferences(
+            situation, speaker_name="", listener_name=actor_name,
+            tool_context=tool_context,
+        )
+
+        # Entity extraction
+        from .memory_manager import extract_and_register_entities
+        extract_and_register_entities(situation, speaker_name="", tool_context=tool_context)
+
+        # Importance detection + working memory
+        is_critical, critical_reason = detect_importance(resolved_situation)
+        importance = "critical" if is_critical else "normal"
+        add_working_memory(
+            actor_name=actor_name,
+            entry=f"面对情境: {resolved_situation}",
+            importance=importance,
+            critical_reason=critical_reason,
+            tool_context=tool_context,
+        )
+
+        # Build prompt
+        role_label = actor_data.get("role", "")
+        personality = actor_data.get("personality", "")
+        emotion_label = actor_data.get("emotions", "neutral")
+        emotion_cn = {
+            "neutral": "平静", "angry": "愤怒", "sad": "悲伤", "happy": "喜悦",
+            "fearful": "恐惧", "confused": "困惑", "determined": "决绝",
+            "anxious": "焦虑", "hopeful": "充满希望",
+        }.get(emotion_label, emotion_label)
+
+        from .state_manager import get_scene_context
+        scene_ctx = get_scene_context(tool_context)
+        coref_annotations = _build_coref_annotations(scene_ctx)
+
+        prompt = (
+            f"【角色锚点】你是{actor_name}，{role_label}。{personality}\n\n"
+            f"【当前情绪】{emotion_cn}\n\n"
+            f"【当前情境】{resolved_situation}\n\n"
+            f"{coref_annotations}\n\n"
+            f"{memory_context}\n\n"
+            f"请以「{actor_name}」的身份回应上述情境。"
+            f"保持角色一致性，不要跳出角色。"
+            f"如有内心独白，用（内心：...）格式。\n\n"
+            f"【重要：代词消解规则】\n"
+            f"1. 情境中若出现「他（实体名）」这样的括号标注，括号内即为该代词的真实指代\n"
+            f"2. 绝对不要将别人话语中的「他/她」默认理解为指代你自己，除非括号标注明确写了你的名字\n"
+            f"3. 如果代词没有括号标注且你无法确定指代对象，按角色性格自然回应（困惑、追问、或忽略）"
+        )
+
+        prep_list.append({
+            "actor_name": actor_name,
+            "skip": False,
+            "config": config,
+            "prompt": prompt,
+            "actor_data": actor_data,
+            "role_label": role_label,
+            "emotion_label": emotion_label,
+            "emotion_cn": emotion_cn,
+            "situation": situation,
+        })
+
+    # ── Phase 2: 并行调用所有 A2A Agent ──
+    async def _call_single(prep: dict) -> dict:
+        """Call one actor's A2A service, return result dict."""
+        actor_name = prep["actor_name"]
+        if prep.get("skip"):
+            return {
+                "actor_name": actor_name,
+                "status": "skipped",
+                "message": prep.get("skip_reason", ""),
+                "dialogue": "",
+                "emotion": "",
+                "sender_type": "actor",
+                "sender_name": actor_name,
+            }
+
+        config = prep["config"]
+        card_file = config["card_file"]
+        port = config.get("port", "N/A")
+
+        try:
+            actor_dialogue = await _call_a2a_sdk(card_file, prep["prompt"], actor_name, port)
+        except Exception as e:
+            err_type = type(e).__name__
+            msg = str(e).lower()
+            if "connect" in err_type or "refused" in msg or "connection" in msg:
+                restart_result = await _restart_actor(actor_name, tool_context)
+                if restart_result.get("status") == "success":
+                    try:
+                        actor_dialogue = await _call_a2a_sdk(card_file, prep["prompt"], actor_name, port)
+                    except Exception:
+                        actor_dialogue = f"[ERROR:connection] {actor_name}重启后仍无法连接(端口:{port})"
+                else:
+                    actor_dialogue = f"[ERROR:connection] {actor_name}重启失败"
+            elif "timeout" in err_type or "timeout" in msg:
+                actor_dialogue = f"[ERROR:timeout] {actor_name}响应超时"
+            else:
+                actor_dialogue = f"[ERROR:{err_type}] {actor_name}调用失败: {e}"
+
+        is_error = actor_dialogue.startswith("[ERROR:")
+
+        # Post-processing: memory + dialogue recording (same as actor_speak)
+        if not is_error:
+            add_working_memory(
+                actor_name=actor_name,
+                entry=f"我说：{actor_dialogue[:200]}",
+                importance="normal",
+                critical_reason=None,
+                tool_context=tool_context,
+            )
+            from .memory_manager import extract_and_register_entities as _ere
+            _ere(actor_dialogue, speaker_name=actor_name, tool_context=tool_context)
+            add_dialogue(actor_name=actor_name, dialogue=actor_dialogue, tool_context=tool_context)
+
+            # Reset crash count
+            state = _get_state(tool_context)
+            if actor_name in state.get("actors", {}):
+                state["actors"][actor_name]["crash_count"] = 0
+                _set_state(state, tool_context)
+
+        # Format dialogue
+        dialogue_lines = []
+        if not is_error:
+            for line in actor_dialogue.split("\n"):
+                if line.strip():
+                    dialogue_lines.append(f"  {line}")
+        formatted_dialogue = "\n".join(dialogue_lines) if dialogue_lines else actor_dialogue
+
+        result_id = f"{actor_name}_{uuid.uuid4().hex[:8]}"
+        return {
+            "status": "error" if is_error else "success",
+            "id": result_id,
+            "actor_name": actor_name,
+            "role": prep["role_label"],
+            "personality": prep["actor_data"].get("personality", ""),
+            "emotions": prep["emotion_label"],
+            "emotions_cn": prep["emotion_cn"],
+            "situation": prep["situation"],
+            "dialogue": actor_dialogue,
+            "formatted_dialogue": formatted_dialogue,
+            "message": formatted_dialogue,
+            "sender_type": "actor",
+            "sender_name": actor_name,
+        }
+
+    # ★ 核心优化：asyncio.gather 并行调用所有演员
+    results = await asyncio.gather(*[_call_single(prep) for prep in prep_list])
+
+    elapsed = _time.monotonic() - start
+    num_actors = len([p for p in prep_list if not p.get("skip")])
+    # 估算串行时间（每个演员平均 10 秒）
+    estimated_serial = num_actors * 10
+
+    # Build formatted output
+    formatted_lines = []
+    for r in results:
+        if r.get("status") == "skipped":
+            continue
+        elif r.get("status") == "error":
+            formatted_lines.append(f"⚠️ {r['actor_name']}：{r.get('dialogue', '')}")
+        else:
+            formatted_lines.append(
+                f"🎭 {r['actor_name']}（{r['role']} · {r['emotions_cn']}）：{r.get('dialogue', '')}"
+            )
+
+    formatted_output = "\n".join(formatted_lines)
+
+    return {
+        "status": "success",
+        "id": f"batch_{uuid.uuid4().hex[:8]}",
+        "message": formatted_output,
+        "results": [r for r in results if r.get("status") != "skipped"],
+        "num_actors": num_actors,
+        "parallel_time_sec": round(elapsed, 1),
+        "estimated_serial_sec": estimated_serial,
+        "speedup": f"{estimated_serial / max(elapsed, 0.1):.1f}x",
     }
 
 
@@ -628,6 +913,225 @@ async def _call_a2a_sdk(card_file: str, prompt: str, actor_name: str, port: str)
 
 
 
+async def actor_chime_in(
+    trigger_context: str,
+    speaking_actor: str | None = None,
+    tool_context: ToolContext = None,
+) -> dict:
+    """Trigger spontaneous comments from related actors (chime-in event).
+
+    自发插话机制：当某个角色发言后，场景中其他关联角色概率性地
+    发表自发的反应或评论。让场景更生动，演员更主动。
+
+    Args:
+        trigger_context: The context that triggered the chime-in
+            (e.g., "朱棣刚刚威胁了苏念").
+        speaking_actor: Name of the actor who just spoke (optional,
+            used to exclude them from chiming in).
+        tool_context: Tool context for state access.
+
+    Returns:
+        dict with chime_in results — one entry per actor who chimed in,
+        each containing actor_name, dialogue, emotion, etc.
+        The 'chime_ins' field is a list of individual chime-in results.
+    """
+    import random
+    from .memory_manager import pre_reasoning_hook, add_working_memory, detect_importance
+    from .memory_manager import extract_and_register_entities
+
+    state = _get_state(tool_context)
+    actors_data = state.get("actors", {})
+
+    if not actors_data:
+        return {
+            "status": "info",
+            "message": "当前没有演员，无法触发自发插话。",
+            "chime_ins": [],
+        }
+
+    # --- Step 1: Determine candidate actors ---
+    # Exclude: the speaking actor, user protagonist, and any actor in error state
+    candidates = []
+    for name, info in actors_data.items():
+        if name == speaking_actor:
+            continue
+        if info.get("is_user_protagonist") or info.get("control_type") == "User-Controlled":
+            continue
+        if not info.get("port"):
+            continue
+        candidates.append(name)
+
+    if not candidates:
+        return {
+            "status": "info",
+            "message": "没有可插话的演员（排除发言者和用户主角后无人可选）。",
+            "chime_ins": [],
+        }
+
+    # --- Step 2: Score each candidate for chime-in probability ---
+    # Factors:
+    #   - Emotional intensity (high emotion → more likely to chime in)
+    #   - Relationship overlap with the trigger context
+    #   - Random base probability (30-70%)
+    chime_scores = {}
+    for name in candidates:
+        info = actors_data[name]
+        score = random.uniform(0.3, 0.7)  # base probability
+
+        # Emotional intensity bonus
+        emotion = info.get("emotions", "neutral")
+        high_emotions = {"angry", "fearful", "anxious", "determined", "happy"}
+        if emotion in high_emotions:
+            score += 0.15
+
+        # Relationship block keyword match bonus
+        blocks = info.get("memory_blocks", {})
+        rel_block = blocks.get("relationship", {}).get("value", "")
+        trigger_lower = trigger_context.lower()
+        # Check if any actor name from the trigger appears in their relationship block
+        for other_name in actors_data:
+            if other_name != name and other_name in trigger_context and other_name in rel_block:
+                score += 0.1
+                break
+
+        chime_scores[name] = min(score, 0.95)  # cap at 95%
+
+    # --- Step 3: Select actors who chime in (probabilistic) ---
+    chiming_actors = []
+    for name, score in chime_scores.items():
+        if random.random() < score:
+            chiming_actors.append(name)
+
+    # Limit to at most 3 chime-ins to avoid overwhelming the scene
+    if len(chiming_actors) > 3:
+        # Prioritize by score (descending)
+        chiming_actors.sort(key=lambda n: chime_scores[n], reverse=True)
+        chiming_actors = chiming_actors[:3]
+
+    if not chiming_actors:
+        return {
+            "status": "info",
+            "message": f"自发插话检测：当前情境下无演员触发插话。({trigger_context[:50]})",
+            "chime_ins": [],
+            "candidates_evaluated": list(chime_scores.keys()),
+        }
+
+    # --- Step 4: Call each chime-in actor via A2A (PARALLEL) ---
+    import asyncio as _aio
+
+    async def _call_chime_in(actor_name: str) -> dict:
+        """Call one chime-in actor, return result dict."""
+        actor_data = actors_data[actor_name]
+        pre_reasoning_hook(actor_name, tool_context)
+        memory_context = build_actor_context(actor_name, tool_context)
+        resolved_context = resolve_coreferences(
+            trigger_context, speaker_name=speaking_actor or "",
+            listener_name=actor_name, tool_context=tool_context,
+        )
+
+        is_critical, critical_reason = detect_importance(resolved_context)
+        importance = "critical" if is_critical else "normal"
+        add_working_memory(
+            actor_name=actor_name,
+            entry=f"[插话触发] {resolved_context}",
+            importance=importance,
+            critical_reason=critical_reason,
+            tool_context=tool_context,
+        )
+
+        role_label = actor_data.get("role", "")
+        personality = actor_data.get("personality", "")
+        emotion_label = actor_data.get("emotions", "neutral")
+        emotion_cn = {
+            "neutral": "平静", "angry": "愤怒", "sad": "悲伤", "happy": "喜悦",
+            "fearful": "恐惧", "confused": "困惑", "determined": "决绝",
+            "anxious": "焦虑", "hopeful": "充满希望",
+        }.get(emotion_label, emotion_label)
+
+        from .state_manager import get_scene_context
+        scene_ctx = get_scene_context(tool_context)
+        coref_annotations = _build_coref_annotations(scene_ctx)
+
+        prompt = (
+            f"【角色锚点】你是{actor_name}，{role_label}。{personality}\n\n"
+            f"【当前情绪】{emotion_cn}\n\n"
+            f"【插话情境】你听到/看到了以下事情，你可能有自发的反应：\n{resolved_context}\n\n"
+            f"{coref_annotations}\n\n"
+            f"{memory_context}\n\n"
+            f"请以「{actor_name}」的身份，做出简短的自发反应。"
+            f'你可以简短评论、低声自语、做出反应动作、或选择沉默（说"无反应"即可）。\n'
+            f"保持角色一致性，不要跳出角色。发言要简短（1-2句），这是插话不是长篇大论。"
+        )
+
+        saved_port = actor_data.get("port")
+        config = get_actor_remote_config(actor_name, saved_port=saved_port)
+        if not config:
+            return None
+
+        card_file = config["card_file"]
+        port = config.get("port", "N/A")
+
+        try:
+            actor_dialogue = await _call_a2a_sdk(card_file, prompt, actor_name, port)
+        except Exception as e:
+            err_type = type(e).__name__
+            actor_dialogue = f"[ERROR:{err_type}] {actor_name}插话调用失败: {e}"
+
+        is_error = actor_dialogue.startswith("[ERROR:")
+        if not is_error:
+            add_working_memory(
+                actor_name=actor_name,
+                entry=f"[插话] 我说：{actor_dialogue[:200]}",
+                importance="normal",
+                critical_reason=None,
+                tool_context=tool_context,
+            )
+            extract_and_register_entities(
+                actor_dialogue, speaker_name=actor_name, tool_context=tool_context
+            )
+            add_dialogue(actor_name=actor_name, dialogue=actor_dialogue, tool_context=tool_context)
+            if actor_name in state.get("actors", {}):
+                state["actors"][actor_name]["crash_count"] = 0
+                _set_state(state, tool_context)
+
+        return {
+            "actor_name": actor_name,
+            "role": role_label,
+            "emotion": emotion_cn,
+            "dialogue": actor_dialogue,
+            "is_error": is_error,
+            "sender_type": "actor",
+            "sender_name": actor_name,
+        }
+
+    # ★ 并行调用所有插话演员
+    chime_results_raw = await _aio.gather(*[_call_chime_in(n) for n in chiming_actors])
+    chime_in_results = [r for r in chime_results_raw if r is not None]
+
+    # Build formatted output
+    formatted_lines = []
+    formatted_lines.append("🔔 【自发插话】")
+    for r in chime_in_results:
+        if r["is_error"]:
+            formatted_lines.append(f"  ⚠️ {r['actor_name']}：{r['dialogue']}")
+        else:
+            formatted_lines.append(f"  🎭 {r['actor_name']}（{r['role']} · {r['emotion']}）：{r['dialogue']}")
+
+    formatted_output = "\n".join(formatted_lines)
+
+    return {
+        "status": "success",
+        "message": formatted_output,
+        "chime_ins": chime_in_results,
+        "trigger_context": trigger_context,
+        "speaking_actor": speaking_actor,
+        "candidates_evaluated": list(chime_scores.keys()),
+        "chime_count": len(chime_in_results),
+        "sender_type": "director",
+        "sender_name": "旁白",
+    }
+
+
 def director_narrate(narration: str, tool_context: ToolContext) -> dict:
     """The director narrates as a voiceover to describe scene transitions, atmosphere, or plot development.
 
@@ -636,6 +1140,7 @@ def director_narrate(narration: str, tool_context: ToolContext) -> dict:
 
     Returns:
         dict with status and the full narration text in multiple formats for display.
+        The 'actors_to_speak' field lists actor names the director wants to speak next.
     """
     result = add_narration(narration, tool_context)
     
@@ -662,11 +1167,21 @@ def director_narrate(narration: str, tool_context: ToolContext) -> dict:
 
     separator = "─" * 30
 
+    # ★ 新增：自动提取应发言的演员列表
+    # 导演的旁白完成后，所有在场演员按顺序发言
+    state = _get_state(tool_context)
+    actors_data = state.get("actors", {})
+    actors_to_speak = list(actors_data.keys())
+
     return {
         "status": "success",
+        "id": f"narration_{uuid.uuid4().hex[:8]}",  # ★ 唯一 ID，防止 REST 去重冲突
         "narration": narration,
         "formatted_narration": formatted_narration,
         "director_context": director_ctx,
+        "actors_to_speak": actors_to_speak,
+        "sender_type": "director",
+        "sender_name": "旁白",
         "message": f"\n{separator}\n{formatted_narration}\n{separator}",
     }
 
@@ -711,14 +1226,50 @@ def write_scene(
                 break
         _set_state(state, tool_context)
 
+    # ★ P-04: Record protagonist contributions and plot turning points in scene summary
+    from .dynamic_storm import build_protagonist_contribution_summary
+    contribution = build_protagonist_contribution_summary(state)
+
+    # Write contribution metadata into the scene record
+    scenes = state.get("scenes", [])
+    for s in scenes:
+        if s.get("scene_number") == scene_number:
+            s["protagonist_contribution"] = {
+                "weight_level": contribution["weight_level"],
+                "narrative_impact": contribution["narrative_impact"],
+                "key_choices": contribution["key_choices"],
+                "turning_points": contribution["turning_points"],
+                "arc_progress_snapshot": contribution["arc_progress_snapshot"],
+            }
+            break
+    _set_state(state, tool_context)
+
+    # Build protagonist contribution section for formatted output
+    contribution_section = ""
+    if contribution["weight_level"] != "passive":
+        contribution_lines = [f"👤 主角贡献（{contribution['weight_level']}）：{contribution['narrative_impact']}"]
+        if contribution["key_choices"]:
+            choice_strs = [f"「{c['action'][:50]}」" for c in contribution["key_choices"]]
+            contribution_lines.append(f"🔑 关键选择：{'；'.join(choice_strs)}")
+        if contribution["turning_points"]:
+            tp_strs = [f"「{tp['description'][:50]}」({tp['narrative_tag']})" for tp in contribution["turning_points"]]
+            contribution_lines.append(f"⚡ 剧情转折：{'；'.join(tp_strs)}")
+        contribution_section = "\n".join(contribution_lines)
+
     # Build a complete formatted version of the scene record
     top_line = "━" * 30
+    # ★ P-04: Include protagonist contribution in formatted output
+    contribution_block = ""
+    if contribution_section:
+        contribution_block = f"\n{contribution_section}\n"
+
     formatted_scene = (
         f"\n{top_line}\n"
         f"📝 第 {scene_number} 场：「{scene_title}」\n"
         f"{top_line}\n\n"
         f"*{scene_description}*\n\n"
         f"{dialogue_content}\n\n"
+        f"{contribution_block}"
         f"{top_line}\n"
         f"✅ 第 {scene_number} 场记录已保存至剧本。\n"
     )
@@ -877,23 +1428,71 @@ def next_scene(tool_context: ToolContext) -> dict:
 def user_action(action_description: str, tool_context: ToolContext) -> dict:
     """Process a user-injected action or event. Use when user provides /action command.
 
+    The user is treated as the protagonist (主角) of the drama. Their actions
+    directly influence the plot, and both the director and actors must respond.
+
     Args:
         action_description: Description of the event or action the user wants to inject.
 
     Returns:
         dict with status and guidance for the director.
     """
+    # ★ 新增：记录主角行动到对话记录
+    add_conversation(
+        speaker="主角",
+        content=action_description,
+        conversation_type="action",
+        tool_context=tool_context,
+    )
+
+    # ★ P-02/P-03: Detect key choices and update protagonist arc progress
+    from .dynamic_storm import detect_key_choice_and_update_arc
+    state = _get_state(tool_context)
+    choice_result = detect_key_choice_and_update_arc(
+        action_description=action_description,
+        state=state,
+        auto_update=True,
+    )
+    if choice_result["is_key_choice"]:
+        _set_state(state, tool_context)
+
+    # Build guidance message
+    base_guidance = (
+        f"主角行动: {action_description}\n"
+        "请作为导演：\n"
+        "1. 考虑这个行动如何影响当前剧情\n"
+        "2. 用 director_narrate 描述事件的发生\n"
+        "3. 用 actor_speak 让相关角色做出反应\n"
+        "4. 更新角色的情绪和记忆"
+    )
+
+    # ★ If key choice detected, add arc update notification
+    arc_notification = ""
+    if choice_result["is_key_choice"]:
+        arc_update = choice_result["arc_update"]
+        arc_notification = (
+            f"\n\n⚡ 关键选择检测！\n"
+            f"叙事标签：{choice_result['narrative_tag']}\n"
+            f"弧线进展增量：+{arc_update['progress_delta']}%\n"
+            f"弧线阶段提示：{arc_update['arc_stage_hint']}\n"
+        )
+        if arc_update.get("arc_type_hint"):
+            arc_notification += f"弧线类型推断：{arc_update['arc_type_hint']}\n"
+        arc_notification += (
+            "⚠️ 此行动为关键性选择，主角的 Arc Progress 已自动更新。\n"
+            "请确保后续剧情体现这一重大转折。"
+        )
+
     return {
         "status": "success",
-        "message": (
-            f"用户注入事件: {action_description}\n"
-            "请作为导演：\n"
-            "1. 考虑这个事件如何影响当前剧情\n"
-            "2. 用 director_narrate 描述事件的发生\n"
-            "3. 用 actor_speak 让相关角色做出反应\n"
-            "4. 更新角色的情绪和记忆"
-        ),
+        "message": base_guidance + arc_notification,
         "action": action_description,
+        "sender_type": "user",
+        "sender_name": "主角",
+        # ★ P-02: Key choice metadata
+        "is_key_choice": choice_result["is_key_choice"],
+        "arc_update": choice_result["arc_update"],
+        "narrative_tag": choice_result["narrative_tag"],
     }
 
 
@@ -1576,6 +2175,7 @@ def load_drama(save_name: str, tool_context: ToolContext) -> dict:
             knowledge_scope=actor_info.get("knowledge_scope", ""),
             other_actors=other_actors_list,
             memory_entries=memory_entries,
+            tool_context=tool_context,
         )
         # Update port in state (in case it changed or wasn't saved before)
         if svc_result.get("status") == "success" and svc_result.get("port"):

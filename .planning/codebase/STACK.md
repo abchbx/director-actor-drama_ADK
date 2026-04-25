@@ -1,92 +1,93 @@
 # Technology Stack
 
-**Analysis Date:** 2026-04-22
+**Analysis Date:** 2026-04-25
 
 ## Languages
 
 **Primary:**
-- Kotlin — All Android app code (UI, ViewModel, Data, Domain layers)
+- Python 3.11+ - Backend agent system, FastAPI API, tools, state management
 
 **Secondary:**
-- Python — Backend server (`director_actor_drama/`, `app/`, `cli.py`)
-- Kotlin DSL — Gradle build scripts (`build.gradle.kts`)
+- Kotlin - Android client (Jetpack Compose)
 
 ## Runtime
 
 **Environment:**
-- Android API (minSdk/targetSdk defined in build.gradle.kts)
-- JVM (for Kotlin compilation)
+- Python 3.11+ (backend)
+- Android API 26+ / Kotlin JVM (client)
+- Node.js not used
 
 **Package Manager:**
-- Gradle with Kotlin DSL
-- Lockfile: Gradle lockfile not present (uses version catalog or direct declarations)
+- uv (Python) — lockfile: `uv.lock` (present)
+- Gradle Kotlin DSL (Android) — version catalog: `libs.versions.toml`
 
 ## Frameworks
 
 **Core:**
-- Jetpack Compose — Declarative UI framework
-- Material 3 (Material3) — Design system and component library
-- Jetpack Navigation Compose — Type-safe navigation with `@Serializable` routes
-- Hilt — Dependency injection (built on Dagger)
-- Kotlin Coroutines + Flow — Asynchronous programming and reactive streams
+- Google ADK (Agent Development Kit) - Agent orchestration, Runner, A2A, session management
+- FastAPI 2.0+ - REST API + WebSocket endpoints
+- LiteLlm (ADK) - OpenAI-compatible LLM interface (supports Claude, GPT, etc.)
 
-**Networking:**
-- Retrofit 2 — REST API client
-- OkHttp — HTTP client + WebSocket support
-- kotlinx.serialization — JSON serialization/deserialization
-
-**Data:**
-- DataStore (Preferences) — Key-value persistence for server config
+**Android:**
+- Jetpack Compose - Declarative UI framework
+- Hilt - Dependency injection
+- Kotlin Coroutines + Flow - Async/reactive programming
+- Retrofit + OkHttp - HTTP client
+- kotlinx.serialization - JSON serialization (replaces Gson/Moshi)
 
 **Testing:**
-- Not detected — No test dependencies found in the Android app source
+- pytest (Python) - Backend test runner
+- Not detected: Android instrumented tests
 
 **Build/Dev:**
-- KSP (Kotlin Symbol Processing) — Used by Hilt for code generation
-- Gradle Wrapper — Build system
+- uvicorn - ASGI server with WatchFiles hot-reload
+- Makefile - Dev command shortcuts (run, test, lint)
 
 ## Key Dependencies
 
 **Critical:**
-- `androidx.compose.ui` — Core Compose UI primitives
-- `androidx.navigation.compose` — Navigation framework with type-safe routes
-- `com.google.dagger:hilt-android` — DI framework
-- `com.squareup.retrofit2:retrofit` — REST API communication
-- `com.squareup.okhttp3:okhttp` — HTTP + WebSocket client
-- `org.jetbrains.kotlinx:kotlinx-serialization-json` — JSON parsing
+- google-adk - Agent framework (Runner, BaseAgent, Agent, A2A, SessionService)
+- a2a-sdk - Agent-to-Agent protocol (ClientFactory, AgentCard, Message, Part)
+- httpx - Async HTTP client for A2A calls
+- pydantic v2 - Request/response validation, JSON schema
+- chromadb - Vector memory storage (Tier 4 semantic retrieval)
 
 **Infrastructure:**
-- `androidx.datastore:datastore-preferences` — Server config persistence
-- `androidx.lifecycle:lifecycle-viewmodel-compose` — ViewModel integration with Compose
-- `androidx.hilt:hilt-navigation-compose` — Hilt ViewModel injection in Compose
+- python-dotenv - Environment variable loading
+- fastapi - Web framework (REST + WebSocket)
+- uvicorn - ASGI server
+
+**Android Critical:**
+- OkHttp - WebSocket client + HTTP
+- Retrofit - REST API client
+- Compose Material3 - UI components
+- DataStore - Local persistence (saves, preferences)
 
 ## Configuration
 
 **Environment:**
-- Server IP/port stored in DataStore (via `ServerPreferences`)
-- Auth token stored in DataStore
-- First launch detected by absence of server config → shows ConnectionGuide
-- Base URL for API: `http://{ip}:{port}/api/v1/` (configurable)
+- `OPENAI_API_KEY` - LLM API key (required)
+- `OPENAI_BASE_URL` - LLM API base URL (for OpenAI-compatible endpoints)
+- `MODEL_NAME` - LLM model identifier (default: "openai/claude-sonnet-4-6")
+- `API_TOKEN` - Optional auth token for API/WS access (empty = auth disabled)
 
 **Build:**
-- `android/app/build.gradle.kts` — App module build config
-- `android/build.gradle.kts` — Project-level build config
-- `android/settings.gradle.kts` — Module includes
-- `android/gradle.properties` — Gradle properties
+- `pyproject.toml` - Python project config + dependencies
+- `android/app/build.gradle.kts` - Android build config
+- `android/gradle/libs.versions.toml` - Version catalog
 
 ## Platform Requirements
 
 **Development:**
-- Android Studio (Iguana or later recommended)
-- Android SDK with Compose support
-- Kotlin 2.0+ (for type-safe navigation routes)
-- KSP for Hilt annotation processing
+- Python 3.11+ with uv
+- Android Studio (for Android client)
+- LLM API access (OpenAI-compatible endpoint)
 
 **Production:**
-- Android device/emulator (API level per minSdk)
-- Backend server running (Python FastAPI) accessible via network
-- Network connectivity required (no offline mode)
+- Python ASGI server (uvicorn)
+- Network accessible by Android clients
+- ChromaDB for vector memory (optional, degrades gracefully)
 
 ---
 
-*Stack analysis: 2026-04-22*
+*Stack analysis: 2026-04-25*

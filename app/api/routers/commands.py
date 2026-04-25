@@ -171,7 +171,11 @@ async def user_action(
     lock=Depends(get_runner_lock),
     tool_context=Depends(get_tool_context),
 ):
-    """Inject a user action/event into the drama."""
+    """Inject a user action/event into the drama.
+
+    The user acts as the protagonist (主角).
+    ★ 用户气泡由 Android ViewModel 在发送时本地创建，后端不需要推送 user_message 事件。
+    """
     async with lock:
         _require_active_drama(tool_context)
         result = await run_command_and_collect(
@@ -293,6 +297,8 @@ async def chat_message(
 
     If mention is provided, routes to /speak for that actor.
     Otherwise, routes to /action (broadcast to all actors).
+    The user is treated as the protagonist (主角) of the drama.
+    ★ 用户气泡由 Android ViewModel 在发送时本地创建，后端不需要推送 user_message 事件。
     """
     async with lock:
         _require_active_drama(tool_context)
@@ -300,7 +306,7 @@ async def chat_message(
             # @提及 → /speak 角色名 情境
             msg = f"/speak {body.mention} {body.message}"
         else:
-            # 群消息 → /action
+            # 群消息 → /action（用户以主角身份行动）
             msg = f"/action {body.message}"
         result = await run_command_and_collect(
             runner, msg, USER_ID, SESSION_ID,

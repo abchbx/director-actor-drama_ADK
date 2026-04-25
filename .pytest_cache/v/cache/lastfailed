@@ -1,4 +1,7 @@
 {
   "tests/unit/test_api_queries.py::test_status_endpoint": true,
-  "tests/unit/test_api.py::TestVersioningAndRoutes::test_all_14_endpoints_exist": true
+  "tests/unit/test_api.py::TestVersioningAndRoutes::test_all_14_endpoints_exist": true,
+  "tests/unit/test_api_commands.py::TestStartAutoSave::test_start_auto_saves_existing": true,
+  "tests/unit/test_api_integration.py::TestFullAPILifecycle::test_all_14_routes_registered": true,
+  "tests/unit/test_api_queries.py::TestNoActiveDrama::test_status_no_active_drama_404": true
 }

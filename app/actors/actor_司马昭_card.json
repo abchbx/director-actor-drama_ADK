@@ -1,0 +1,26 @@
+{
+  "name": "actor_司马昭",
+  "description": "演员 司马昭，角色：权力者/裁决者",
+  "url": "http://localhost:9035/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_司马昭",
+      "name": "扮演司马昭",
+      "description": "以司马昭的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

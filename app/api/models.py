@@ -200,6 +200,23 @@ class AuthVerifyResponse(BaseModel):
 # ============================================================================
 
 
+class MessageSender(BaseModel):
+    """消息发送者标识 — 三方消息体系（导演/演员/用户）.
+
+    sender_type:
+      - "director": 导演/旁白
+      - "actor": 演员（附带 actor_name）
+      - "user": 用户/主角
+    """
+
+    sender_type: str = Field(
+        ..., description="发送者类型: director, actor, user"
+    )
+    sender_name: str = Field(
+        default="", description="发送者名称（导演=旁白, 演员=角色名, 用户=主角）"
+    )
+
+
 class WsEvent(BaseModel):
     """WebSocket event message for real-time scene push (WS-02)."""
 

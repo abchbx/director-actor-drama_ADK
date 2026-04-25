@@ -20,8 +20,10 @@ TOOL_EVENT_MAP: dict[str, list[str]] = {
     "start_drama": ["scene_start", "status", "command_echo"],       # ★ command_echo 回显用户指令
     "next_scene": ["scene_start", "command_echo"],
     "director_narrate": ["narration"],
-    "actor_speak": ["dialogue", "actor_chime_in"],   # CHAT-07: chime_in when actor speaks
-    "user_action": ["dialogue", "command_echo"],       # ★ 用户行动回显指令 + 触发对话
+    "actor_speak": ["dialogue"],                        # ★ 对话事件 — 只映射 dialogue，chime_in 由独立工具触发
+    "actor_speak_batch": ["dialogue"],                  # ★ 批量对话 — 映射到 dialogue，results 列表中每个演员一条
+    "actor_chime_in": ["actor_chime_in"],               # ★ 自发插话事件 — 独立映射，携带所有插话结果
+    "user_action": ["command_echo"],  # ★ 用户行动仅回显命令，气泡由客户端本地创建
     "write_scene": ["scene_end"],
     "update_emotion": ["actor_status"],
     "create_actor": ["actor_created", "cast_update"],  # D-06: cast_update
@@ -34,6 +36,10 @@ TOOL_EVENT_MAP: dict[str, list[str]] = {
     "end_drama": ["end_narration", "command_echo"],
     "steer_drama": ["command_echo"],                    # ★ steer 也回显
     "auto_advance": ["command_echo"],                   # ★ auto 也回显
+    # ★ 语义检索 & Dynamic STORM — 前端需要详细进度透出
+    "retrieve_relevant_scenes_tool": ["command_echo"],  # ★ 语义检索 — typing + director_log 驱动进度
+    "backfill_tags_tool": ["command_echo"],             # ★ 标签回填 — 同上
+    "dynamic_storm": ["storm_discover"],               # ★ 动态STORM — 映射到 storm_discover 推送进度
 }
 
 # DEBUG: Tools whose function_call/function_response should emit rich 'director_log' events.
@@ -41,7 +47,9 @@ TOOL_EVENT_MAP: dict[str, list[str]] = {
 DIRECTOR_LOG_TOOLS = {
     "start_drama", "storm_discover_perspectives", "storm_research_perspective",
     "storm_synthesize_outline", "create_actor", "next_scene", "write_scene",
-    "actor_speak", "user_action", "director_narrate",
+    "actor_speak", "actor_speak_batch", "actor_chime_in", "user_action", "director_narrate",
+    # ★ 语义检索 & Dynamic STORM — 长耗时工具，Android 需要详细进度透出
+    "retrieve_relevant_scenes_tool", "backfill_tags_tool", "dynamic_storm",
 }
 
 
@@ -49,31 +57,48 @@ def _extract_call_data(event_type: str, function_call) -> dict:
     """Extract relevant data from function_call for the given event type."""
     args = dict(function_call.args) if function_call.args else {}
     if event_type == "scene_start":
-        return {"tool": function_call.name}
+        return {"tool": function_call.name, "sender_type": "director", "sender_name": "旁白"}
     elif event_type == "status":
-        return {"tool": function_call.name}
+        return {"tool": function_call.name, "sender_type": "director", "sender_name": "旁白"}
     elif event_type == "narration":
         content = args.get("content", args.get("text", ""))
-        return {"tool": function_call.name, "text": content}
+        return {"tool": function_call.name, "text": content, "sender_type": "director", "sender_name": "旁白"}
     elif event_type == "dialogue":
         return {
             "actor_name": args.get("actor_name", ""),
             "tool": function_call.name,
             "situation": args.get("situation", ""),
+            "sender_type": "actor",
+            "sender_name": args.get("actor_name", ""),
         }
     elif event_type == "actor_created":
-        return {"actor_name": args.get("actor_name", ""), "tool": function_call.name}
+        return {"actor_name": args.get("actor_name", ""), "tool": function_call.name, "sender_type": "director", "sender_name": "旁白"}
     elif event_type == "cast_update":
-        return {"tool": function_call.name}
+        return {"tool": function_call.name, "sender_type": "director", "sender_name": "旁白"}
     elif event_type == "actor_chime_in":
-        return {"actor_name": args.get("actor_name", ""), "tool": function_call.name}
+        # ★ chime_in call 阶段：返回触发上下文（typing 指示用）
+        return {
+            "tool": function_call.name,
+            "trigger_context": args.get("trigger_context", ""),
+            "speaking_actor": args.get("speaking_actor", ""),
+            "sender_type": "director",
+            "sender_name": "旁白",
+        }
     elif event_type == "command_echo":
-        # ★ 新增：command_echo 事件 — 回显用户指令到前端
-        # 前端收到此事件后，在会话界面显示用户执行的命令
         return {
             "tool": function_call.name,
             "command": _format_command_echo(function_call.name, args),
             "args": {k: str(v)[:100] for k, v in args.items()},
+            "sender_type": "user",
+            "sender_name": "主角",
+        }
+    elif event_type == "user_action_echo":
+        # ★ 用户行动事件 — 以主角身份在聊天中展示
+        desc = args.get("description", args.get("action", ""))
+        return {
+            "text": desc,
+            "sender_type": "user",
+            "sender_name": "主角",
         }
     else:
         return {"tool": function_call.name}
@@ -90,40 +115,60 @@ def _extract_response_data(event_type: str, response: dict) -> dict:
         return {
             "scene_number": response.get("scene_number"),
             "scene_title": response.get("scene_title", ""),
+            "sender_type": "director",
+            "sender_name": "旁白",
         }
     elif event_type == "actor_status":
         return {
             "actor_name": response.get("actor_name", ""),
             "emotion": response.get("emotion", ""),
+            "sender_type": "director",
+            "sender_name": "旁白",
         }
     elif event_type == "dialogue":
-        # ★ 核心修复：携带完整对话文本和情绪，前端创建气泡
+        actor_name = response.get("actor_name", "")
         return {
-            "actor_name": response.get("actor_name", ""),
+            "actor_name": actor_name,
             "text": response.get("text", ""),
             "emotion": response.get("emotion", ""),
+            "sender_type": "actor",
+            "sender_name": actor_name,
         }
     elif event_type == "actor_chime_in":
-        # ★ 修复：插话事件也需要完整文本
+        # ★ chime_in response 阶段：携带所有插话演员的完整对话
+        # response 包含 chime_ins 列表，每项有 actor_name/dialogue/emotion 等
+        chime_ins = response.get("chime_ins", [])
         return {
-            "actor_name": response.get("actor_name", ""),
-            "text": response.get("text", ""),
+            "chime_ins": chime_ins,
+            "chime_count": response.get("chime_count", len(chime_ins)),
+            "trigger_context": response.get("trigger_context", ""),
+            "speaking_actor": response.get("speaking_actor", ""),
+            "sender_type": "director",
+            "sender_name": "旁白",
         }
     elif event_type == "narration":
-        # ★ 核心修复：携带旁白完整文本
         return {
             "text": response.get("formatted_narration", response.get("text", response.get("narration", ""))),
+            "sender_type": "director",
+            "sender_name": "旁白",
         }
     elif event_type == "save_confirm":
-        return {"message": response.get("message", "")}
+        return {"message": response.get("message", ""), "sender_type": "director", "sender_name": "旁白"}
+    elif event_type == "user_action_echo":
+        # ★ 用户行动事件响应 — 以主角身份展示
+        action = response.get("action", "")
+        return {
+            "text": action,
+            "sender_type": "user",
+            "sender_name": "主角",
+        }
     elif event_type == "load_confirm":
-        return {"message": response.get("message", ""), "theme": response.get("theme", "")}
+        return {"message": response.get("message", ""), "theme": response.get("theme", ""), "sender_type": "director", "sender_name": "旁白"}
     elif event_type == "progress":
-        return {"message": response.get("message", ""), "export_path": response.get("export_path", "")}
+        return {"message": response.get("message", ""), "export_path": response.get("export_path", ""), "sender_type": "director", "sender_name": "旁白"}
     elif event_type == "end_narration":
-        return {"text": response.get("formatted_narration", response.get("message", ""))}
+        return {"text": response.get("formatted_narration", response.get("message", "")), "sender_type": "director", "sender_name": "旁白"}
     elif event_type == "storm_outline":
-        # ★ 修复：传递大纲摘要数据到前端，而非空 dict
         outline = response.get("outline", {})
         acts = outline.get("acts", [])
         act_summaries = []
@@ -142,6 +187,8 @@ def _extract_response_data(event_type: str, response: dict) -> dict:
             "acts": act_summaries,
             "core_tensions": outline.get("core_tensions", []),
             "new_status": response.get("new_status", "acting"),
+            "sender_type": "director",
+            "sender_name": "旁白",
         }
     else:
         return {}
@@ -165,6 +212,10 @@ def _format_command_echo(fn_name: str, args: dict) -> str:
         case "actor_speak":
             actor = args.get("actor_name", "")
             return f"@{actor}"
+        case "actor_chime_in":
+            ctx = args.get("trigger_context", "")[:40]
+            speaker = args.get("speaking_actor", "")
+            return f"🔔 插话触发: {ctx}" + (f" (after {speaker})" if speaker else "")
         case "save_drama":
             name = args.get("save_name", "")
             return f"/save {name}".strip()
@@ -181,6 +232,8 @@ def _format_command_echo(fn_name: str, args: dict) -> str:
         case "auto_advance":
             n = args.get("num_scenes", "?")
             return f"/auto {n}"
+        case "show_cast":
+            return "/cast"
         case _:
             return f"/{fn_name}"
 
@@ -229,12 +282,29 @@ def _build_director_log_call(fn_name: str, args: dict) -> str:
             actor = args.get("actor_name", "")
             situation = args.get("situation", "")[:40]
             return f"💬 {actor} 说话: {situation}"
+        case "actor_speak_batch":
+            actors_list = args.get("actors", [])
+            names = "、".join(a.get("actor_name", "?") for a in (actors_list if isinstance(actors_list, list) else []))
+            return f"💬⚡ 批量对话: {names}"
+        case "actor_chime_in":
+            ctx = args.get("trigger_context", "")[:40]
+            speaker = args.get("speaking_actor", "")
+            return f"🔔 自发插话检测: {ctx}" + (f" (after {speaker})" if speaker else "")
         case "user_action":
             desc = args.get("description", "")[:60]
             return f"👤 用户行动: {desc}"
         case "director_narrate":
             content = args.get("content", "")[:50]
             return f"🎬 导演旁白: {content}"
+        # ★ 语义检索 & Dynamic STORM 进度透出
+        case "retrieve_relevant_scenes_tool":
+            tags = args.get("tags", "")[:60]
+            return f"🔍 正在检索人物记忆... (标签: {tags})"
+        case "backfill_tags_tool":
+            return "🏷️ 正在回填场景标签..."
+        case "dynamic_storm":
+            focus = args.get("focus_area", "")[:40]
+            return f"⚡ 正在推演剧情走向... (聚焦: {focus})" if focus else "⚡ 正在推演剧情走向..."
         case _:
             return f"⚙️ 执行 {fn_name}"
 
@@ -276,6 +346,29 @@ def _build_director_log_response(fn_name: str, response: dict) -> str:
             tension = response.get("tension_score")
             tension_str = f" 张力:{tension}" if tension is not None else ""
             return f"✅ 第{scene}场写入完成{tension_str}"
+        case "actor_speak":
+            # Handled by default case below
+            pass
+        case "actor_chime_in":
+            count = response.get("chime_count", 0)
+            chime_ins = response.get("chime_ins", [])
+            names = "、".join(c.get("actor_name", "?") for c in chime_ins[:3])
+            if count > 0:
+                return f"✅ 自发插话: {names} 等{count}人反应"
+            else:
+                return "✅ 自发插话检测完毕: 无人插话"
+        # ★ 语义检索 & Dynamic STORM 响应进度
+        case "retrieve_relevant_scenes_tool":
+            count = len(response.get("relevant_scenes", []))
+            return f"✅ 人物记忆检索完成: 找到 {count} 条相关回忆"
+        case "backfill_tags_tool":
+            count = response.get("backfilled_count", 0)
+            return f"✅ 标签回填完成: {count} 条场景"
+        case "dynamic_storm":
+            count = len(response.get("new_perspectives", []))
+            focus = response.get("focus_area", "")
+            focus_str = f"「{focus}」" if focus else ""
+            return f"✅ 剧情推演完成{focus_str}: 发现 {count} 个新视角"
         case _:
             if status_val == "error":
                 return f"❌ {fn_name} 失败: {(msg or '')[:80]}"
@@ -368,11 +461,33 @@ def map_runner_event(event: Event) -> list[dict]:
 
             # Emit response data for mapped event types
             if fn_name in TOOL_EVENT_MAP:
-                for event_type in TOOL_EVENT_MAP[fn_name]:
-                    results.append({
-                        "type": event_type,
-                        "data": _extract_response_data(event_type, resp),
-                    })
+                # ★ actor_speak_batch 特殊处理：展开 results 列表为多个独立 dialogue 事件
+                if fn_name == "actor_speak_batch":
+                    batch_results = resp.get("results", [])
+                    for actor_result in batch_results:
+                        results.append({
+                            "type": "dialogue",
+                            "data": _extract_response_data("dialogue", actor_result),
+                        })
+                    # 同时推送 speedup 信息
+                    speedup = resp.get("speedup", "")
+                    parallel_time = resp.get("parallel_time_sec", 0)
+                    if speedup:
+                        results.append({
+                            "type": "director_log",
+                            "data": {
+                                "message": f"⚡ 批量对话完成: {len(batch_results)}人并行 {parallel_time}s (提速{speedup})",
+                                "tool": fn_name,
+                                "phase": "done",
+                                "timestamp": time.strftime("%H:%M:%S"),
+                            },
+                        })
+                else:
+                    for event_type in TOOL_EVENT_MAP[fn_name]:
+                        results.append({
+                            "type": event_type,
+                            "data": _extract_response_data(event_type, resp),
+                        })
 
     # D-06: end_narration from final_response text (for /end command)
     if event.is_final_response() and event.content and event.content.parts:

@@ -27,12 +27,35 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 
 fun getTypingText(toolName: String?): String = when (toolName) {
-    "director_narrate" -> "导演正在构思..."
-    "actor_speak" -> "演员正在回复..."
-    "user_action" -> "剧情推进中..."
+    // Director 系列工具
+    "director_narrate" -> "导演正在构思旁白..."
     "next_scene", "write_scene" -> "剧情推进中..."
-    "create_actor" -> "正在创建角色..."
     "start_drama" -> "正在初始化剧本..."
+
+    // Actor 系列工具
+    "actor_speak" -> "演员正在回复..."
+    "actor_speak_batch" -> "多位演员正在回应..."
+    "actor_chime_in" -> "角色想要发言..."
+    "create_actor" -> "正在创建角色..."
+
+    // ★ Semantic Retriever — 语义记忆检索
+    "retrieve_relevant_scenes", "semantic_retriever",
+    "backfill_tags", "memory_search", "memory_recall" -> "正在检索人物记忆..."
+
+    // ★ Dynamic STORM — 剧情推演
+    "storm_discover_perspectives", "storm_research_perspective",
+    "storm_synthesize_outline", "dynamic_storm" -> "正在推演剧情走向..."
+
+    // 用户操作
+    "user_action" -> "剧情推进中..."
+
+    // 其他工具
+    "save_drama", "load_drama", "export_drama" -> "正在处理存档..."
+    "update_emotion" -> "更新角色情绪..."
+    "steer_drama" -> "调整剧情方向..."
+    "auto_advance" -> "自动推进中..."
+    "end_drama" -> "正在落幕..."
+
     else -> "AI 正在思考..."
 }
 

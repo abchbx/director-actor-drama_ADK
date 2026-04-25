@@ -1,89 +1,96 @@
 # Technology Stack
 
-**Analysis Date:** 2026-04-24
+**Analysis Date:** 2026-04-25
 
 ## Languages
 
 **Primary:**
-- Kotlin 2.1.0 - All application code (100%)
+- Kotlin — All application code (UI, logic, data, DI)
 
 **Secondary:**
-- None (pure Kotlin project)
+- XML — Android resources (manifest, layouts, themes, icons)
+- Groovy/KTS — Gradle build scripts (`build.gradle.kts`, `settings.gradle.kts`)
+- TOML — Version catalog (`gradle/libs.versions.toml`)
+- Python — Backend (`event_mapper.py`, ADK Runner)
 
 ## Runtime
 
 **Environment:**
-- Android SDK 35 (compileSdk), minSdk 26, targetSdk 35
-- Java 17 (source/target compatibility)
+- Android SDK (minSdk/targetSdk defined in `app/build.gradle.kts`)
+- JVM (JDK 17 based on Kotlin configuration)
 
 **Package Manager:**
-- Gradle 8.7.3 (via AGP)
-- Version catalog: `gradle/libs.versions.toml`
-- Lockfile: Not present (Gradle lockfile not enabled)
+- Gradle with Kotlin DSL
+- Lockfile: Not present (version catalog `gradle/libs.versions.toml` serves as version pinning)
 
 ## Frameworks
 
 **Core:**
-- Jetpack Compose (BOM 2025.12.01) - Declarative UI framework
-- Material3 - Design system
-- Navigation Compose 2.8.9 - Type-safe navigation with `@Serializable` routes
-- Hilt 2.54 - Dependency injection
+- Jetpack Compose — Declarative UI framework (BOM-managed versions)
+- Material3 — Design system (`androidx.compose.material3`)
+- Hilt — Dependency injection (`dagger.hilt`)
+- Navigation Compose — Type-safe routing (`androidx.navigation.compose`)
+- Kotlin Serialization — JSON serialization (`kotlinx.serialization`)
+- Kotlin Coroutines + Flow — Asynchronous programming
 
 **Networking:**
-- Retrofit 2.12.0 - REST API client
-- OkHttp 4.12.0 - HTTP client + WebSocket
-- Kotlinx Serialization 1.8.1 - JSON serialization (compiler plugin + runtime)
+- Retrofit — REST API client
+- OkHttp — HTTP client + WebSocket support
+- kotlinx.serialization.json — JSON parsing (not Gson/Moshi)
 
-**Data:**
-- DataStore Preferences 1.1.7 - Key-value persistent storage
-- Security Crypto 1.1.0-alpha06 - Encrypted SharedPreferences for token storage
+**Local Storage:**
+- DataStore (Preferences) — Key-value persistence for saves and preferences
+- EncryptedSharedPreferences — Secure credential storage
 
-**Lifecycle:**
-- Lifecycle ViewModel Compose 2.8.7 - ViewModel integration with Compose
-- Lifecycle Runtime Compose 2.8.7 - `collectAsStateWithLifecycle()`
+**Testing:**
+- Not detected — No test dependencies or test files found in the codebase
 
 **Build/Dev:**
-- KSP 2.1.0-1.0.29 - Kotlin Symbol Processing (for Hilt)
-- Compose Compiler Plugin 2.1.0 - Compose compiler (via kotlin-compose plugin)
-- Kotlin Serialization Plugin 2.1.0 - `@Serializable` code generation
+- KSP (Kotlin Symbol Processing) — Hilt annotation processing
+- Gradle Version Catalog — Centralized dependency version management
 
 ## Key Dependencies
 
 **Critical:**
-- `okhttp` 4.12.0 - HTTP client for REST and WebSocket; `WebSocketManager` depends on OkHttp's `WebSocket` API
-- `retrofit` 2.12.0 - REST API client; all backend communication uses Retrofit service interfaces
-- `kotlinx-serialization-json` 1.8.1 - JSON parsing for both REST responses and WebSocket messages
-- `hilt-android` 2.54 - DI framework; all ViewModels, repositories, and managers are Hilt-injected
+- `androidx.compose.material3` — All UI components use Material3 theming
+- `dagger.hilt` — All ViewModels and repositories are Hilt-injected
+- `kotlinx.serialization` — All DTOs and `SceneBubble` use `@Serializable`
+- `okhttp3` — WebSocket connection (`WebSocketManager`) and HTTP client
+- `retrofit2` — REST API calls (`DramaApiService`)
+- `androidx.datastore` — Local save/load system
 
 **Infrastructure:**
-- `datastore-preferences` 1.1.7 - Server config persistence (IP, port, base URL)
-- `security-crypto` 1.1.0-alpha06 - Encrypted token storage via `SecureStorage`
-- `navigation-compose` 2.8.9 - Type-safe routing with `@Serializable` route objects
+- `androidx.navigation.compose` — Screen navigation with type-safe routes
+- `androidx.lifecycle` — ViewModel + `StateFlow` + `collectAsStateWithLifecycle()`
+- `androidx.compose.foundation` — LazyColumn, animations, gestures
 
 ## Configuration
 
 **Environment:**
-- Server IP/port/base URL stored in DataStore (`drama_settings`)
-- Auth token stored encrypted via `EncryptedSharedPreferences` (`drama_secure_prefs`)
-- Default server: `http://127.0.0.1:8000/api/v1/` (placeholder for first launch)
+- Server connection configured via `ServerPreferences` DataStore (IP, port, token, baseUrl)
+- Auth token stored in `SecureStorage` (EncryptedSharedPreferences)
+- `.env` files not used on Android side
 
 **Build:**
-- `app/build.gradle.kts` - App module config (SDK versions, compose, plugins)
-- `gradle/libs.versions.toml` - Centralized version catalog
-- `build.gradle.kts` - Root project config
-- `settings.gradle.kts` - Module declarations (single `:app` module)
-- `gradle.properties` - Gradle/JVM properties
-- `proguard-rules.pro` - ProGuard rules (minify disabled in release)
+- `app/build.gradle.kts` — Module-level build configuration
+- `build.gradle.kts` — Root build configuration
+- `gradle/libs.versions.toml` — Version catalog (all dependency versions)
+- `gradle.properties` — Gradle properties
+- `settings.gradle.kts` — Module inclusion
 
 ## Platform Requirements
 
 **Development:**
 - Android Studio (Iguana or later)
 - JDK 17
-- Android SDK with API 35
-- Kotlin 2.1.0 plugin
+- Android SDK with Compose tooling
+- Physical device or emulator for testing
 
 **Production:**
-- Android 8.0 (API 26) minimum
-- Internet permission required
-- Deployed as APK (built via `build_apk.sh`)
+- Android API level matching minSdk (check `app/build.gradle.kts`)
+- Network connectivity to server (REST + WebSocket)
+- Server running at configured IP:port
+
+---
+
+*Stack analysis: 2026-04-25*
