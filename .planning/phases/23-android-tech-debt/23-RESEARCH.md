@@ -684,22 +684,25 @@ fun `connectionOrchestrator emits state changes`() = runTest {
 
 **A5 验证：** Hilt 自 2.31+ 支持 `ActivityComponent` 和 `@ActivityScoped`。项目使用 Hilt 2.54，完全支持。[CITED: Android开发者文档 — Hilt组件生命周期]
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **DramaCreateViewModel 的 WS 连接移交机制**
    - What we know: 当前代码注释说 DramaCreateVM 导航到 DramaDetailVM 时不调用 `webSocketManager.disconnect()`，以保持连接
    - What's unclear: 改为 acquire/release 后，DramaCreateVM 的 release 是否应在导航前调用？如果 DramaDetailVM 的 acquire 在 DramaCreateVM 的 release 之前，则引用计数不会降为 0，连接不断
    - Recommendation: DramaCreateVM 在 `onCleared()` 时 release，DramaDetailVM 在 `init` 时 acquire。由于两个 VM 都在同一 Activity 中，@ActivityScoped 实例相同，引用计数从 1→2→1 不会断连
+   - RESOLVED: acquire/release 引用计数 + onCleared 统一清理，同 Activity VM 引用 1→2→1 不断连。Plan 01 Task 3 实现
 
 2. **network_security_config 对 192.168.x.x 的处理**
    - What we know: `domain-config` 不支持 CIDR，LAN IP 无法精确白名单
    - What's unclear: Release 构建是否需要允许 192.168.x.x 明文
    - Recommendation: Release 构建仅允许 localhost/10.0.2.2；LAN 开发使用 Debug 构建（宽松配置）。这在 CONTEXT.md 的 D-23-14 中已隐含
+   - RESOLVED: Debug/Release 分离安全配置，Release 仅白名单 localhost/10.0.2.2/127.0.0.1。Plan 02 Task 1b 实现
 
 3. **R8 对 kotlinx-serialization 插件的影响**
    - What we know: kotlinx-serialization 编译器插件在编译期生成 serializer，字段名以字符串常量存储
    - What's unclear: R8 是否可能内联这些常量后混淆原始类字段名
    - Recommendation: keep 所有 DTO 和密封类子类。首次 Release 构建后必须逐个 API 端点验证
+   - RESOLVED: 保守 keep 所有 DTO + 密封类子类，首次 Release 构建后逐 API 验证。Plan 01 Task 4 实现
 
 ## Environment Availability
 
