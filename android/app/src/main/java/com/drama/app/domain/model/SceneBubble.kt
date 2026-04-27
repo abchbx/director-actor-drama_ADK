@@ -109,10 +109,10 @@ sealed class SceneBubble {
     }
 
     /**
-     * 用户在群聊中发送的消息 — 右对齐显示，用户以"主角"身份参与
+     * 用户在群聊中发送的消息 — 右对齐显示，用户以"用户"身份参与
      *
      * ★ 交互语义区分：
-     * - isAction = false（默认）: 直接对话，渲染为右侧聊天气泡 + 主角头像
+     * - isAction = false（默认）: 直接对话，渲染为右侧聊天气泡 + 用户头像
      * - isAction = true: 动作行为（如 /action 拔剑），渲染为居中斜体无气泡，强调行为的发生
      */
     @Serializable
@@ -124,7 +124,7 @@ sealed class SceneBubble {
         val avatarType: AvatarType = AvatarType.USER,
         val avatarUrl: String? = null,
         val senderType: SenderType = SenderType.USER,
-        val senderName: String = "主角",
+        val senderName: String = "用户",
         /** ★ 是否为动作行为 — true 时渲染为居中斜体（旁白式），false 时渲染为右侧聊天气泡 */
         val isAction: Boolean = false,
     ) : SceneBubble() {

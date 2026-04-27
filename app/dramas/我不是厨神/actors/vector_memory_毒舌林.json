@@ -1,0 +1,90 @@
+[
+  {
+    "id": "727878f2-bc28-4a8a-8f71-bdd74a0a2307",
+    "content": "[插话触发] 苏晴发消息关心陈小满，他可能会看到消息并回复",
+    "metadata": {
+      "actor_name": "毒舌林",
+      "stored_at": "2026-04-27T04:08:10.196741",
+      "type": "working_memory",
+      "importance": "normal",
+      "scene": 1
+    }
+  },
+  {
+    "id": "30edc8de-2029-4c4c-8631-1ca32f308731",
+    "content": "[插话] 我说：苏晴这时候冒出来献殷勤，有意思。",
+    "metadata": {
+      "stored_at": "2026-04-27T04:08:17.898172",
+      "importance": "normal",
+      "actor_name": "毒舌林",
+      "type": "working_memory",
+      "scene": 1
+    }
+  },
+  {
+    "id": "8b365f89-9d38-4f9d-8173-36a499c803e2",
+    "content": "[插话触发] 陈小满差点说出真相，神秘投资人的反应",
+    "metadata": {
+      "importance": "normal",
+      "type": "working_memory",
+      "stored_at": "2026-04-27T04:15:50.918066",
+      "actor_name": "毒舌林",
+      "scene": 3
+    }
+  },
+  {
+    "id": "19e468cf-a10c-4b48-a14b-0142c7d5fa88",
+    "content": "[插话] 我说：有意思，这投资人比我还紧张，怕不是心里有鬼？",
+    "metadata": {
+      "scene": 3,
+      "importance": "normal",
+      "type": "working_memory",
+      "stored_at": "2026-04-27T04:15:56.034667",
+      "actor_name": "毒舌林"
+    }
+  },
+  {
+    "id": "617082e5-ced6-4fa9-b723-787453c7032c",
+    "content": "面对情境: 带着直播团队闯入咖啡馆，准备当场试探或拆穿\"厨神\"的真面目",
+    "metadata": {
+      "type": "working_memory",
+      "scene": 4,
+      "stored_at": "2026-04-27T04:19:25.324871",
+      "actor_name": "毒舌林",
+      "importance": "normal"
+    }
+  },
+  {
+    "id": "ff0525e4-c2a6-4c0e-8b07-85f15d8cc7aa",
+    "content": "我说：（推门而入，手机直播已开启）哟，这不是咱们大名鼎鼎的\"厨神\"陈小满吗？怎么，躲在咖啡馆里喝饮料逃避镜头呢？\n\n各位老铁们，看看啊，正主在这儿呢！我毒舌林今天可是专门来讨个说法的。网上把你吹得天花乱坠，什么\"厨房天才\"、\"味觉奇迹\"，我倒想亲眼看看，是不是真的有那么神。\n\n（环顾四周）怎么，没带你的锅碗瓢盆？厨神下乡体验生活来了？",
+    "metadata": {
+      "type": "working_memory",
+      "stored_at": "2026-04-27T04:19:33.658594",
+      "importance": "normal",
+      "actor_name": "毒舌林",
+      "scene": 4
+    }
+  },
+  {
+    "id": "8ddb678a-c194-4664-b3fe-3bfdfb3914e1",
+    "content": "面对情境: 举着自拍杆直播，面对苏晴的阻拦，不屑地笑着继续追问陈小满关于\"厨神\"的问题，试图让他当场露馅",
+    "metadata": {
+      "type": "working_memory",
+      "stored_at": "2026-04-27T04:23:52.520339",
+      "actor_name": "毒舌林",
+      "importance": "normal",
+      "scene": 5
+    }
+  },
+  {
+    "id": "6771f19f-c57b-4c6e-b150-8841c6c4e00e",
+    "content": "我说：怎么，苏小姐，你这么紧张干什么？我问的是\"厨神\"陈小满，又不是问你。你俩什么关系啊，这么急着替他挡枪？\n\n（把镜头转向陈小满）来来来，陈大厨神，给直播间的家人们打个招呼。几百万人等着看你表演呢——对了，上次那个\"徒手颠锅\"的视频，我们粉丝可是研究了好几遍，总觉得哪里不太对劲啊。你今天既然来了，不如现场给我们露一手？咖啡馆没有锅？那苏小姐刚才端给你的那杯饮料，总该会喝吧？厨神的味觉应该很灵敏吧，让我",
+    "metadata": {
+      "stored_at": "2026-04-27T04:24:19.440324",
+      "scene": 5,
+      "importance": "normal",
+      "actor_name": "毒舌林",
+      "type": "working_memory"
+    }
+  }
+]

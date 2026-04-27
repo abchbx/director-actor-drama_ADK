@@ -1,0 +1,26 @@
+{
+  "name": "actor_烛阴",
+  "description": "演员 烛阴，角色：导师/守秘者",
+  "url": "http://localhost:9033/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_烛阴",
+      "name": "扮演烛阴",
+      "description": "以烛阴的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

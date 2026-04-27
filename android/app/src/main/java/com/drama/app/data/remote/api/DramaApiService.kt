@@ -63,4 +63,7 @@ interface DramaApiService {
 
     @GET("drama/scenes/{sceneNumber}")
     suspend fun getDramaSceneDetail(@Path("sceneNumber") sceneNumber: Int): SceneDetailDto
+
+    @GET("drama/conversation_log")
+    suspend fun getConversationLog(): ConversationLogResponseDto
 }

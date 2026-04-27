@@ -1,0 +1,26 @@
+{
+  "name": "actor_欧阳铁",
+  "description": "演员 欧阳铁，角色：导师/引路人",
+  "url": "http://localhost:9077/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_欧阳铁",
+      "name": "扮演欧阳铁",
+      "description": "以欧阳铁的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

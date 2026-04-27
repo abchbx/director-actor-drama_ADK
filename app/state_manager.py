@@ -576,7 +576,7 @@ def init_drama_state(theme: str, tool_context=None) -> dict:
 
     # ★ 用户即主角：将用户作为特殊角色加入 Cast，标记为 User-Controlled
     state["actors"] = {
-        "你": {
+        "用户": {
             "role": "主角（Protagonist）",
             "personality": "由用户实时定义——导演应根据用户输入推断性格特征",
             "background": "用户自己的故事——导演应根据剧情发展逐步揭示",
@@ -1223,8 +1223,8 @@ def register_actor(
         return {"status": "error", "message": "Maximum number of actors (10) reached."}
 
     # ★ 禁止覆盖用户主角
-    if actor_name == "你" and actors.get("你", {}).get("is_user_protagonist"):
-        return {"status": "error", "message": "无法覆盖用户主角角色'你'。"}
+    if actor_name == "用户" and actors.get("用户", {}).get("is_user_protagonist"):
+        return {"status": "error", "message": "无法覆盖用户主角角色'用户'。"}
 
     actor_data = {
         "role": role,

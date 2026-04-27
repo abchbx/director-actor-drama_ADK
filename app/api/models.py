@@ -238,3 +238,21 @@ class HeartbeatMessage(BaseModel):
     """Application-level heartbeat (D-14)."""
 
     type: str = "ping"
+
+
+class ConversationLogEntry(BaseModel):
+    """Single entry in the conversation log."""
+
+    speaker: str = ""
+    content: str = ""
+    type: str = "dialogue"
+    scene: int = 0
+    timestamp: str = ""
+
+
+class ConversationLogResponse(BaseModel):
+    """Response for the conversation log query."""
+
+    status: str = "success"
+    entries: list[ConversationLogEntry] = Field(default_factory=list)
+    count: int = 0

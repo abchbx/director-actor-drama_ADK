@@ -141,30 +141,29 @@ fun SceneBubbleList(
                 items = reversedBubbles,
                 key = { bubble -> bubble.id },
             ) { bubble ->
-                val enterAnimation = fadeIn(
-                    animationSpec = tween(350, easing = FastOutSlowInEasing),
-                ) + slideInVertically(
-                    initialOffsetY = { it / 3 },
-                    animationSpec = tween(400, easing = FastOutSlowInEasing),
-                )
+                // ★ 修复：LazyColumn 回收复用 item 时，AnimatedVisibility(visible=true) 会重新播放 enter 动画，
+                // 导致上下滑动时已有消息重复播放入场动画（看起来像流式输出）。
+                // 改用 remember 跟踪该 id 是否已播放过动画，只播放一次。
+                val hasAnimated = remember(bubble.id) { mutableSetOf<String>() }
+                val shouldAnimate = !hasAnimated.contains(bubble.id).also {
+                    hasAnimated.add(bubble.id)
+                }
 
-                AnimatedVisibility(
-                    visible = true,
-                    enter = enterAnimation,
-                ) {
-                    when (bubble) {
-                        is SceneBubble.Narration -> NarrationBubble(bubble)
-                        is SceneBubble.Dialogue -> DialogueBubble(bubble)
-                        // ★ 交互语义区分：动作行为→居中斜体无气泡，直接对话→右侧聊天气泡
-                        is SceneBubble.UserMessage -> {
-                            if (bubble.isAction) UserActionBubble(bubble)
-                            else UserMessageBubble(bubble)
-                        }
-                        is SceneBubble.ActorInteraction -> ActorInteractionBubble(bubble)
-                        is SceneBubble.SceneDivider -> SceneDivider(bubble)
-                        is SceneBubble.SystemError -> SystemErrorBubble(bubble)
-                        is SceneBubble.PlotGuidance -> PlotGuidanceBubble(bubble)
+                if (shouldAnimate) {
+                    val enterAnimation = fadeIn(
+                        animationSpec = tween(350, easing = FastOutSlowInEasing),
+                    ) + slideInVertically(
+                        initialOffsetY = { it / 3 },
+                        animationSpec = tween(400, easing = FastOutSlowInEasing),
+                    )
+                    AnimatedVisibility(
+                        visible = true,
+                        enter = enterAnimation,
+                    ) {
+                        BubbleContent(bubble = bubble)
                     }
+                } else {
+                    BubbleContent(bubble = bubble)
                 }
             }
         }
@@ -298,8 +297,28 @@ private fun SystemErrorBubble(bubble: SceneBubble.SystemError) {
 }
 
 /**
+ * 统一气泡内容渲染 — 提取自 items 块，供动画和非动画路径复用
+ */
+@Composable
+private fun BubbleContent(bubble: SceneBubble) {
+    when (bubble) {
+        is SceneBubble.Narration -> NarrationBubble(bubble)
+        is SceneBubble.Dialogue -> DialogueBubble(bubble)
+        // ★ 交互语义区分：动作行为→居中斜体无气泡，直接对话→右侧聊天气泡
+        is SceneBubble.UserMessage -> {
+            if (bubble.isAction) UserActionBubble(bubble)
+            else UserMessageBubble(bubble)
+        }
+        is SceneBubble.ActorInteraction -> ActorInteractionBubble(bubble)
+        is SceneBubble.SceneDivider -> SceneDivider(bubble)
+        is SceneBubble.SystemError -> SystemErrorBubble(bubble)
+        is SceneBubble.PlotGuidance -> PlotGuidanceBubble(bubble)
+    }
+}
+
+/**
  * ★ 剧情引导反馈气泡 — 短暂动画确认导演已接收到剧情变动
- * 
+ *
  * 设计要点：
  * - 居中显示，半透明紫色渐变背景
  * - 探索图标 + 脉冲动画

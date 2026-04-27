@@ -1,0 +1,68 @@
+[
+  {
+    "id": "b826fa3e-b020-46e9-a24f-9cdbd220d577",
+    "content": "[插话触发] 苏晴发消息关心陈小满，他可能会看到消息并回复",
+    "metadata": {
+      "stored_at": "2026-04-27T04:08:09.731944",
+      "type": "working_memory",
+      "scene": 1,
+      "actor_name": "老陈",
+      "importance": "normal"
+    }
+  },
+  {
+    "id": "17f9191c-8360-4171-8767-afbf79ca8be9",
+    "content": "[插话] 我说：苏晴那丫头……",
+    "metadata": {
+      "scene": 1,
+      "type": "working_memory",
+      "importance": "normal",
+      "actor_name": "老陈",
+      "stored_at": "2026-04-27T04:08:22.163253"
+    }
+  },
+  {
+    "id": "306eb7c5-a051-46cc-8dc4-571fa130c0cf",
+    "content": "[插话触发] 陈小满差点说出真相，神秘投资人的反应",
+    "metadata": {
+      "scene": 3,
+      "importance": "normal",
+      "actor_name": "老陈",
+      "stored_at": "2026-04-27T04:15:50.117699",
+      "type": "working_memory"
+    }
+  },
+  {
+    "id": "f6dca670-aff5-4a84-af20-b9f522aae491",
+    "content": "[插话] 我说：这孩子……还是沉不住气。",
+    "metadata": {
+      "scene": 3,
+      "importance": "normal",
+      "actor_name": "老陈",
+      "type": "working_memory",
+      "stored_at": "2026-04-27T04:15:57.961209"
+    }
+  },
+  {
+    "id": "096906a8-2048-433a-b89c-e93108d5f5b1",
+    "content": "面对情境: 从后厨探出头来，看到儿子被围观的窘境，眉头紧锁，似乎在犹豫是否要出面帮忙解围",
+    "metadata": {
+      "actor_name": "老陈",
+      "type": "working_memory",
+      "scene": 5,
+      "stored_at": "2026-04-27T04:23:55.717644",
+      "importance": "normal"
+    }
+  },
+  {
+    "id": "05a404e4-ebc3-4e12-9b89-39707e332db1",
+    "content": "我说：（内心：这小子，又在硬撑……）\n\n……也罢，让他自己闯闯。",
+    "metadata": {
+      "actor_name": "老陈",
+      "importance": "normal",
+      "type": "working_memory",
+      "stored_at": "2026-04-27T04:24:17.691412",
+      "scene": 5
+    }
+  }
+]

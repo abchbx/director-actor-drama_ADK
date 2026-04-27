@@ -1,0 +1,26 @@
+{
+  "name": "actor_苏晴",
+  "description": "演员 苏晴，角色：支持者",
+  "url": "http://localhost:9088/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_苏晴",
+      "name": "扮演苏晴",
+      "description": "以苏晴的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

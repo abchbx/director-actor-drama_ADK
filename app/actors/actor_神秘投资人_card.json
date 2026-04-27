@@ -1,0 +1,26 @@
+{
+  "name": "actor_神秘投资人",
+  "description": "演员 神秘投资人，角色：商业势力",
+  "url": "http://localhost:9025/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_神秘投资人",
+      "name": "扮演神秘投资人",
+      "description": "以神秘投资人的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "name": "actor_陆小凤",
+  "description": "演员 陆小凤，角色：对手/挑战者",
+  "url": "http://localhost:9083/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_陆小凤",
+      "name": "扮演陆小凤",
+      "description": "以陆小凤的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

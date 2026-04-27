@@ -1,0 +1,26 @@
+{
+  "name": "actor_帝俊之后",
+  "description": "演员 帝俊之后，角色：反派/对立面",
+  "url": "http://localhost:9073/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_帝俊之后",
+      "name": "扮演帝俊之后",
+      "description": "以帝俊之后的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

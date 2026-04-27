@@ -1,0 +1,134 @@
+[
+  {
+    "id": "1cd9a593-efe0-49ac-940c-0a5777296ba4",
+    "content": "面对情境: 正在通过助理了解这个爆红的\"厨神\"，想约见他谈谈合作",
+    "metadata": {
+      "importance": "normal",
+      "stored_at": "2026-04-27T04:07:53.329458",
+      "actor_name": "神秘投资人",
+      "type": "working_memory",
+      "scene": 1
+    }
+  },
+  {
+    "id": "289a8f32-4eeb-4805-b256-076566ff7f92",
+    "content": "我说：让助理安排一下，我想亲自见见这位\"厨神\"。有些东西，镜头拍不出来，得当面聊聊才知道。",
+    "metadata": {
+      "importance": "normal",
+      "scene": 1,
+      "actor_name": "神秘投资人",
+      "stored_at": "2026-04-27T04:07:59.765456",
+      "type": "working_memory"
+    }
+  },
+  {
+    "id": "f7e349da-65d7-4637-bf6d-37d256c60afa",
+    "content": "面对情境: 在咖啡馆等待\"厨神\"，发现目标出现了，摘下墨镜准备接近",
+    "metadata": {
+      "stored_at": "2026-04-27T04:11:35.724475",
+      "type": "working_memory",
+      "importance": "normal",
+      "actor_name": "神秘投资人",
+      "scene": 2
+    }
+  },
+  {
+    "id": "ee171cd3-312e-4ca4-b5b0-bab6ee9b80cd",
+    "content": "我说：这位就是传说中的\"厨神\"？比我想象的还要年轻。坐吧，今天的咖啡我请。",
+    "metadata": {
+      "importance": "normal",
+      "actor_name": "神秘投资人",
+      "scene": 2,
+      "type": "working_memory",
+      "stored_at": "2026-04-27T04:11:40.658324"
+    }
+  },
+  {
+    "id": "072bbe12-1f5f-4104-89d2-28cadcccf1bf",
+    "content": "面对情境: 正式向陈小满提出商业合作意向，开出诱人的条件，想看他的反应",
+    "metadata": {
+      "importance": "normal",
+      "stored_at": "2026-04-27T04:15:27.018244",
+      "actor_name": "神秘投资人",
+      "type": "working_memory",
+      "scene": 3
+    }
+  },
+  {
+    "id": "ad5bc801-10a8-4c25-b2f2-9fa64d0e1944",
+    "content": "我说：陈小满，我今天约你来，你应该知道是什么事了吧？网上那些视频我都看了，说实话，有点意思。但视频只是皮毛，我感兴趣的是……你这个人。你有没有想过，光靠拍视频，能赚多少钱？平台分成、广告植入，撑死了一年几百万吧？但如果有一个真正的团队，帮你打造品牌、开放加盟、乃至上市……那就不是几百万的事了。当然，我这个人一向公平，投资嘛讲究的是双赢。你拿手艺，我拿资源，利润分成好商量。怎么样，有没有兴趣聊聊？",
+    "metadata": {
+      "stored_at": "2026-04-27T04:15:41.623445",
+      "scene": 3,
+      "importance": "normal",
+      "actor_name": "神秘投资人",
+      "type": "working_memory"
+    }
+  },
+  {
+    "id": "7978345a-617d-43d0-baf8-d164af014057",
+    "content": "面对情境: 被打断谈判感到不悦，但很快调整策略，想借机观察陈小满的反应",
+    "metadata": {
+      "type": "working_memory",
+      "stored_at": "2026-04-27T04:19:26.924888",
+      "importance": "normal",
+      "scene": 4,
+      "actor_name": "神秘投资人"
+    }
+  },
+  {
+    "id": "4804fa83-457d-41e9-93ae-471e177b8151",
+    "content": "我说：（内心：有意思，这小子倒是沉得住气。）\n\n怎么不说话了？嫌条件不够？没关系，生意嘛本来就是慢慢谈的。我再加一条——我私人再借你一百万，不用利息，什么时候还，看你诚意。\n\n这年头，肯下血本的人不多了。我是真的看好你，别让我失望啊。",
+    "metadata": {
+      "type": "working_memory",
+      "actor_name": "神秘投资人",
+      "stored_at": "2026-04-27T04:19:38.985678",
+      "scene": 4,
+      "importance": "normal"
+    }
+  },
+  {
+    "id": "311fa9e9-e1ea-4a2d-8bde-bb403d42461b",
+    "content": "面对情境: 悠然靠在吧台边观察局势，突然开口插话，提出一个出人意料的提议来打破僵局",
+    "metadata": {
+      "scene": 5,
+      "importance": "normal",
+      "stored_at": "2026-04-27T04:23:54.918205",
+      "actor_name": "神秘投资人",
+      "type": "working_memory"
+    }
+  },
+  {
+    "id": "db268e2f-9c68-40b2-960e-abe06e122ce7",
+    "content": "我说：对了，我倒是有个新想法。\n\n既然咱们聊到现在也没个定论，不如换个方式——你先不用急着答复我，先去我的厨房看看。不在谈判桌上谈，到实地去看看咱们能做出什么东西来。\n\n怎么样，敢不敢？",
+    "metadata": {
+      "scene": 5,
+      "actor_name": "神秘投资人",
+      "stored_at": "2026-04-27T04:24:20.217921",
+      "importance": "normal",
+      "type": "working_memory"
+    }
+  },
+  {
+    "id": "b0fcbbc1-4153-4230-b719-0850dacb91b5",
+    "content": "[插话触发] 毒舌林刚刚当众挑衅陈小满，要求他现场展示厨艺，陈小满陷入恐慌，直播间的弹幕可能正在疯狂滚动",
+    "metadata": {
+      "type": "working_memory",
+      "scene": 5,
+      "stored_at": "2026-04-27T04:24:25.023016",
+      "actor_name": "神秘投资人",
+      "importance": "normal"
+    }
+  },
+  {
+    "id": "11981d5a-b05c-42c2-a879-63249eaac0f8",
+    "content": "[插话] 我说：这就有意思了，看来\"厨神\"的压力不小啊。",
+    "metadata": {
+      "scene": 5,
+      "stored_at": "2026-04-27T04:24:29.495276",
+      "type": "working_memory",
+      "importance": "normal",
+      "actor_name": "神秘投资人"
+    }
+  }
+]

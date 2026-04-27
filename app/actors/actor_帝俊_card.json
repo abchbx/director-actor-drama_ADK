@@ -1,0 +1,26 @@
+{
+  "name": "actor_帝俊",
+  "description": "演员 帝俊，角色：幕后主宰",
+  "url": "http://localhost:9095/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_帝俊",
+      "name": "扮演帝俊",
+      "description": "以帝俊的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

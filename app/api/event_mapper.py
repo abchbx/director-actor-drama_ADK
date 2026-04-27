@@ -90,15 +90,15 @@ def _extract_call_data(event_type: str, function_call) -> dict:
             "command": _format_command_echo(function_call.name, args),
             "args": {k: str(v)[:100] for k, v in args.items()},
             "sender_type": "user",
-            "sender_name": "主角",
+            "sender_name": "用户",
         }
     elif event_type == "user_action_echo":
-        # ★ 用户行动事件 — 以主角身份在聊天中展示
+        # ★ 用户行动事件 — 以用户身份在聊天中展示
         desc = args.get("description", args.get("action", ""))
         return {
             "text": desc,
             "sender_type": "user",
-            "sender_name": "主角",
+            "sender_name": "用户",
         }
     else:
         return {"tool": function_call.name}
@@ -155,12 +155,12 @@ def _extract_response_data(event_type: str, response: dict) -> dict:
     elif event_type == "save_confirm":
         return {"message": response.get("message", ""), "sender_type": "director", "sender_name": "旁白"}
     elif event_type == "user_action_echo":
-        # ★ 用户行动事件响应 — 以主角身份展示
+        # ★ 用户行动事件响应 — 以用户身份展示
         action = response.get("action", "")
         return {
             "text": action,
             "sender_type": "user",
-            "sender_name": "主角",
+            "sender_name": "用户",
         }
     elif event_type == "load_confirm":
         return {"message": response.get("message", ""), "theme": response.get("theme", ""), "sender_type": "director", "sender_name": "旁白"}
@@ -522,10 +522,30 @@ def map_runner_event(event: Event) -> list[dict]:
     # D-06: end_narration from final_response text (for /end command)
     if event.is_final_response() and event.content and event.content.parts:
         for part in event.content.parts:
-            if part.text and part.text.strip():
-                results.append({
-                    "type": "end_narration",
-                    "data": {"text": part.text.strip()},
-                })
+            if part.text:
+                text = part.text.strip()
+                # ★ 识别 command_complete 合成事件
+                if text == "[COMMAND_COMPLETE]":
+                    results.append({
+                        "type": "command_complete",
+                        "data": {},
+                    })
+                elif text:
+                    results.append({
+                        "type": "end_narration",
+                        "data": {"text": text},
+                    })
+
+    # ★ 兜底：无论 is_final_response 结果如何，只要内容包含 [COMMAND_COMPLETE] 就识别
+    # 某些 ADK 版本对 synthetic event 的 is_final_response() 判断可能不一致
+    if event.content and event.content.parts:
+        for part in event.content.parts:
+            if part.text and part.text.strip() == "[COMMAND_COMPLETE]":
+                # 避免重复添加
+                if not any(r.get("type") == "command_complete" for r in results):
+                    results.append({
+                        "type": "command_complete",
+                        "data": {},
+                    })
 
     return results

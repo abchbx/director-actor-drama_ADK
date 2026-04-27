@@ -39,11 +39,19 @@ class WebSocketManager @Inject constructor(
 ) {
     private val wsClient: OkHttpClient by lazy {
         // 使用全局 OkHttpClient.newBuilder() 继承超时/日志/异常拦截器，
-        // 但移除 BaseUrlInterceptor（动态替换 URL 的拦截器），
+        // 但排除 BaseUrlInterceptor（动态替换 URL 的拦截器），
         // 避免其用 ServerPreferences 缓存的旧值覆盖 WebSocket 目标 URL。
+        // ⚠️ 注意：newBuilder().interceptors() 返回的是原列表的不可变视图，
+        // 必须通过重新 addInterceptor 来构建新列表，不能调用 removeIf。
+        val originalInterceptors = okHttpClient.interceptors
         okHttpClient.newBuilder()
             .apply {
-                interceptors().removeIf { it is com.drama.app.data.remote.interceptor.BaseUrlInterceptor }
+                interceptors().clear()
+                originalInterceptors.forEach {
+                    if (it !is com.drama.app.data.remote.interceptor.BaseUrlInterceptor) {
+                        addInterceptor(it)
+                    }
+                }
             }
             .readTimeout(0, java.util.concurrent.TimeUnit.SECONDS)  // WS: 无读取超时（覆盖全局 300s）
             .build()
@@ -197,7 +205,10 @@ class WebSocketManager @Inject constructor(
             "ws://$currentHost:$currentPort/api/v1/ws"
         }
         Log.d(TAG, "WS connectInternal: url=$url, generation=$thisGeneration")
-        val request = Request.Builder().url(url).build()
+        val request = Request.Builder()
+            .url(url)
+            .header("User-Agent", "DramaApp-Android/2.0")
+            .build()
 
         val newWebSocket = wsClient.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {

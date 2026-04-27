@@ -12,6 +12,7 @@ ADK Runner 在自动推进等多步骤场景中，可能产生多次 is_final_re
 
 import asyncio
 import logging
+import re
 import time
 import uuid
 from typing import Any, Awaitable, Callable
@@ -22,6 +23,90 @@ from google.adk.runners import Runner
 from google.genai import types
 
 logger = logging.getLogger(__name__)
+
+
+# ★ 兜底解析：从导演 final_response 中提取角色对话（当导演未调用 actor_speak 时）
+_DIALOGUE_PATTERN = re.compile(
+    r'[🎭]?\s*([^（\n【】]+)（[^）]*）\s*[：:]\s*(.+?)(?=\n[🎭\-─]|\n\n|$)',
+    re.DOTALL,
+)
+_DIALOGUE_PATTERN_SIMPLE = re.compile(
+    r'([^\s\n【】:]+)\s*[：:]\s*[「"\']([^」"\']+)[」"\']',
+    re.MULTILINE,
+)
+
+
+def _extract_dialogue_from_text(text: str) -> list[dict]:
+    """Extract dialogue lines from director's final_response text.
+
+    Handles the format required by prompt:
+    - 🎭 角色名（身份 · 情绪）：台词
+    - 角色名："台词"
+    Returns list of {"actor_name": str, "text": str}.
+    """
+    dialogues = []
+    seen = set()
+
+    # Pattern 1: 🎭 角色名（...）：台词
+    for m in _DIALOGUE_PATTERN.finditer(text):
+        actor_name = m.group(1).strip()
+        dialogue_text = m.group(2).strip()
+        if actor_name and dialogue_text and len(dialogue_text) > 1:
+            key = (actor_name, dialogue_text)
+            if key not in seen:
+                seen.add(key)
+                dialogues.append({"actor_name": actor_name, "text": dialogue_text})
+
+    # Pattern 2: 角色名："台词"
+    if not dialogues:
+        for m in _DIALOGUE_PATTERN_SIMPLE.finditer(text):
+            actor_name = m.group(1).strip()
+            dialogue_text = m.group(2).strip()
+            if actor_name and dialogue_text and len(dialogue_text) > 1:
+                key = (actor_name, dialogue_text)
+                if key not in seen:
+                    seen.add(key)
+                    dialogues.append({"actor_name": actor_name, "text": dialogue_text})
+
+    return dialogues
+
+
+def _build_synthetic_actor_speak_event(dialogue: dict) -> Event:
+    """Build a synthetic ADK Event that looks like an actor_speak function_response."""
+    return Event(
+        author="tool",
+        content=types.Content(
+            role="user",
+            parts=[types.Part(
+                function_response=types.FunctionResponse(
+                    name="actor_speak",
+                    response={
+                        "actor_name": dialogue["actor_name"],
+                        "text": dialogue["text"],
+                        "dialogue": dialogue["text"],
+                        "status": "ok",
+                        "message": "synthetic from final_response",
+                    }
+                )
+            )]
+        )
+    )
+
+
+def _build_command_complete_event() -> Event:
+    """Build a synthetic ADK Event to signal command completion (closes typing).
+
+    Uses author='improv_director' and end_turn=True to ensure is_final_response()
+    returns True, so event_mapper will process it.
+    """
+    return Event(
+        author="improv_director",
+        content=types.Content(
+            role="model",
+            parts=[types.Part(text="[COMMAND_COMPLETE]")]
+        ),
+        actions=types.EventActions(end_turn=True),
+    )
 
 
 async def run_command_and_collect(
@@ -44,6 +129,9 @@ async def run_command_and_collect(
     - function_response events with identical (name, response_id) are deduped
     - This prevents duplicate bubbles in Android when ADK yields multiple
       final_response events during auto-advance or multi-step flows.
+
+    ★ 兜底解析：如果导演未调用 actor_speak/_batch，但 final_response 包含角色对话，
+    自动解析并生成合成的 function_response 事件推送给前端，防止白屏。
 
     Args:
         runner: The ADK Runner instance.
@@ -80,6 +168,8 @@ async def run_command_and_collect(
         seen_tool_results: set[tuple[str, str]] = set()
         event_count = 0
         start_time = time.monotonic()
+        # ★ 跟踪是否有真正的演员对话生成
+        has_actor_dialogue = False
 
         # DEBUG: Log command entry point
         cmd_label = message[:80] + ("..." if len(message) > 80 else "")
@@ -142,6 +232,10 @@ async def run_command_and_collect(
                         tool_name = part.function_response.name or "?"
                         resp = part.function_response.response
 
+                        # ★ 跟踪是否有真正的演员对话
+                        if tool_name in ("actor_speak", "actor_speak_batch"):
+                            has_actor_dialogue = True
+
                         # ★ 核心修复：基于 (tool_name, id) 去重 tool_results
                         # ADK 有时会对同一个工具调用产生重复的 function_response 事件
                         # ★ 修复去重键冲突：actor_speak/director_narrate/create_actor 等工具
@@ -174,6 +268,36 @@ async def run_command_and_collect(
                             invocation_id, tool_name, status_val, msg_preview,
                         )
                         tool_results.append(dict(resp))
+
+        # ★ 兜底解析：如果导演没有调用 actor_speak/_batch，但 final_response 包含角色对话
+        if not has_actor_dialogue and final_text and event_callback:
+            synthetic_dialogues = _extract_dialogue_from_text(final_text)
+            if synthetic_dialogues:
+                logger.warning(
+                    "[DIRECTOR-LOG] ⚠️ [%s] 导演未调用 actor_speak，从 final_response 解析出 %d 条合成对话",
+                    invocation_id, len(synthetic_dialogues),
+                )
+                for dialogue in synthetic_dialogues:
+                    synthetic_event = _build_synthetic_actor_speak_event(dialogue)
+                    try:
+                        await event_callback(synthetic_event)
+                    except Exception:
+                        pass
+                    # 同时加入 tool_results，让 REST 响应也包含这些对话
+                    tool_results.append({
+                        "actor_name": dialogue["actor_name"],
+                        "text": dialogue["text"],
+                        "dialogue": dialogue["text"],
+                        "status": "ok",
+                        "message": "synthetic from final_response",
+                    })
+
+        # ★ 发送 command_complete 事件，确保前端关闭 typing 状态
+        if event_callback:
+            try:
+                await event_callback(_build_command_complete_event())
+            except Exception:
+                pass
 
         total_time = time.monotonic() - start_time
         logger.info(

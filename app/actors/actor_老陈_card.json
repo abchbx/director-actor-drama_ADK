@@ -1,0 +1,26 @@
+{
+  "name": "actor_老陈",
+  "description": "演员 老陈，角色：关键配角（父亲）",
+  "url": "http://localhost:9069/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_老陈",
+      "name": "扮演老陈",
+      "description": "以老陈的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

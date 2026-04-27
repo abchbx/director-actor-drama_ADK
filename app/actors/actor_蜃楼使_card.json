@@ -1,0 +1,26 @@
+{
+  "name": "actor_蜃楼使",
+  "description": "演员 蜃楼使，角色：神秘人/商人",
+  "url": "http://localhost:9090/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_蜃楼使",
+      "name": "扮演蜃楼使",
+      "description": "以蜃楼使的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

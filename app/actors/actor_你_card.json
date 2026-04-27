@@ -1,0 +1,26 @@
+{
+  "name": "actor_你",
+  "description": "演员 你，角色：主角",
+  "url": "http://localhost:9087/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_你",
+      "name": "扮演你",
+      "description": "以你的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,178 @@
+[
+  {
+    "id": "246f86ac-01a1-4df6-a933-02250e5724f2",
+    "content": "面对情境: 独自一人面对爆红的虚假人设，内心惶恐又有些飘飘然，不知如何是好",
+    "metadata": {
+      "stored_at": "2026-04-27T04:07:52.327052",
+      "type": "working_memory",
+      "scene": 1,
+      "importance": "normal",
+      "actor_name": "陈小满"
+    }
+  },
+  {
+    "id": "961ce0a6-323d-4999-9755-e2331adc13fc",
+    "content": "我说：（低头看着手机屏幕上不断跳动的粉丝数和评论）这……真的是我吗？（内心：这些网友怎么这么热情，我就是个服务员啊……他们夸得我都脸红了）可是……万一哪天有人让我现场做菜怎么办？（攥紧手机，既兴奋又忐忑）我真的有他们说的那么厉害吗？",
+    "metadata": {
+      "scene": 1,
+      "actor_name": "陈小满",
+      "stored_at": "2026-04-27T04:08:05.642900",
+      "type": "working_memory",
+      "importance": "normal"
+    }
+  },
+  {
+    "id": "4bc002ec-5e6d-4307-9cf1-6a5ce90dbe2f",
+    "content": "面对情境: 面对苏晴的关心，想倾诉却又不知从何说起，既感动又有些愧疚",
+    "metadata": {
+      "scene": 2,
+      "actor_name": "陈小满",
+      "importance": "normal",
+      "stored_at": "2026-04-27T04:11:34.828602",
+      "type": "working_memory"
+    }
+  },
+  {
+    "id": "762b2228-9ac8-45ed-a0f8-f68804bec1b2",
+    "content": "我说：（欲言又止，手指不安地绞着衣角）\n\n苏晴，谢谢你……可是我……（声音越来越小）\n\n算了，没什么啦。就是最近有点累，休息一下就好。\n\n（内心：其实好想跟你说啊，但是……万一说出来了，你会怎么看我？会不会觉得我是骗子？）",
+    "metadata": {
+      "type": "working_memory",
+      "importance": "normal",
+      "actor_name": "陈小满",
+      "scene": 2,
+      "stored_at": "2026-04-27T04:11:41.392646"
+    }
+  },
+  {
+    "id": "d66c404c-7634-40e2-b151-60515a0a01b2",
+    "content": "[插话触发] 神秘投资人主动搭讪陈小满，苏晴和陈小满会如何反应",
+    "metadata": {
+      "scene": 2,
+      "type": "working_memory",
+      "importance": "normal",
+      "stored_at": "2026-04-27T04:11:45.220110",
+      "actor_name": "陈小满"
+    }
+  },
+  {
+    "id": "6a8ffce6-2516-4fa6-96bd-61c1fd016356",
+    "content": "[插话] 我说：投资人……找我？（心跳加速）我、我就一个普通服务员，他是不是认错人了？",
+    "metadata": {
+      "actor_name": "陈小满",
+      "stored_at": "2026-04-27T04:11:51.402258",
+      "scene": 2,
+      "importance": "normal",
+      "type": "working_memory"
+    }
+  },
+  {
+    "id": "f9899a83-14c6-4e9f-83c8-6b861956ee6b",
+    "content": "面对情境: 面对投资人开出的诱人条件，内心既心动又害怕，不知道该不该接受",
+    "metadata": {
+      "stored_at": "2026-04-27T04:15:27.824417",
+      "type": "working_memory",
+      "importance": "normal",
+      "scene": 3,
+      "actor_name": "陈小满"
+    }
+  },
+  {
+    "id": "218ac828-99b3-4e3d-9133-920e0a3a5108",
+    "content": "我说：这条件……（内心：太优厚了！但我配吗？）您真的觉得我能行？我就是随便发发视频，没想过会有人找上门……（攥紧衣角，眼神闪烁）您、您是不是调查错了？我真的不是什么厨神……",
+    "metadata": {
+      "type": "working_memory",
+      "actor_name": "陈小满",
+      "stored_at": "2026-04-27T04:15:34.081590",
+      "importance": "normal",
+      "scene": 3
+    }
+  },
+  {
+    "id": "e6b9329d-6fff-42d3-9d88-e95da1ac61c7",
+    "content": "面对情境: 看到毒舌林的阵仗彻底慌了，下意识想躲，不知道该怎么办",
+    "metadata": {
+      "actor_name": "陈小满",
+      "scene": 4,
+      "stored_at": "2026-04-27T04:19:26.119937",
+      "importance": "normal",
+      "type": "working_memory"
+    }
+  },
+  {
+    "id": "181e433a-6134-4f7b-888f-653d7092e1d6",
+    "content": "我说：（内心：毒舌林？是谁啊？看着好多人……怎么办，要是来采访我现场做菜怎么办，我哪会那个啊……）\n\n那、那个……苏晴，你能告诉我到底怎么回事吗？我看到好多人朝这边过来，我……我还是先躲一下吧？（说着就往后缩）",
+    "metadata": {
+      "type": "working_memory",
+      "actor_name": "陈小满",
+      "importance": "normal",
+      "scene": 4,
+      "stored_at": "2026-04-27T04:19:37.631139"
+    }
+  },
+  {
+    "id": "e170ba66-64f9-4ccb-a783-0a16bb222ec5",
+    "content": "[插话触发] 毒舌林闯入直播，苏晴试图阻拦，场面即将失控",
+    "metadata": {
+      "actor_name": "陈小满",
+      "stored_at": "2026-04-27T04:19:44.026644",
+      "type": "working_memory",
+      "importance": "normal",
+      "scene": 4
+    }
+  },
+  {
+    "id": "4c75d1da-295c-41d2-ab32-412361a4ffef",
+    "content": "[插话] 我说：怎么办怎么办……那个林什么来了？我、我真的要出去吗？",
+    "metadata": {
+      "scene": 4,
+      "actor_name": "陈小满",
+      "stored_at": "2026-04-27T04:19:49.643558",
+      "type": "working_memory",
+      "importance": "normal"
+    }
+  },
+  {
+    "id": "906a74f5-b8b1-4d44-aa64-66feef872bb1",
+    "content": "面对情境: 慌乱中与你的目光相遇，眼神中满是求救信号，不知道该如何应对这场突如其来的直播风波",
+    "metadata": {
+      "importance": "normal",
+      "stored_at": "2026-04-27T04:23:54.112613",
+      "scene": 5,
+      "actor_name": "陈小满",
+      "type": "working_memory"
+    }
+  },
+  {
+    "id": "eca090d2-2902-47ac-995c-503e1a66a9f9",
+    "content": "我说：（眼眶微微泛红，声音带着颤抖）\n\n苏晴……我真的不知道该怎么办……我、我又不会做菜，万一他让我现场做怎么办……你能帮帮我吗？",
+    "metadata": {
+      "actor_name": "陈小满",
+      "importance": "normal",
+      "type": "working_memory",
+      "scene": 5,
+      "stored_at": "2026-04-27T04:24:18.102369"
+    }
+  },
+  {
+    "id": "12c6b948-29d8-4d08-91c3-4ac535f817fb",
+    "content": "[插话触发] 毒舌林刚刚当众挑衅陈小满，要求他现场展示厨艺，陈小满陷入恐慌，直播间的弹幕可能正在疯狂滚动",
+    "metadata": {
+      "actor_name": "陈小满",
+      "stored_at": "2026-04-27T04:24:24.126206",
+      "type": "working_memory",
+      "importance": "normal",
+      "scene": 5
+    }
+  },
+  {
+    "id": "ee6bbb43-2a59-4c04-bf16-77eff34f5ede",
+    "content": "[插话] 我说：我……我真的不行，你们别逼我……",
+    "metadata": {
+      "actor_name": "陈小满",
+      "type": "working_memory",
+      "scene": 5,
+      "importance": "normal",
+      "stored_at": "2026-04-27T04:24:29.902002"
+    }
+  }
+]

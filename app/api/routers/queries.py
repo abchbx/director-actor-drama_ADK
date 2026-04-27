@@ -10,6 +10,8 @@ from app.api.deps import get_tool_context, require_auth
 from app.api.models import (
     CastResponse,
     CastStatusResponse,
+    ConversationLogEntry,
+    ConversationLogResponse,
     DeleteDramaResponse,
     DramaListResponse,
     DramaStatusResponse,
@@ -215,3 +217,20 @@ async def export_drama(
     _require_active_drama(tool_context)
     result = export_script(tool_context)
     return ExportResponse(**result)
+
+
+@router.get("/drama/conversation_log", response_model=ConversationLogResponse)
+async def get_conversation_log(
+    _auth: bool = Depends(require_auth),
+    tool_context=Depends(get_tool_context),
+):
+    """Get the full conversation log across all scenes."""
+    _require_active_drama(tool_context)
+    from app.state_manager import get_conversation_log
+    result = get_conversation_log(tool_context=tool_context)
+    entries = [ConversationLogEntry(**e) for e in result.get("entries", [])]
+    return ConversationLogResponse(
+        status=result.get("status", "success"),
+        entries=entries,
+        count=result.get("count", 0),
+    )

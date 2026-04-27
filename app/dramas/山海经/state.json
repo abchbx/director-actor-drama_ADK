@@ -1,0 +1,486 @@
+{
+  "theme": "山海经",
+  "status": "acting",
+  "current_scene": 1,
+  "scenes": [
+    {
+      "scene_number": 1,
+      "title": "山海初临",
+      "description": "天地混沌如鸡子，你睁开眼时，发现自己正站在一片陌生而诡谲的土地上。四周是连绵不绝的青色山脉，山间云雾缭绕，隐约可见珍禽异兽的身影在林间穿行。一株参天巨木拔地而起，树冠直入云霄，枝叶间似有流光闪烁。空气中弥漫着淡淡的草木清香，却隐隐夹杂着一丝令人心悸的远古气息。",
+      "content": "【第一场：山海初临】\n\n🎭 禹（主角 · 平静）：你是何人？为何会出现在此处？\n\n🔔 精卫（悲情角色 · 平静）：我是炎帝的女儿，死于东海，化为这只小鸟……日复一日，衔木填海，不知疲倦。",
+      "updated_at": "2026-04-27T04:49:00.900991",
+      "time_label": "第一天",
+      "protagonist_contribution": {
+        "weight_level": "passive",
+        "narrative_impact": "主角暂无显著行动",
+        "key_choices": [],
+        "turning_points": [],
+        "arc_progress_snapshot": {}
+      }
+    }
+  ],
+  "narration_log": [
+    {
+      "text": "天地混沌如鸡子，你睁开眼时，发现自己正站在一片陌生而诡谲的土地上。\n\n四周是连绵不绝的青色山脉，山间云雾缭绕，隐约可见珍禽异兽的身影在林间穿行。一株参天巨木拔地而起，树冠直入云霄，枝叶间似有流光闪烁。空气中弥漫着淡淡的草木清香，却隐隐夹杂着一丝令人心悸的远古气息。\n\n你下意识地环顾四周，发现不远处还站着一个人影——一个身着粗布衣衫的男子，正背对着你凝视着那株巨木。他的身姿挺拔，却透着一股说不清的迷茫与疲惫。",
+      "timestamp": "2026-04-27T04:48:31.130868"
+    }
+  ],
+  "remaining_auto_scenes": 0,
+  "steer_direction": null,
+  "storm": {
+    "last_review": {},
+    "perspectives": [
+      {
+        "name": "主角视角",
+        "description": "从主角的内心世界出发：山海经对主角意味着什么？主角最深的渴望和恐惧是什么？",
+        "questions": [
+          "在「山海经」中，主角最核心的矛盾是什么？",
+          "主角在山海经的情境下，最大的内心冲突是什么？",
+          "主角会如何面对山海经带来的挑战？"
+        ]
+      },
+      {
+        "name": "反派/对立面视角",
+        "description": "从对立面的立场出发：为什么山海经的另一面也有其合理性？对立力量的内在逻辑是什么？",
+        "questions": [
+          "站在山海经的对立面，什么动机是合理且令人同情的？",
+          "如果反派也有自己的正义，那会是什么样的正义？",
+          "对立力量如何从山海经中获得力量？"
+        ]
+      },
+      {
+        "name": "旁观者/社会视角",
+        "description": "从旁观者和社会的角度：山海经在更广阔的社会背景下意味着什么？对他人产生了什么影响？",
+        "questions": [
+          "山海经对旁观者或社会有什么深远影响？",
+          "社会如何看待和评判山海经中的事件？",
+          "有哪些不为人知的角落受到了山海经的波及？"
+        ]
+      },
+      {
+        "name": "伦理/哲学视角",
+        "description": "从伦理和哲学的高度：山海经触及了什么根本性的道德问题？存在怎样的价值冲突？",
+        "questions": [
+          "山海经触及了什么根本性的伦理困境？",
+          "在山海经的情境下，什么是\"对\"什么是\"错\"的边界？",
+          "如果从不同哲学流派的角度审视山海经，会有什么不同的结论？"
+        ]
+      },
+      {
+        "name": "时间/命运视角",
+        "description": "从时间和命运的维度：山海经的过去如何塑造了现在？未来可能如何演变？如果时间倒流会怎样？",
+        "questions": [
+          "山海经的根源可以追溯到什么过去的事件？",
+          "如果给山海经一个转折点，最戏剧性的变化会是什么？",
+          "十年后再回望山海经，什么才是真正重要的？"
+        ]
+      }
+    ],
+    "research_results": [
+      {
+        "perspective": "主角视角",
+        "questions": [
+          "在「山海经」中，主角最核心的矛盾是什么？主角在山海经的情境下，最大的内心冲突是什么？主角会如何面对山海经带来的挑战？"
+        ],
+        "findings": {
+          "角色原型": "从主角视角的视角中浮现的角色原型",
+          "冲突模式": "主角视角视角下揭示的核心冲突模式",
+          "情感曲线": "主角视角维度中的情感走向和转折点",
+          "意象符号": "主角视角带来的独特意象和象征",
+          "跨视角联系": "主角视角与其他视角的共鸣或矛盾"
+        },
+        "timestamp": "2026-04-27T04:47:40.721724"
+      },
+      {
+        "perspective": "反派/对立面视角",
+        "questions": [
+          "站在山海经的对立面，什么动机是合理且令人同情的？如果反派也有自己的正义，那会是什么样的正义？对立力量如何从山海经中获得力量？"
+        ],
+        "findings": {
+          "角色原型": "从反派/对立面视角的视角中浮现的角色原型",
+          "冲突模式": "反派/对立面视角视角下揭示的核心冲突模式",
+          "情感曲线": "反派/对立面视角维度中的情感走向和转折点",
+          "意象符号": "反派/对立面视角带来的独特意象和象征",
+          "跨视角联系": "反派/对立面视角与其他视角的共鸣或矛盾"
+        },
+        "timestamp": "2026-04-27T04:47:40.722329"
+      },
+      {
+        "perspective": "伦理/哲学视角",
+        "questions": [
+          "山海经触及了什么根本性的伦理困境？在山海经的情境下，什么是\"对\"什么是\"错\"的边界？如果从不同哲学流派的角度审视山海经，会有什么不同的结论？"
+        ],
+        "findings": {
+          "角色原型": "从伦理/哲学视角的视角中浮现的角色原型",
+          "冲突模式": "伦理/哲学视角视角下揭示的核心冲突模式",
+          "情感曲线": "伦理/哲学视角维度中的情感走向和转折点",
+          "意象符号": "伦理/哲学视角带来的独特意象和象征",
+          "跨视角联系": "伦理/哲学视角与其他视角的共鸣或矛盾"
+        },
+        "timestamp": "2026-04-27T04:47:40.722712"
+      }
+    ],
+    "outline": {
+      "theme": "山海经",
+      "synthesis_strategy": "多视角辩证融合",
+      "acts": [
+        {
+          "act_number": 1,
+          "title": "起——多视角的碰撞",
+          "description": "从主角视角, 反派/对立面视角, 伦理/哲学视角等视角展开山海经的初始面貌，呈现各视角的碰撞和火花。",
+          "key_conflict": "主角视角与反派/对立面视角的首次交锋",
+          "emotional_arc": "好奇 → 紧张 → 震撼"
+        },
+        {
+          "act_number": 2,
+          "title": "承——深层的挖掘",
+          "description": "深入山海经的深层结构，揭示隐藏在多视角背后的共同线索和根本矛盾。",
+          "key_conflict": "表面冲突升级为价值观的对抗",
+          "emotional_arc": "紧张 → 压抑 → 爆发"
+        },
+        {
+          "act_number": 3,
+          "title": "转——视角的颠覆",
+          "description": "颠覆初始认知——从意想不到的角度重新解读山海经，所有视角的发现在此汇聚为转折。",
+          "key_conflict": "认知框架的崩塌与重建",
+          "emotional_arc": "震惊 → 迷惘 → 觉醒"
+        },
+        {
+          "act_number": 4,
+          "title": "合——多视角的统一",
+          "description": "将所有视角的发现融合为对山海经的深层理解，在统一中保留张力，在和解中留下余韵。",
+          "key_conflict": "对立面的和解或永恒的悬置",
+          "emotional_arc": "释然 → 深沉 → 余韵"
+        }
+      ],
+      "core_tensions": [
+        "主角视角与其他视角的张力",
+        "反派/对立面视角与其他视角的张力",
+        "伦理/哲学视角与其他视角的张力"
+      ],
+      "thematic_layers": {
+        "表层": "山海经的直接呈现",
+        "中层": "人物之间的价值冲突",
+        "深层": "关于存在、选择与命运的思考"
+      },
+      "perspective_integration": {
+        "主角视角": "通过角色命运和场景设计体现主角视角的洞察",
+        "反派/对立面视角": "通过角色命运和场景设计体现反派/对立面视角的洞察",
+        "伦理/哲学视角": "通过角色命运和场景设计体现伦理/哲学视角的洞察"
+      }
+    }
+  },
+  "conflict_engine": {
+    "tension_score": 0,
+    "is_boring": false,
+    "tension_history": [],
+    "active_conflicts": [],
+    "used_conflict_types": [],
+    "last_inject_scene": 0,
+    "consecutive_low_tension": 0,
+    "resolved_conflicts": []
+  },
+  "plot_threads": [],
+  "dynamic_storm": {
+    "scenes_since_last_storm": 1,
+    "trigger_history": [],
+    "discovered_perspectives": []
+  },
+  "established_facts": [],
+  "coherence_checks": {
+    "last_check_scene": 0,
+    "last_result": null,
+    "check_history": [],
+    "total_contradictions": 0
+  },
+  "timeline": {
+    "current_time": "第一天",
+    "days_elapsed": 1,
+    "current_period": null,
+    "time_periods": [],
+    "last_jump_check": null
+  },
+  "created_at": "2026-04-27T04:47:33.838374",
+  "updated_at": "2026-04-27T04:54:41.393933",
+  "conversation_log": [
+    {
+      "speaker": "[系统]",
+      "content": "戏剧「山海经」已创建，数据保存路径: /workspace/director-actor-drama/app/dramas/山海经",
+      "type": "system",
+      "scene": 0,
+      "timestamp": "2026-04-27T04:47:33.851787"
+    },
+    {
+      "speaker": "主角",
+      "content": "进入山海经世界的奇妙之旅",
+      "type": "action",
+      "scene": 0,
+      "timestamp": "2026-04-27T04:47:59.968969"
+    },
+    {
+      "speaker": "导演",
+      "content": "天地混沌如鸡子，你睁开眼时，发现自己正站在一片陌生而诡谲的土地上。\n\n四周是连绵不绝的青色山脉，山间云雾缭绕，隐约可见珍禽异兽的身影在林间穿行。一株参天巨木拔地而起，树冠直入云霄，枝叶间似有流光闪烁。空气中弥漫着淡淡的草木清香，却隐隐夹杂着一丝令人心悸的远古气息。\n\n你下意识地环顾四周，发现不远处还站着一个人影——一个身着粗布衣衫的男子，正背对着你凝视着那株巨木。他的身姿挺拔，却透着一股说不清的迷茫与疲惫。",
+      "type": "narration",
+      "scene": 1,
+      "timestamp": "2026-04-27T04:48:31.131232"
+    },
+    {
+      "speaker": "禹",
+      "content": "你是何人？为何会出现在此处？",
+      "type": "dialogue",
+      "scene": 1,
+      "timestamp": "2026-04-27T04:48:41.605520"
+    },
+    {
+      "speaker": "精卫",
+      "content": "我是炎帝的女儿，死于东海，化为这只小鸟……日复一日，衔木填海，不知疲倦。",
+      "type": "dialogue",
+      "scene": 1,
+      "timestamp": "2026-04-27T04:48:53.918864"
+    }
+  ],
+  "scene_context": {},
+  "actors": {
+    "用户": {
+      "role": "主角（Protagonist）",
+      "personality": "由用户实时定义——导演应根据用户输入推断性格特征",
+      "background": "用户自己的故事——导演应根据剧情发展逐步揭示",
+      "knowledge_scope": "用户所知范围——导演应根据用户输入动态推断",
+      "control_type": "User-Controlled",
+      "memory": [],
+      "working_memory": [],
+      "scene_summaries": [],
+      "arc_summary": {
+        "structured": {
+          "theme": "",
+          "key_characters": [],
+          "unresolved": [],
+          "resolved": []
+        },
+        "narrative": ""
+      },
+      "critical_memories": [],
+      "memorySummary": "暂无记忆摘要。",
+      "emotions": "neutral",
+      "arc_progress": {
+        "arc_type": "",
+        "arc_stage": "",
+        "progress": 0,
+        "related_threads": []
+      },
+      "is_user_protagonist": true,
+      "created_at": "2026-04-27T04:47:33.838383"
+    },
+    "禹": {
+      "role": "主角",
+      "personality": "沉稳内敛，话不多但每句话都切中要害。内心有着执着的追求，不轻易放弃。",
+      "background": "上古炼气士，因某种原因失去记忆，在山海经的神秘世界中游历，寻找自己被封印的过去与远古秘宝的真相。",
+      "knowledge_scope": "知晓上古神话传说的片段，了解炼气术的基础，但对自己的过去一无所知。",
+      "memory": [],
+      "working_memory": [
+        {
+          "entry": "面对情境: 作为同样被传送至山海经世界的炼气士，禹注意到身边突然出现了另一个人。他转过身，目光中带着一丝警惕与好奇，用简短的话语询问对方的来历。",
+          "importance": "normal",
+          "scene": 1
+        },
+        {
+          "entry": "我说：你是何人？为何会出现在此处？",
+          "importance": "normal",
+          "scene": 1
+        }
+      ],
+      "scene_summaries": [],
+      "arc_summary": {
+        "structured": {
+          "theme": "",
+          "key_characters": [],
+          "unresolved": [],
+          "resolved": []
+        },
+        "narrative": ""
+      },
+      "critical_memories": [],
+      "memorySummary": "近期经历：我说：你是何人？为何会出现在此处？；面对情境: 作为同样被传送至山海经世界的炼气士，禹注意到身边突然出现了另一个人。",
+      "emotions": "neutral",
+      "arc_progress": {
+        "arc_type": "",
+        "arc_stage": "",
+        "progress": 0,
+        "related_threads": []
+      },
+      "created_at": "2026-04-27T04:48:14.961376",
+      "port": 9024,
+      "_pending_compression": {
+        "working_to_scene": null,
+        "scene_to_arc": null,
+        "pending_entries": [],
+        "result": null
+      },
+      "memory_blocks": {
+        "persona": {
+          "label": "persona",
+          "value": "性格：沉稳内敛，话不多但每句话都切中要害。内心有着执着的追求，不轻易放弃。\n背景：上古炼气士，因某种原因失去记忆，在山海经的神秘世界中游历，寻找自己被封印的过去与远古秘宝的真相。",
+          "updated_scene": 0,
+          "source": "auto_init"
+        },
+        "relationship": {
+          "label": "relationship",
+          "value": "我了解的范围：知晓上古神话传说的片段，了解炼气术的基础，但对自己的过去一无所知。",
+          "updated_scene": 0,
+          "source": "auto_init"
+        }
+      },
+      "crash_count": 0
+    },
+    "烛龙": {
+      "role": "对立面",
+      "personality": "暴烈而威严，一旦被激怒便会天崩地裂。但对山海世界有着深沉的爱。",
+      "background": "山海守护者，拥有开天辟地的神力，却被远古封印囚禁于不为人知的深渊。以复仇为生存意义，痛恨打破平衡的一切存在。",
+      "knowledge_scope": "知晓山海经世界的一切秘密，了解远古封印的来源和破解之法。",
+      "memory": [],
+      "working_memory": [],
+      "scene_summaries": [],
+      "arc_summary": {
+        "structured": {
+          "theme": "",
+          "key_characters": [],
+          "unresolved": [],
+          "resolved": []
+        },
+        "narrative": ""
+      },
+      "critical_memories": [],
+      "memorySummary": "暂无记忆摘要。",
+      "emotions": "neutral",
+      "arc_progress": {
+        "arc_type": "",
+        "arc_stage": "",
+        "progress": 0,
+        "related_threads": []
+      },
+      "created_at": "2026-04-27T04:48:16.994680",
+      "port": 9056
+    },
+    "精卫": {
+      "role": "悲情角色",
+      "personality": "悲伤而执着，声音如风铃般空灵，在执着与释然之间挣扎。",
+      "background": "本是炎帝之女，溺于东海，化为小鸟。灵魂被困于填海的无尽轮回中，是执念与放下的化身。",
+      "knowledge_scope": "知晓东海的秘密，了解灵魂被困的缘由，以及如何获得解脱。",
+      "memory": [],
+      "working_memory": [
+        {
+          "entry": "[插话触发] 禹刚刚询问了你的来历，此时天空中的云雾微微翻涌，那株参天巨木的枝叶轻轻摇曳，似乎有某种力量正在注视着你们。",
+          "importance": "normal",
+          "scene": 1
+        },
+        {
+          "entry": "[插话] 我说：我是炎帝的女儿，死于东海，化为这只小鸟……日复一日，衔木填海，不知疲倦。",
+          "importance": "normal",
+          "scene": 1
+        }
+      ],
+      "scene_summaries": [],
+      "arc_summary": {
+        "structured": {
+          "theme": "",
+          "key_characters": [],
+          "unresolved": [],
+          "resolved": []
+        },
+        "narrative": ""
+      },
+      "critical_memories": [],
+      "memorySummary": "近期经历：[插话] 我说：我是炎帝的女儿，死于东海，化为这只小鸟……日复一日，衔木填海，不；[插话触发] 禹刚刚询问了你的来历，此时天空中的云雾微微翻涌，那株参天巨木的枝叶",
+      "emotions": "neutral",
+      "arc_progress": {
+        "arc_type": "",
+        "arc_stage": "",
+        "progress": 0,
+        "related_threads": []
+      },
+      "created_at": "2026-04-27T04:48:19.054115",
+      "port": 9086,
+      "_pending_compression": {
+        "working_to_scene": null,
+        "scene_to_arc": null,
+        "pending_entries": [],
+        "result": null
+      },
+      "memory_blocks": {
+        "persona": {
+          "label": "persona",
+          "value": "性格：悲伤而执着，声音如风铃般空灵，在执着与释然之间挣扎。\n背景：本是炎帝之女，溺于东海，化为小鸟。灵魂被困于填海的无尽轮回中，是执念与放下的化身。",
+          "updated_scene": 0,
+          "source": "auto_init"
+        },
+        "relationship": {
+          "label": "relationship",
+          "value": "我了解的范围：知晓东海的秘密，了解灵魂被困的缘由，以及如何获得解脱。",
+          "updated_scene": 0,
+          "source": "auto_init"
+        }
+      },
+      "crash_count": 0
+    },
+    "帝俊": {
+      "role": "幕后主宰",
+      "personality": "深沉莫测，言辞简洁而充满暗示，喜欢以棋局比喻天下大事。",
+      "background": "隐藏的上古天帝，规则的制定者。看似超然物外，实则一直在幕后操控着山海经世界的命运。",
+      "knowledge_scope": "知晓一切秘密，是这个世界的真正主宰，但从不轻易显露真身。",
+      "memory": [],
+      "working_memory": [],
+      "scene_summaries": [],
+      "arc_summary": {
+        "structured": {
+          "theme": "",
+          "key_characters": [],
+          "unresolved": [],
+          "resolved": []
+        },
+        "narrative": ""
+      },
+      "critical_memories": [],
+      "memorySummary": "暂无记忆摘要。",
+      "emotions": "neutral",
+      "arc_progress": {
+        "arc_type": "",
+        "arc_stage": "",
+        "progress": 0,
+        "related_threads": []
+      },
+      "created_at": "2026-04-27T04:48:21.088153",
+      "port": 9095
+    },
+    "你": {
+      "role": "主角（Protagonist）",
+      "personality": "由用户实时定义——导演应根据用户输入推断性格特征",
+      "background": "用户自己的故事——导演应根据剧情发展逐步揭示",
+      "knowledge_scope": "用户所知范围——导演应根据用户输入动态推断",
+      "control_type": "User-Controlled",
+      "memory": [],
+      "working_memory": [],
+      "scene_summaries": [],
+      "arc_summary": {
+        "structured": {
+          "theme": "",
+          "key_characters": [],
+          "unresolved": [],
+          "resolved": []
+        },
+        "narrative": ""
+      },
+      "critical_memories": [],
+      "memorySummary": "暂无记忆摘要。",
+      "emotions": "neutral",
+      "arc_progress": {
+        "arc_type": "",
+        "arc_stage": "",
+        "progress": 0,
+        "related_threads": []
+      },
+      "is_user_protagonist": true,
+      "created_at": "2026-04-27T04:54:41.393959"
+    }
+  },
+  "_last_scene_advance_time": 1777265304.936203
+}

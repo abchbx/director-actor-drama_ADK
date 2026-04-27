@@ -1,0 +1,26 @@
+{
+  "name": "actor_精卫",
+  "description": "演员 精卫，角色：悲情角色",
+  "url": "http://localhost:9086/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_精卫",
+      "name": "扮演精卫",
+      "description": "以精卫的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

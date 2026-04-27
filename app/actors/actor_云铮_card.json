@@ -1,0 +1,26 @@
+{
+  "name": "actor_云铮",
+  "description": "演员 云铮，角色：主角",
+  "url": "http://localhost:9081/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_云铮",
+      "name": "扮演云铮",
+      "description": "以云铮的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

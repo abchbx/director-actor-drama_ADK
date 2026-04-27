@@ -1,0 +1,134 @@
+[
+  {
+    "id": "bab65838-f991-4f8d-8340-ba20619900c2",
+    "content": "面对情境: 陆小凤此时正站在酒楼大厅的中央，一身锦衣，手持折扇。他是这场品鉴会的热门人选——出身名厨世家，自信满满。面对周围人的议论，他似乎早有准备，嘴角挂着淡淡的笑。",
+    "metadata": {
+      "type": "working_memory",
+      "stored_at": "2026-04-27T03:15:21.732170",
+      "importance": "normal",
+      "scene": 1,
+      "actor_name": "陆小凤"
+    }
+  },
+  {
+    "id": "df850d55-ff0f-445f-82e8-03b6028210af",
+    "content": "我说：呵，这满座宾客，十之八九都是来凑热闹的吧？真正懂行的，怕是找不出几个。",
+    "metadata": {
+      "actor_name": "陆小凤",
+      "importance": "normal",
+      "stored_at": "2026-04-27T03:15:30.058989",
+      "scene": 1,
+      "type": "working_memory"
+    }
+  },
+  {
+    "id": "8defa90d-a13b-4a37-b12f-7b04d529cc6d",
+    "content": "面对情境: 陆小凤注意到了你的到来，他放下酒杯，目光在你身上打量了一番。作为名厨世家的传人，他习惯性地评估着每一个潜在的对手。你的穿着朴素，不张扬，但这反而让他更加警觉——真正的高手往往深藏不露。他决定先开口试探。",
+    "metadata": {
+      "scene": 2,
+      "type": "working_memory",
+      "actor_name": "陆小凤",
+      "importance": "normal",
+      "stored_at": "2026-04-27T03:17:35.229139"
+    }
+  },
+  {
+    "id": "73ce01cf-06a2-4806-b59e-b5bfc5919819",
+    "content": "我说：这位朋友，既然来了这品鉴会，总不会是来蹭酒喝的吧？敢问阁下也是冲着\"厨神\"称号来的？",
+    "metadata": {
+      "actor_name": "陆小凤",
+      "scene": 2,
+      "stored_at": "2026-04-27T03:17:42.732483",
+      "importance": "normal",
+      "type": "working_memory"
+    }
+  },
+  {
+    "id": "4d7cb69a-83e8-4208-8f17-eddfd36894a3",
+    "content": "面对情境: 陆小凤已经走向灶台，但他的话显然是说给你听的。他一边系着围裙，一边回头看向你。作为名厨世家的传人，他对自己的厨艺有着绝对的自信，但你的沉默反而让他有些不安——真正的高手往往不动声色。他决定用挑衅来试探你的深浅。",
+    "metadata": {
+      "actor_name": "陆小凤",
+      "importance": "normal",
+      "type": "working_memory",
+      "stored_at": "2026-04-27T03:19:26.920660",
+      "scene": 3
+    }
+  },
+  {
+    "id": "02f9768a-0660-4447-9226-c672a4538671",
+    "content": "我说：怎么，站在那儿发什么愣？是怕了，还是在盘算待会儿怎么输得不太难看？",
+    "metadata": {
+      "type": "working_memory",
+      "scene": 3,
+      "stored_at": "2026-04-27T03:19:32.105148",
+      "actor_name": "陆小凤",
+      "importance": "normal"
+    }
+  },
+  {
+    "id": "f6ed04a5-e372-4de9-9b33-4abb0c369367",
+    "content": "[插话触发] 欧阳铁刚刚注意到主角手中的菜谱，并询问其来源——\"二十年前的纸墨，保管得倒好\"。这暗示欧阳铁可能认识这张菜谱或其原主人。同时陆小凤在灶台前挑衅，神秘来客的话充满玄机。场景中气氛微妙，各方势力都在试探主角。",
+    "metadata": {
+      "actor_name": "陆小凤",
+      "stored_at": "2026-04-27T03:19:43.019545",
+      "type": "working_memory",
+      "scene": 3,
+      "importance": "normal"
+    }
+  },
+  {
+    "id": "d31b1ee0-7cf1-4495-83b6-4bbfca642dba",
+    "content": "[插话] 我说：怎么，哑巴了？连句话都不敢应？",
+    "metadata": {
+      "scene": 3,
+      "importance": "normal",
+      "type": "working_memory",
+      "actor_name": "陆小凤",
+      "stored_at": "2026-04-27T03:19:49.503436"
+    }
+  },
+  {
+    "id": "b57bf96b-c58b-475b-87e0-2525c88bf138",
+    "content": "面对情境: 陆小凤看到你走上灶台，眼中的不屑渐渐收敛，取而代之的是一种审视的认真。他也开始了自己的准备，刀在砧板上飞舞，动作行云流水。但他的余光始终没有离开你——一个敢于在这种场合应战的人，绝非等闲之辈。他一边切菜，一边开口。",
+    "metadata": {
+      "scene": 4,
+      "stored_at": "2026-04-27T03:23:34.227570",
+      "importance": "normal",
+      "actor_name": "陆小凤",
+      "type": "working_memory"
+    }
+  },
+  {
+    "id": "930867e1-4736-4a8c-8025-75c2b592e808",
+    "content": "我说：我看你切菜的架势倒是有几分门道，不过光会切可不行。待会儿做出来的菜要是难以下咽，那可就贻笑大方了。你可别告诉我，你是来这儿现眼的？",
+    "metadata": {
+      "importance": "normal",
+      "actor_name": "陆小凤",
+      "stored_at": "2026-04-27T03:23:50.305530",
+      "scene": 4,
+      "type": "working_memory"
+    }
+  },
+  {
+    "id": "0ac861c9-9f1a-4c47-a2da-1db7925abd9a",
+    "content": "[插话触发] 欧阳铁注意到主角闭眼的架势，心生疑惑。神秘来客暗示欧阳铁\"认得那纸墨却装作不认得\"，陆小凤\"急的不是厨神的位子而是别的什么\"。场景气氛紧张，灶台前的对峙即将开始。",
+    "metadata": {
+      "scene": 4,
+      "importance": "normal",
+      "stored_at": "2026-04-27T03:23:57.218988",
+      "actor_name": "陆小凤",
+      "type": "working_memory"
+    }
+  },
+  {
+    "id": "cf2445ab-94cc-4b64-8fab-640d112f5876",
+    "content": "[插话] 我说：怎么，还在那儿磨蹭什么？等菜自己长腿跑进锅里去？",
+    "metadata": {
+      "stored_at": "2026-04-27T03:24:04.567922",
+      "importance": "normal",
+      "type": "working_memory",
+      "actor_name": "陆小凤",
+      "scene": 4
+    }
+  }
+]

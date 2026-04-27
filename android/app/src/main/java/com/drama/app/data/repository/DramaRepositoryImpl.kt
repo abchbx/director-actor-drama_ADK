@@ -167,6 +167,72 @@ class DramaRepositoryImpl @Inject constructor(
         mergeCastWithStatus(cast, status)
     }
 
+    override suspend fun getConversationLogBubbles(): Result<List<SceneBubble>> = runCatching {
+        val resp = dramaApiService.getConversationLog()
+        val bubbles = mutableListOf<SceneBubble>()
+        var counter = 0
+        var lastScene = 0
+
+        for (entry in resp.entries) {
+            val scene = entry.scene
+            val speaker = entry.speaker
+            val content = entry.content
+            val type = entry.type
+
+            // 场景变化时添加分隔线
+            if (scene > 0 && scene != lastScene) {
+                bubbles.add(SceneBubble.SceneDivider(
+                    id = "conv_div_${scene}",
+                    sceneNumber = scene,
+                    sceneTitle = "第${scene}场",
+                ))
+                lastScene = scene
+            }
+
+            when (type) {
+                "narration" -> {
+                    bubbles.add(SceneBubble.Narration(
+                        id = "conv_${counter++}",
+                        text = normalizeLineBreaks(content),
+                        avatarType = SceneBubble.AvatarType.DIRECTOR,
+                        senderType = SceneBubble.SenderType.DIRECTOR,
+                        senderName = speaker.ifBlank { "旁白" },
+                    ))
+                }
+                "dialogue" -> {
+                    bubbles.add(SceneBubble.Dialogue(
+                        id = "conv_${counter++}",
+                        actorName = speaker,
+                        text = normalizeLineBreaks(content),
+                        avatarType = SceneBubble.AvatarType.ACTOR,
+                        senderType = SceneBubble.SenderType.ACTOR,
+                        senderName = speaker,
+                    ))
+                }
+                "action" -> {
+                    bubbles.add(SceneBubble.Narration(
+                        id = "conv_${counter++}",
+                        text = normalizeLineBreaks(content),
+                        avatarType = SceneBubble.AvatarType.DIRECTOR,
+                        senderType = SceneBubble.SenderType.DIRECTOR,
+                        senderName = speaker.ifBlank { "旁白" },
+                    ))
+                }
+                else -> {
+                    // user_message / system / other
+                    bubbles.add(SceneBubble.Narration(
+                        id = "conv_${counter++}",
+                        text = normalizeLineBreaks(content),
+                        avatarType = if (speaker == "[系统]") SceneBubble.AvatarType.SYSTEM else SceneBubble.AvatarType.USER,
+                        senderType = if (speaker == "[系统]") SceneBubble.SenderType.SYSTEM else SceneBubble.SenderType.USER,
+                        senderName = speaker.ifBlank { "用户" },
+                    ))
+                }
+            }
+        }
+        bubbles
+    }
+
     // ===== 私有映射方法 =====
 
     private fun dramaItemDtoToDrama(dto: com.drama.app.data.remote.dto.DramaItemDto): Drama =
@@ -198,6 +264,9 @@ class DramaRepositoryImpl @Inject constructor(
             bubbles.add(SceneBubble.Narration(
                 id = "api_resp_n_${counter++}",
                 text = normalizeLineBreaks(resp.final_response.trim()),
+                avatarType = SceneBubble.AvatarType.DIRECTOR,
+                senderType = SceneBubble.SenderType.DIRECTOR,
+                senderName = "旁白",
             ))
         }
 
@@ -207,6 +276,7 @@ class DramaRepositoryImpl @Inject constructor(
                 ?: result["formatted_narration"]?.jsonPrimitive?.contentOrNull
             val dialogueText = result["text"]?.jsonPrimitive?.contentOrNull
             val emotion = result["emotion"]?.jsonPrimitive?.contentOrNull ?: ""
+            val senderName = result["sender_name"]?.jsonPrimitive?.contentOrNull ?: actorName
 
             if (!actorName.isNullOrBlank() && !dialogueText.isNullOrBlank()) {
                 bubbles.add(SceneBubble.Dialogue(
@@ -214,11 +284,17 @@ class DramaRepositoryImpl @Inject constructor(
                     actorName = actorName,
                     text = normalizeLineBreaks(dialogueText),
                     emotion = emotion,
+                    avatarType = SceneBubble.AvatarType.ACTOR,
+                    senderType = SceneBubble.SenderType.ACTOR,
+                    senderName = senderName.ifBlank { actorName },
                 ))
             } else if (!narrationText.isNullOrBlank() && narrationText.length > 3) {
                 bubbles.add(SceneBubble.Narration(
                     id = "api_resp_tool_n_${counter++}",
                     text = normalizeLineBreaks(narrationText),
+                    avatarType = SceneBubble.AvatarType.DIRECTOR,
+                    senderType = SceneBubble.SenderType.DIRECTOR,
+                    senderName = "旁白",
                 ))
             }
         }
@@ -249,6 +325,9 @@ class DramaRepositoryImpl @Inject constructor(
             bubbles.add(SceneBubble.Narration(
                 id = "${prefix}${sceneNumber}_n",
                 text = detail.narration,
+                avatarType = SceneBubble.AvatarType.DIRECTOR,
+                senderType = SceneBubble.SenderType.DIRECTOR,
+                senderName = "旁白",
             ))
         }
 
@@ -256,12 +335,16 @@ class DramaRepositoryImpl @Inject constructor(
             val actorName = d["actor_name"]?.jsonPrimitive?.contentOrNull ?: ""
             val text = d["text"]?.jsonPrimitive?.contentOrNull ?: ""
             val emotion = d["emotion"]?.jsonPrimitive?.contentOrNull ?: ""
+            val senderName = d["sender_name"]?.jsonPrimitive?.contentOrNull ?: actorName
             if (actorName.isNotBlank() && text.isNotBlank()) {
                 bubbles.add(SceneBubble.Dialogue(
                     id = "${prefix}${sceneNumber}_d$idx",
                     actorName = actorName,
                     text = text,
                     emotion = emotion,
+                    avatarType = SceneBubble.AvatarType.ACTOR,
+                    senderType = SceneBubble.SenderType.ACTOR,
+                    senderName = senderName.ifBlank { actorName },
                 ))
             }
         }

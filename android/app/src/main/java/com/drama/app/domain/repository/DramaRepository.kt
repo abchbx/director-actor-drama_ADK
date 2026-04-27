@@ -56,4 +56,10 @@ interface DramaRepository {
      * 将两个 API 的数据合并逻辑封装在 Repository 层。
      */
     suspend fun getMergedCast(): Result<List<ActorInfo>>
+
+    /**
+     * 获取完整对话历史并转换为 SceneBubble 列表。
+     * 用于从历史场景返回主聊天时恢复全部历史消息。
+     */
+    suspend fun getConversationLogBubbles(): Result<List<SceneBubble>>
 }

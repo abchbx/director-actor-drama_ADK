@@ -21,11 +21,18 @@ class AuthRepositoryImpl @Inject constructor(
         return try {
             // 临时构建 Retrofit 实例用于验证（连接前不知道最终服务器）
             // 使用全局 OkHttpClient.newBuilder() 继承超时/日志/异常拦截器，
-            // 但移除 BaseUrlInterceptor（index=0），避免其用缓存旧值覆盖验证 URL。
+            // 但排除 BaseUrlInterceptor，避免其用缓存旧值覆盖验证 URL。
+            // ⚠️ 注意：newBuilder().interceptors() 返回的是原列表的不可变视图，
+            // 必须通过重新 addInterceptor 来构建新列表，不能调用 removeIf。
+            val originalInterceptors = okHttpClient.interceptors
             val verifyClient = okHttpClient.newBuilder()
                 .apply {
-                    // 移除 BaseUrlInterceptor（动态替换 URL 的拦截器）
-                    interceptors().removeIf { it is com.drama.app.data.remote.interceptor.BaseUrlInterceptor }
+                    interceptors().clear()
+                    originalInterceptors.forEach {
+                        if (it !is com.drama.app.data.remote.interceptor.BaseUrlInterceptor) {
+                            addInterceptor(it)
+                        }
+                    }
                 }
                 .build()
             val apiBaseUrl = if (!baseUrl.isNullOrBlank()) {
@@ -40,7 +47,10 @@ class AuthRepositoryImpl @Inject constructor(
                 .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
                 .build()
             val authApi = retrofit.create(AuthApiService::class.java)
+            // ★ 打印请求 URL，便于调试云端连接问题
+            android.util.Log.d("AuthRepository", "verifyServer: requesting $apiBaseUrl auth/verify")
             val response = authApi.verifyToken()  // D-02
+            android.util.Log.d("AuthRepository", "verifyServer: response mode=${response.mode}")
             if (response.mode == "bypass") {
                 Result.success(AuthMode.Bypass)
             } else {

@@ -1,0 +1,156 @@
+[
+  {
+    "id": "c7865e6a-6c2b-497d-a2e9-0d0ff8a091cc",
+    "content": "面对情境: 发现陈小满社交媒体上异常的爆红，决定发消息关心一下这个老朋友",
+    "metadata": {
+      "importance": "normal",
+      "type": "working_memory",
+      "scene": 1,
+      "stored_at": "2026-04-27T04:07:52.831031",
+      "actor_name": "苏晴"
+    }
+  },
+  {
+    "id": "e365131a-b135-4a8b-a1d8-3d417b785892",
+    "content": "我说：小满，我看到你最近好像在网上挺火的？发生什么事了吗？有什么需要我帮忙的尽管说。",
+    "metadata": {
+      "type": "working_memory",
+      "stored_at": "2026-04-27T04:08:05.133808",
+      "actor_name": "苏晴",
+      "importance": "normal",
+      "scene": 1
+    }
+  },
+  {
+    "id": "d64ededa-4f4b-4de5-af55-e81933bbfb53",
+    "content": "面对情境: 看到陈小满憔悴的样子心疼又担忧，想知道到底发生了什么，以及他昨晚没回复消息是不是因为那个\"厨神\"的事",
+    "metadata": {
+      "actor_name": "苏晴",
+      "stored_at": "2026-04-27T04:11:34.121063",
+      "importance": "normal",
+      "scene": 2,
+      "type": "working_memory"
+    }
+  },
+  {
+    "id": "57073d2d-63ce-4a58-8ff1-024bb344ae0e",
+    "content": "我说：小满，你昨晚怎么没回我消息啊？我看你今天脸色好像不太好，是不是那个\"厨神\"的事让你很困扰？有什么烦心事可以跟我说说，别一个人扛着。",
+    "metadata": {
+      "actor_name": "苏晴",
+      "importance": "normal",
+      "type": "working_memory",
+      "stored_at": "2026-04-27T04:11:42.005347",
+      "scene": 2
+    }
+  },
+  {
+    "id": "71659a47-15a5-440a-ba96-1925c4df8087",
+    "content": "[插话触发] 神秘投资人主动搭讪陈小满，苏晴和陈小满会如何反应",
+    "metadata": {
+      "stored_at": "2026-04-27T04:11:46.019300",
+      "scene": 2,
+      "actor_name": "苏晴",
+      "importance": "normal",
+      "type": "working_memory"
+    }
+  },
+  {
+    "id": "8f8b6288-2387-4c37-8428-0add4b500844",
+    "content": "[插话] 我说：小满，那边那个神秘投资人是怎么回事？需要我过去帮你挡一下吗？",
+    "metadata": {
+      "stored_at": "2026-04-27T04:11:50.920780",
+      "importance": "normal",
+      "type": "working_memory",
+      "scene": 2,
+      "actor_name": "苏晴"
+    }
+  },
+  {
+    "id": "a5877cf2-045b-482f-9f68-4294f906fb72",
+    "content": "面对情境: 在吧台后观察陈小满和投资人的互动，担忧好友会陷入麻烦",
+    "metadata": {
+      "stored_at": "2026-04-27T04:15:28.623158",
+      "scene": 3,
+      "importance": "normal",
+      "actor_name": "苏晴",
+      "type": "working_memory"
+    }
+  },
+  {
+    "id": "a3d7ea5c-81ba-42bb-a9d2-a2dd59690f23",
+    "content": "我说：小满，看起来那位投资人对你挺感兴趣的。需要我帮你留意一下他的来意吗？",
+    "metadata": {
+      "importance": "normal",
+      "type": "working_memory",
+      "actor_name": "苏晴",
+      "scene": 3,
+      "stored_at": "2026-04-27T04:15:34.502714"
+    }
+  },
+  {
+    "id": "b130e51e-8cdb-4f87-9034-8588c5317a28",
+    "content": "[插话触发] 陈小满差点说出真相，神秘投资人的反应",
+    "metadata": {
+      "actor_name": "苏晴",
+      "stored_at": "2026-04-27T04:15:51.717625",
+      "importance": "normal",
+      "type": "working_memory",
+      "scene": 3
+    }
+  },
+  {
+    "id": "87502e18-a4e8-43da-88d7-f130f43d9bd8",
+    "content": "[插话] 我说：小满，你还好吗？刚才好像气氛有点紧张……需要我过去吗？",
+    "metadata": {
+      "stored_at": "2026-04-27T04:15:56.759852",
+      "scene": 3,
+      "type": "working_memory",
+      "importance": "normal",
+      "actor_name": "苏晴"
+    }
+  },
+  {
+    "id": "6985e8a8-89ef-454a-aa62-0f1fa359d043",
+    "content": "面对情境: 看到直播设备闯入，急忙想上前阻止，保护好友不受媒体侵扰",
+    "metadata": {
+      "actor_name": "苏晴",
+      "importance": "normal",
+      "type": "working_memory",
+      "scene": 4,
+      "stored_at": "2026-04-27T04:19:27.819459"
+    }
+  },
+  {
+    "id": "15c8f949-1885-4b07-a48c-5795e435da05",
+    "content": "我说：（内心：那些人是怎么回事？举着直播设备闯进来，小满最不喜欢被人打扰了……）\n\n哎哎哎，等等一下！\n\n（急忙上前几步，挡在镜头前）\n\n各位这是做什么呀？我们这儿是小咖啡馆，不是拍摄现场。这位先生他不太喜欢面对镜头，能不能麻烦你们先停一停？\n\n（语气尽量平和但带着坚持）",
+    "metadata": {
+      "importance": "normal",
+      "stored_at": "2026-04-27T04:19:35.258629",
+      "type": "working_memory",
+      "scene": 4,
+      "actor_name": "苏晴"
+    }
+  },
+  {
+    "id": "9cc19cb1-c477-42c1-a87d-87436f6d01a0",
+    "content": "面对情境: 奋力挡在镜头前保护陈小满，面对毒舌林的咄咄逼人，语气坚定但无奈地请求对方离开",
+    "metadata": {
+      "type": "working_memory",
+      "stored_at": "2026-04-27T04:23:53.319565",
+      "actor_name": "苏晴",
+      "importance": "normal",
+      "scene": 5
+    }
+  },
+  {
+    "id": "6b1fce35-53ff-476e-a769-4215304f1319",
+    "content": "我说：各位，真的很抱歉，我们这里真的不适合拍摄。你们看这样行不行，先把设备收起来，有什么问题我们可以好好说，好吗？",
+    "metadata": {
+      "scene": 5,
+      "stored_at": "2026-04-27T04:24:15.871614",
+      "actor_name": "苏晴",
+      "type": "working_memory",
+      "importance": "normal"
+    }
+  }
+]

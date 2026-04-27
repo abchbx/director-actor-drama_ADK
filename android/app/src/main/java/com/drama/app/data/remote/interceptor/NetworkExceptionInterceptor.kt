@@ -23,7 +23,17 @@ class NetworkExceptionInterceptor @Inject constructor() : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val request: Request = chain.request()
         return try {
-            chain.proceed(request)
+            val response = chain.proceed(request)
+            // ★ 打印所有非 2xx 响应的日志，便于调试云平台拦截/重定向问题
+            if (!response.isSuccessful) {
+                val bodyString = try {
+                    response.peekBody(Long.MAX_VALUE).string().take(500)
+                } catch (_: Exception) {
+                    "<unable-to-read-body>"
+                }
+                Log.w(TAG, "HTTP ${response.code} ${response.request.url} | body=$bodyString")
+            }
+            response
         } catch (e: SocketTimeoutException) {
             Log.w(TAG, "Network timeout: ${request.url}", e)
             buildErrorResponse(

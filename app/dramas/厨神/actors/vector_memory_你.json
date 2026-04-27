@@ -1,0 +1,46 @@
+[
+  {
+    "id": "c807b744-88d5-4b00-9e88-46ccad596bd4",
+    "content": "面对情境: 你作为主角的同行者，站在主角身旁。注意到了主角的犹豫与那封信的存在。天色渐暗，酒楼门口的人越聚越多，你决定开口说点什么——也许是提醒，也许是询问。",
+    "metadata": {
+      "importance": "normal",
+      "type": "working_memory",
+      "stored_at": "2026-04-27T03:15:21.217689",
+      "scene": 1,
+      "actor_name": "你"
+    }
+  },
+  {
+    "id": "8a43a95b-afce-4114-8be7-bd0c607f5250",
+    "content": "我说：天快黑了，站在这儿也不是办法。里面那帮人等急了怕是要出来催。\n\n……那封信，要不先收好？",
+    "metadata": {
+      "type": "working_memory",
+      "stored_at": "2026-04-27T03:15:28.573754",
+      "scene": 1,
+      "importance": "normal",
+      "actor_name": "你"
+    }
+  },
+  {
+    "id": "eae9aabf-14ae-4083-b0aa-fc1999b59b7d",
+    "content": "[插话触发] 欧阳铁刚刚邀请主角上二楼雅间，同时神秘来客在暗处发出意味深长的询问。这是一个关键时刻——主角面临选择：是接受欧阳铁的邀请上楼，还是先应对暗处的神秘声音？其他角色可能会有反应。",
+    "metadata": {
+      "scene": 1,
+      "type": "working_memory",
+      "stored_at": "2026-04-27T03:15:45.120450",
+      "importance": "normal",
+      "actor_name": "你"
+    }
+  },
+  {
+    "id": "19898a80-e615-4169-b166-9baa929285a4",
+    "content": "[插话] 我说：那边有人。",
+    "metadata": {
+      "type": "working_memory",
+      "actor_name": "你",
+      "scene": 1,
+      "importance": "normal",
+      "stored_at": "2026-04-27T03:15:50.001689"
+    }
+  }
+]

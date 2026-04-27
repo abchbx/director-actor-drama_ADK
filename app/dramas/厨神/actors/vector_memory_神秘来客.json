@@ -1,0 +1,134 @@
+[
+  {
+    "id": "3a6b35a6-2b82-4618-beb2-3eb93e101cff",
+    "content": "面对情境: 酒楼后院的阴影中，一个身影静静地立着。看不清面容，只能隐约感觉到一道目光正穿透人群，锁定在某个方向——也许是你，也许是别的什么人。",
+    "metadata": {
+      "actor_name": "神秘来客",
+      "stored_at": "2026-04-27T03:15:22.530807",
+      "scene": 1,
+      "type": "working_memory",
+      "importance": "normal"
+    }
+  },
+  {
+    "id": "b70232bb-0871-4daa-8ef0-2231e165aa9f",
+    "content": "我说：（阴影中传来低沉的声音）\n\n有趣……今日这酒楼，倒是热闹得很。\n\n那边的人（你），可嗅到了什么气息？",
+    "metadata": {
+      "importance": "normal",
+      "scene": 1,
+      "stored_at": "2026-04-27T03:15:29.072938",
+      "type": "working_memory",
+      "actor_name": "神秘来客"
+    }
+  },
+  {
+    "id": "9805d865-72a1-4575-839d-a9244889fe98",
+    "content": "面对情境: 你总觉得有一道目光跟随着自己，从你踏入大堂的那一刻起就没有离开。也许是后院那道阴影中的声音，也许只是错觉。但空气中那一丝若有若无的异样气息，提醒着你——这场品鉴会，远没有表面上那么简单。",
+    "metadata": {
+      "actor_name": "神秘来客",
+      "stored_at": "2026-04-27T03:17:36.920170",
+      "importance": "normal",
+      "scene": 2,
+      "type": "working_memory"
+    }
+  },
+  {
+    "id": "fd78f396-7619-43ee-92f4-a8cf4d6e658a",
+    "content": "我说：这空气中……有股熟悉的味道。（阴影微微晃动，似笑非笑）就像多年前某个雨夜，某个人打开的那扇门。",
+    "metadata": {
+      "importance": "normal",
+      "stored_at": "2026-04-27T03:17:55.343977",
+      "actor_name": "神秘来客",
+      "type": "working_memory",
+      "scene": 2
+    }
+  },
+  {
+    "id": "b50c95af-370a-4b9e-981f-5beb65a7afaa",
+    "content": "面对情境: 阴影中，那道若有若无的气息似乎更浓了。神秘来客的声音再次在空气中飘荡，这一次，他的话似乎是对你说的，又似乎是在自言自语。",
+    "metadata": {
+      "scene": 3,
+      "stored_at": "2026-04-27T03:19:28.520069",
+      "type": "working_memory",
+      "actor_name": "神秘来客",
+      "importance": "normal"
+    }
+  },
+  {
+    "id": "801dbfa8-2cc1-46fc-9548-b20dc5273159",
+    "content": "我说：这江湖啊……人人都在争那\"厨神\"的名号。（声音悠悠荡荡）却不知，有些东西一旦入了局，便由不得自己了。\n\n你（主角）今日来此，想必也不只是为了凑个热闹吧？\n\n（阴影中似有什么东西在微微闪烁）\n\n有些门，推开了便再难合上。而钥匙……往往就握在最不经意的人手中。",
+    "metadata": {
+      "importance": "normal",
+      "type": "working_memory",
+      "actor_name": "神秘来客",
+      "stored_at": "2026-04-27T03:19:35.125774",
+      "scene": 3
+    }
+  },
+  {
+    "id": "e9819f7e-0491-4cc3-b9ca-9aa51f153e65",
+    "content": "[插话触发] 欧阳铁刚刚注意到主角手中的菜谱，并询问其来源——\"二十年前的纸墨，保管得倒好\"。这暗示欧阳铁可能认识这张菜谱或其原主人。同时陆小凤在灶台前挑衅，神秘来客的话充满玄机。场景中气氛微妙，各方势力都在试探主角。",
+    "metadata": {
+      "stored_at": "2026-04-27T03:19:43.819176",
+      "type": "working_memory",
+      "importance": "normal",
+      "scene": 3,
+      "actor_name": "神秘来客"
+    }
+  },
+  {
+    "id": "3a95097b-f566-426b-baed-b7440a4c4af8",
+    "content": "[插话] 我说：那菜谱上的字迹……倒有几分眼熟。",
+    "metadata": {
+      "actor_name": "神秘来客",
+      "importance": "normal",
+      "type": "working_memory",
+      "scene": 3,
+      "stored_at": "2026-04-27T03:19:48.638907"
+    }
+  },
+  {
+    "id": "a86428c5-9328-4455-becf-6a32c9a3f5eb",
+    "content": "面对情境: 阴影中，那道身影似乎更近了一步。神秘来客的声音再次飘来，比之前更轻，却更清晰——仿佛就在你耳边呢喃。",
+    "metadata": {
+      "scene": 4,
+      "stored_at": "2026-04-27T03:23:35.820334",
+      "actor_name": "神秘来客",
+      "type": "working_memory",
+      "importance": "normal"
+    }
+  },
+  {
+    "id": "989582bc-9644-4830-93db-cbffbe6f67c9",
+    "content": "我说：那菜谱……或许不该出现在这里。（声音更低了几分）但既已出现，便是缘分。\n\n那位欧阳师傅的目光，想必你也察觉到了。（阴影微微晃动）他认得那纸墨，却装作不认得……有趣。\n\n至于那灶台边的陆小凤……呵，他急的不是厨神的位子，而是别的什么。\n\n（声音忽远忽近）你手中的东西，究竟是福是祸……且看今夜月色如何吧。",
+    "metadata": {
+      "actor_name": "神秘来客",
+      "importance": "normal",
+      "stored_at": "2026-04-27T03:23:45.870905",
+      "type": "working_memory",
+      "scene": 4
+    }
+  },
+  {
+    "id": "1b9d79bf-6ff4-4cc6-a153-b23acfece723",
+    "content": "[插话触发] 欧阳铁注意到主角闭眼的架势，心生疑惑。神秘来客暗示欧阳铁\"认得那纸墨却装作不认得\"，陆小凤\"急的不是厨神的位子而是别的什么\"。场景气氛紧张，灶台前的对峙即将开始。",
+    "metadata": {
+      "scene": 4,
+      "type": "working_memory",
+      "importance": "normal",
+      "actor_name": "神秘来客",
+      "stored_at": "2026-04-27T03:23:58.025845"
+    }
+  },
+  {
+    "id": "1822c55b-8596-4b4a-830c-f60f87fdcbdf",
+    "content": "[插话] 我说：这灶台前的火……倒是比方才更旺了些。",
+    "metadata": {
+      "scene": 4,
+      "type": "working_memory",
+      "importance": "normal",
+      "actor_name": "神秘来客",
+      "stored_at": "2026-04-27T03:24:03.838142"
+    }
+  }
+]
