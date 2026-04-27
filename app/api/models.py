@@ -60,6 +60,7 @@ class ChatRequest(BaseModel):
 
     message: str = Field(..., min_length=1, description="Chat message text")
     mention: str | None = Field(default=None, description="Optional @mention actor name")
+    sender_name: str = Field(default="导演", description="Name of the message sender")
 
 
 class SaveRequest(BaseModel):
@@ -180,6 +181,7 @@ class ExportResponse(BaseModel):
     status: str = "success"
     message: str = ""
     export_path: str = ""
+    content: str = ""
 
 
 class ErrorResponse(BaseModel):

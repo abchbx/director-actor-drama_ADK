@@ -67,9 +67,9 @@ object DataStoreModule {
     @Provides
     @Singleton
     fun provideAuthRepository(
-        okHttpClient: okhttp3.OkHttpClient,
         json: kotlinx.serialization.json.Json,
+        okHttpClient: okhttp3.OkHttpClient,
     ): AuthRepository {
-        return AuthRepositoryImpl(okHttpClient, json)
+        return AuthRepositoryImpl(json, okHttpClient)
     }
 }

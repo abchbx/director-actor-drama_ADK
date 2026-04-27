@@ -11,7 +11,8 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.DramaApp"
-        android:usesCleartextTraffic="true">
+        android:usesCleartextTraffic="false"
+        android:networkSecurityConfig="${networkSecurityConfig}">
 
         <activity
             android:name=".MainActivity"

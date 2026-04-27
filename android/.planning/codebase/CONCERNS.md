@@ -1,144 +1,173 @@
 # Codebase Concerns
 
-**Analysis Date:** 2026-04-25
+**Analysis Date:** 2026-04-27
 
 ## Tech Debt
 
-**DramaDetailViewModel.kt — God Object (1227 lines, 51KB):**
-- Issue: Single ViewModel handles WS events, REST calls, state management, command parsing, local saves, actor panel, history, and error handling
-- Files: `app/src/main/java/com/drama/app/ui/screens/dramadetail/DramaDetailViewModel.kt`
-- Impact: Difficult to understand, modify, and test. Any change risks side effects across unrelated features.
-- Fix approach: Extract responsibilities into separate classes:
-  - `WsEventHandler` — Parse WS events and create bubbles
-  - `CommandRouter` — Parse and route commands (already partially separated in `CommandType`)
-  - `LocalSaveManager` — Handle local save/load/list/delete
-  - `DramaStateManager` — Handle status polling and state sync
+**NetworkExceptionInterceptor 504 code collision:**
+- Issue: `NetworkExceptionInterceptor` uses HTTP 504 (Gateway Timeout) for client-side `SocketTimeoutException`, but the server also returns real HTTP 504 from `runner_utils.py` when command execution exceeds the timeout. Both produce "UNKNOWN:504" in `AuthRepositoryImpl`, making it impossible to distinguish client-side timeout from server-side timeout.
+- Files: `app/src/main/java/com/drama/app/data/remote/interceptor/NetworkExceptionInterceptor.kt`, `app/src/main/java/com/drama/app/data/repository/AuthRepositoryImpl.kt`
+- Impact: Cannot differentiate "network unreachable / connection timed out" from "server received request but processing timed out". Users see generic "UNKNOWN:504" instead of actionable error messages.
+- Fix approach: Use a custom error code (e.g., 599 or a non-HTTP code) for client-side timeouts in `NetworkExceptionInterceptor`, or add a custom header (e.g., `X-Client-Error: true`) to distinguish synthetic responses from real server responses.
 
-**handleWsEvent() — Monolithic when block (~240 lines):**
-- Issue: Single function handles 15+ event types with complex branching logic
-- Files: `app/src/main/java/com/drama/app/ui/screens/dramadetail/DramaDetailViewModel.kt` (lines 417-655)
-- Impact: High cyclomatic complexity, easy to introduce bugs when adding new event types
-- Fix approach: Extract each event type handler into a separate private function or use a map of event type → handler function
+**AuthRepositoryImpl temporary Retrofit instance:**
+- Issue: `AuthRepositoryImpl.verifyServer()` creates a new `Retrofit` instance per verification call instead of using the Hilt-provided one. The comment explains this is intentional (no interceptors for pre-connection verification), but the approach creates a new `OkHttpClient` each time (via `okHttpClient.newBuilder()`) which allocates new connection pools and threads.
+- Files: `app/src/main/java/com/drama/app/data/repository/AuthRepositoryImpl.kt` (line 24-37)
+- Impact: Repeated server verification (e.g., user retrying connection) creates orphaned OkHttp resources until GC
+- Fix approach: Create a dedicated `@NoAuth` qualified OkHttpClient in NetworkModule that shares the same connection pool but has no auth interceptor, and inject it into AuthRepositoryImpl
 
-**DramaRepositoryImpl.kt — Dual Concern (10.76KB):**
-- Issue: Implements both REST API calls and DTO→domain mapping logic
-- Files: `app/src/main/java/com/drama/app/data/repository/DramaRepositoryImpl.kt`
-- Impact: Mapping logic is tightly coupled to API implementation, making it hard to test independently
-- Fix approach: Extract `SceneBubbleMapper` class for DTO→domain conversion, testable in isolation
+**runBlocking in ServerPreferences:**
+- Issue: `ServerPreferences.currentApiBaseUrl()` uses `runBlocking` on first access when memory cache is empty. This is called from `BaseUrlInterceptor.intercept()` which runs on OkHttp's dispatcher thread. Blocking OkHttp threads can cause deadlocks in edge cases.
+- Files: `app/src/main/java/com/drama/app/data/local/ServerPreferences.kt` (line 53)
+- Impact: Potential deadlock if DataStore has pending writes and OkHttp thread is blocked waiting for it
+- Fix approach: Pre-populate the cache during Application.onCreate() or eagerly read DataStore at Hilt module provision time
+
+**No HTTP cache configured:**
+- Issue: OkHttpClient has no cache configured, meaning every request hits the network even for cacheable GET endpoints (drama list, drama status, cast, scenes).
+- Files: `app/src/main/java/com/drama/app/di/NetworkModule.kt`
+- Impact: Unnecessary network usage and slower responses for frequently polled endpoints
+- Fix approach: Add `Cache` to OkHttpClient with reasonable size (e.g., 5MB) and configure cache control headers on server or interceptor
 
 ## Known Bugs
 
-**None confirmed — but potential issues observed:**
+**"UNKNOWN:504" error message shown to users:**
+- Symptoms: When a network timeout occurs, the user sees "UNKNOWN:504" as the error message on the connection screen
+- Files: `app/src/main/java/com/drama/app/data/repository/AuthRepositoryImpl.kt` (line 49-56), `app/src/main/java/com/drama/app/ui/screens/connection/ConnectionViewModel.kt` (line 87-94)
+- Trigger: 1) SocketTimeoutException caught by NetworkExceptionInterceptor → synthetic 504 response → Retrofit throws HttpException(504) → AuthRepositoryImpl catches and produces "UNKNOWN:504". OR 2) Real server 504 from runner_utils.py timeout → same path.
+- Workaround: None — user must retry, but the error message doesn't guide them to the actual cause
 
-**Bubble counter race condition:**
-- Symptoms: Potential duplicate IDs if `bubbleCounter++` is called from multiple coroutines
-- Files: `app/src/main/java/com/drama/app/ui/screens/dramadetail/DramaDetailViewModel.kt`
-- Trigger: Multiple WS events arriving simultaneously could interleave `bubbleCounter++` operations
-- Workaround: Currently safe because WS events are collected on a single coroutine, but `addErrorBubble()` is called from multiple coroutine scopes
-
-**WS reconnection during scene transition:**
-- Symptoms: After `returnToCurrentScene()`, `disconnectWebSocketSafely()` resets `hasCalledConnectWebSocket = false`, then `connectWebSocket()` is called — but if the reconnection is slow, the user might see stale state
-- Files: `app/src/main/java/com/drama/app/ui/screens/dramadetail/DramaDetailViewModel.kt` (lines 707-714)
-- Trigger: Rapid switching between history view and current scene
-- Workaround: None — user must wait for reconnection
+**BaseUrlInterceptor doesn't update Retrofit.baseUrl:**
+- Issue: When user switches servers, `BaseUrlInterceptor` correctly redirects requests, but the `Retrofit.baseUrl` remains the original value. This works because the interceptor replaces scheme/host/port before each request, but any code that reads `retrofit.baseUrl()` directly would get the wrong value.
+- Files: `app/src/main/java/com/drama/app/di/NetworkModule.kt` (line 82-96)
+- Impact: Currently benign (all requests go through interceptor), but could cause confusion if new code relies on `retrofit.baseUrl()`
+- Fix approach: Document this explicitly or rebuild Retrofit instance when server changes
 
 ## Security Considerations
 
-**Token in WebSocket URL:**
-- Risk: Auth token passed as query parameter in WS connection URL — may be logged by proxies/servers
-- Files: `app/src/main/java/com/drama/app/data/remote/ws/WebSocketManager.kt`
-- Current mitigation: HTTPS/WSS would encrypt the URL (but current setup may use plain HTTP)
-- Recommendations: Consider using WebSocket subprotocol for auth or first-message auth instead of URL query param
+**Debug build trusts user certificates:**
+- Risk: Debug `network_security_config_debug.xml` trusts user-installed certificates, enabling MITM attacks on debug builds
+- Files: `app/src/main/res/xml/network_security_config_debug.xml` (line 8)
+- Current mitigation: Only affects debug builds, not shipped to users
+- Recommendations: Acceptable for development, but developers should be aware they're vulnerable to MITM when using debug builds on shared networks
+
+**Release network_security_config allows localhost cleartext:**
+- Risk: The release config allows cleartext HTTP to `10.0.2.2`, `localhost`, `127.0.0.1`. On a real device, `localhost` could be exploited by malicious local apps.
+- Files: `app/src/main/res/xml/network_security_config.xml` (line 14-18)
+- Current mitigation: `10.0.2.2` only resolves on emulators; `localhost`/`127.0.0.1` are local-only
+- Recommendations: Consider removing the localhost exception from release builds entirely, or restrict to emulator-only detection
+
+**WebSocket token in query parameter:**
+- Risk: Auth token is passed as `?token=` query parameter in WebSocket URL, which may appear in server logs, proxy logs, and browser history (if applicable)
+- Files: `app/src/main/java/com/drama/app/domain/model/ServerConfig.kt` (line 27), `app/src/main/java/com/drama/app/data/remote/ws/WebSocketManager.kt` (line 178-186)
+- Current mitigation: OkHttp WebSocket connections don't cache URLs like browsers do; server logs should be secured
+- Recommendations: This is standard practice for WebSocket auth (no header support in WS handshake), but ensure server logs don't persist the token
 
 **No certificate pinning:**
-- Risk: MITM attacks could intercept REST or WS traffic
+- Risk: Without certificate pinning, a compromised CA or trusted root could allow MITM even on HTTPS connections
 - Files: `app/src/main/java/com/drama/app/di/NetworkModule.kt`
-- Current mitigation: None
-- Recommendations: Add certificate pinning for production deployments
-
-**SecureStorage implementation:**
-- Risk: EncryptedSharedPreferences is used but implementation not audited
-- Files: `app/src/main/java/com/drama/app/data/local/SecureStorage.kt`
-- Current mitigation: Android Keystore-backed encryption
-- Recommendations: Verify key alias uniqueness and encryption parameters
+- Current mitigation: Not implemented
+- Recommendations: Consider adding certificate pinning for cloud-hosted servers (baseUrl) if they have known certificates; skip for IP:port local development
 
 ## Performance Bottlenecks
 
-**Full bubble list replacement on every update:**
-- Problem: `_uiState.update { it.copy(bubbles = it.bubbles + bubble) }` creates a new list on every bubble addition
-- Files: `app/src/main/java/com/drama/app/ui/screens/dramadetail/DramaDetailViewModel.kt`
-- Cause: Immutable state + List concatenation creates O(n) copies on each update
-- Improvement path: Use `MutableList` internally and only expose immutable snapshot, or use a persistent data structure (e.g., `kotlinx.collections.immutable`)
+**300s read timeout for all requests:**
+- Problem: OkHttpClient has 300s (5 minute) read timeout configured for all requests. This was set for LLM calls that can take minutes, but it means quick API calls (status, cast, list) will hang for 5 minutes if the server stops responding.
+- Files: `app/src/main/java/com/drama/app/di/NetworkModule.kt` (line 76)
+- Cause: Single OkHttpClient shared between all API calls and WebSocket, timeout configured for worst-case LLM scenario
+- Improvement path: Use per-request timeout overrides via `okhttp3.Request.Builder.tag(Timeout::class)` or create separate API service interfaces with different client configurations
 
-**ReverseLayout + reversed list:**
-- Problem: `bubbles.reversed()` creates a new list on every recomposition
-- Files: `app/src/main/java/com/drama/app/ui/screens/dramadetail/components/SceneBubbleList.kt` (line 71)
-- Cause: `remember(bubbles)` caches, but still creates a new reversed list whenever `bubbles` reference changes
-- Improvement path: Maintain bubbles in reverse order in ViewModel, or use `LazyColumn` without `reverseLayout`
-
-**SceneBubbleList key stability:**
-- Problem: Bubble IDs use counter-based IDs like `"b_0"`, `"b_1"` — if bubbles are reloaded, IDs may conflict with existing ones
-- Files: `app/src/main/java/com/drama/app/ui/screens/dramadetail/DramaDetailViewModel.kt`
-- Cause: `bubbleCounter` resets to 0 in `resetAllState()`, but scene loading uses different prefixes
-- Improvement path: Use UUID-based IDs or ensure prefix uniqueness across all bubble creation paths
+**No request cancellation on ViewModel clear:**
+- Problem: When a ViewModel is cleared (screen navigation), in-flight OkHttp requests continue executing until they complete or timeout (up to 300s)
+- Files: `app/src/main/java/com/drama/app/di/NetworkModule.kt`, various ViewModels
+- Cause: No call cancellation mechanism tied to ViewModel lifecycle
+- Improvement path: Use `viewModelScope` launch + `suspendCancellableCoroutine` to cancel OkHttp calls when coroutine is cancelled
 
 ## Fragile Areas
 
-**WS event handling — message source deduplication:**
-- Files: `app/src/main/java/com/drama/app/ui/screens/dramadetail/DramaDetailViewModel.kt` (lines 1131-1171)
-- Why fragile: The dedup logic assumes WS events arrive after REST response, but timing is non-deterministic. The `isWsConnected` check at send time may not reflect WS state at response time.
-- Safe modification: Test thoroughly with rapid connect/disconnect cycles; consider adding sequence numbers or timestamps for dedup
-- Test coverage: None
+**Interceptor order dependency:**
+- Files: `app/src/main/java/com/drama/app/di/NetworkModule.kt` (line 61-74)
+- Why fragile: The interceptor chain order is critical: BaseUrlInterceptor MUST be first (routes to correct server), AuthInterceptor MUST be second (adds token), NetworkExceptionInterceptor MUST be third (catches errors from real network calls). Reordering would break functionality.
+- Safe modification: Add new interceptors at the correct position in the chain, with clear comments explaining the dependency
+- Test coverage: Only `BaseUrlInterceptorTest` exists; no tests for `AuthInterceptor` or `NetworkExceptionInterceptor`
 
-**Three-party message system (director/actor/user):**
-- Files: `app/src/main/java/com/drama/app/domain/model/SceneBubble.kt`, `event_mapper.py`
-- Why fragile: `senderType` and `senderName` must match between backend event_mapper and frontend ViewModel handling. Any mismatch in naming convention (e.g., "旁白" vs "narrator") will break avatar display
-- Safe modification: Keep a shared enum/mapping between backend and frontend; add integration tests
-- Test coverage: None
+**ServerPreferences memory cache invalidation:**
+- Files: `app/src/main/java/com/drama/app/data/local/ServerPreferences.kt`
+- Why fragile: The `@Volatile cachedApiBaseUrl` is only invalidated by `saveServerConfig()` and `clearServerConfig()`. If DataStore is modified externally (e.g., backup restore, multi-process), the cache becomes stale.
+- Safe modification: Always update both DataStore and cache atomically; consider adding a cache invalidation mechanism
+- Test coverage: No tests for ServerPreferences
+
+**WebSocket generation counter pattern:**
+- Files: `app/src/main/java/com/drama/app/data/remote/ws/WebSocketManager.kt` (line 56, 174, 192-346)
+- Why fragile: The `connectGeneration` counter is used to ignore stale WebSocket callbacks. If the counter overflows (unlikely but theoretically possible with rapid connect/disconnect), stale callbacks could be processed.
+- Safe modification: The Long type makes overflow practically impossible, but the pattern is complex and error-prone
+- Test coverage: ConnectionOrchestratorTest exists but tests orchestrator, not WebSocketManager directly
 
 ## Scaling Limits
 
-**Bubble list size:**
-- Current capacity: No limit — bubbles accumulate for entire drama session
-- Limit: Memory pressure on long sessions (hundreds of scenes with dozens of bubbles each)
-- Scaling path: Implement pagination or windowing in `SceneBubbleList`, only keep recent N bubbles in memory
+**Single Retrofit instance for all API calls:**
+- Current capacity: All REST calls share one Retrofit instance with one OkHttpClient
+- Limit: Cannot configure different timeouts for different endpoints (e.g., fast status check vs slow LLM calls)
+- Scaling path: Create qualified Retrofit instances (e.g., `@LongTimeout`, `@ShortTimeout`) or use per-request timeout overrides
 
-**WebSocket reconnection:**
-- Current capacity: Max 5 retries with exponential backoff
-- Limit: Permanent failure after 5 retries, user must manually retry
-- Scaling path: Add infinite retry with increasing delays, or background service for reconnection
+**WebSocket is Activity-scoped:**
+- Current capacity: One WebSocket connection per Activity lifecycle
+- Limit: Multiple concurrent drama sessions are not supported
+- Scaling path: If multi-session is needed, elevate WebSocketManager to Singleton scope with multi-connection support
 
 ## Dependencies at Risk
 
-**Google ADK (Agent Development Kit):**
-- Risk: Relatively new framework, API may change
-- Impact: Backend `event_mapper.py` and tool definitions would need updating
-- Migration plan: Pin ADK version, add integration tests for event mapping
+**Security Crypto alpha version:**
+- Risk: `androidx.security:security-crypto:1.1.0-alpha06` is an alpha release with known issues on some devices (Keystore exceptions)
+- Impact: Token storage could fail on certain devices/Android versions, causing auth failures
+- Migration plan: Monitor for stable release; consider fallback to regular SharedPreferences with obfuscation if EncryptedSharedPreferences fails
+
+**OkHttp 4.12.0:**
+- Risk: OkHttp 4.x is in maintenance mode; OkHttp 5.x is the active development line
+- Impact: No future features or non-critical bug fixes
+- Migration plan: Plan migration to OkHttp 5.x when Retrofit adds support
 
 ## Missing Critical Features
 
-**No test infrastructure:**
-- Problem: Zero test files, no test dependencies, no CI
-- Blocks: Confidence in refactoring, regression prevention, code quality
+**No retry mechanism for REST API calls:**
+- Problem: Failed REST calls are not automatically retried. Only WebSocket has reconnection logic.
+- Blocks: Resilient operation on flaky mobile networks
 
-**No offline support:**
-- Problem: App requires constant server connection; no local caching of drama state beyond manual saves
-- Blocks: Usage in poor network conditions
+**No offline mode or request queueing:**
+- Problem: All functionality requires active server connection
+- Blocks: Viewing cached drama data when offline
 
 ## Test Coverage Gaps
 
-**Entire codebase is untested:**
-- What's not tested: All functionality
-- Files: All `.kt` files
-- Risk: Any change could introduce regressions without detection
+**NetworkExceptionInterceptor:**
+- What's not tested: Error conversion logic (SocketTimeoutException→504, UnknownHostException→503, etc.)
+- Files: `app/src/main/java/com/drama/app/data/remote/interceptor/NetworkExceptionInterceptor.kt`
+- Risk: Changes to error codes or messages could break UI error handling without detection
+- Priority: High (directly impacts "UNKNOWN:504" error flow)
+
+**AuthInterceptor:**
+- What's not tested: Token injection, no-token passthrough
+- Files: `app/src/main/java/com/drama/app/data/remote/interceptor/AuthInterceptor.kt`
+- Risk: Token header changes could silently break auth
+- Priority: Medium
+
+**ServerPreferences:**
+- What's not tested: Memory cache lifecycle, runBlocking fallback, save/clear operations
+- Files: `app/src/main/java/com/drama/app/data/local/ServerPreferences.kt`
+- Risk: Cache invalidation bugs could route requests to wrong server
 - Priority: High
 
-**Highest-priority testing targets:**
-1. `DetectActorInteractionUseCase` — Pure logic, easy to test, high value
-2. `DramaDetailViewModel.handleWsEvent()` — Core business logic, complex branching
-3. `DramaRepositoryImpl.getSceneBubbles()` — DTO mapping correctness
-4. `WebSocketManager` — Connection lifecycle and reconnection
+**AuthRepositoryImpl:**
+- What's not tested: Error mapping (TIMEOUT, NETWORK_UNREACHABLE, AUTH_FAILED, UNKNOWN:code)
+- Files: `app/src/main/java/com/drama/app/data/repository/AuthRepositoryImpl.kt`
+- Risk: Error type classification changes could break connection screen error display
+- Priority: High (directly impacts "UNKNOWN:504" flow)
+
+**WebSocketManager:**
+- What's not tested: Reconnection logic, heartbeat, generation counter, reference counting
+- Files: `app/src/main/java/com/drama/app/data/remote/ws/WebSocketManager.kt`
+- Risk: Reconnection or lifecycle bugs could cause connection leaks or UI deadlocks
+- Priority: Medium
 
 ---
 
-*Concerns audit: 2026-04-25*
+*Concerns audit: 2026-04-27*

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- D-23-14: Debug 配置 — 允许明文 HTTP（包括 LAN 192.168.x.x） -->
+<!-- Debug 构建用于开发测试，允许连接局域网开发机 -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

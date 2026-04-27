@@ -553,3 +553,108 @@ class TestHeartbeatTracking:
 
         # Connection should have been removed
         assert ws not in manager.active_connections
+
+
+class TestHeartbeatMessageTypeHandling:
+    """Test server handling of different heartbeat message types (D-06/D-14)."""
+
+    @pytest.mark.asyncio
+    async def test_pong_message_records_pong(self):
+        """收到 {"type":"pong"} 时调用 record_pong (D-14)."""
+        manager = ConnectionManager()
+        ws = AsyncMock()
+        ws.accept = AsyncMock()
+        ws.send_json = AsyncMock()
+        await manager.connect(ws)
+
+        # Simulate pong received
+        manager.record_pong(ws)
+        assert not manager.is_pong_expired(ws)
+
+    @pytest.mark.asyncio
+    async def test_heartbeat_message_records_pong(self):
+        """收到 {"type":"heartbeat"} 时也应 record_pong (D-06 兼容)."""
+        manager = ConnectionManager()
+        ws = AsyncMock()
+        ws.accept = AsyncMock()
+        ws.send_json = AsyncMock()
+        await manager.connect(ws)
+
+        # 模拟 heartbeat 消息到达后服务端 record_pong
+        manager.record_pong(ws)
+        assert not manager.is_pong_expired(ws)
+
+    @pytest.mark.asyncio
+    async def test_heartbeat_timeout_with_no_pong(self):
+        """无 pong 响应时心跳超时断连 (D-14)."""
+        manager = ConnectionManager()
+        manager.HEARTBEAT_INTERVAL = 0.05  # 极短间隔加速测试
+        manager.HEARTBEAT_TIMEOUT = 0.1
+        ws = AsyncMock()
+        ws.send_json = AsyncMock()
+        ws.close = AsyncMock()
+        manager.active_connections.add(ws)
+        # 设置过期 pong 时间戳
+        manager._last_pong[ws] = time.monotonic() - 1.0
+
+        task = asyncio.create_task(manager.heartbeat(ws))
+        await asyncio.sleep(0.2)
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+        ws.close.assert_called()
+        assert ws not in manager.active_connections
+
+    @pytest.mark.asyncio
+    async def test_pong_resets_timeout_clock(self):
+        """pong 到达后超时计时重置，连接不会被误判超时 (D-14)."""
+        manager = ConnectionManager()
+        manager.HEARTBEAT_INTERVAL = 0.1
+        manager.HEARTBEAT_TIMEOUT = 0.3
+        ws = AsyncMock()
+        ws.send_json = AsyncMock()
+        ws.close = AsyncMock()
+        manager.active_connections.add(ws)
+        manager._last_pong[ws] = time.monotonic() - 0.2  # 接近超时
+
+        # 先发送 ping，心跳检查 pong 未过期（因为还差一点）
+        # 但立即 record_pong 重置计时
+        manager.record_pong(ws)
+
+        task = asyncio.create_task(manager.heartbeat(ws))
+        await asyncio.sleep(0.15)
+        # 在超时前再次 record_pong
+        manager.record_pong(ws)
+        await asyncio.sleep(0.15)
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+        # 不应关闭连接
+        ws.close.assert_not_called()
+        assert ws in manager.active_connections
+
+    @pytest.mark.asyncio
+    async def test_heartbeat_task_cancellation_cleans_up(self):
+        """心跳任务取消时正常退出，不抛异常 (D-14)."""
+        manager = ConnectionManager()
+        manager.HEARTBEAT_INTERVAL = 10
+        ws = AsyncMock()
+        ws.send_json = AsyncMock()
+        manager.active_connections.add(ws)
+        manager._last_pong[ws] = time.monotonic()
+
+        task = asyncio.create_task(manager.heartbeat(ws))
+        await asyncio.sleep(0.05)
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+        assert ws in manager.active_connections

@@ -30,6 +30,7 @@ import com.drama.app.ui.components.ActorEmphasizeColor
 import com.drama.app.ui.components.MarkdownConfig
 import com.drama.app.ui.components.MarkdownText
 import com.drama.app.ui.components.ParagraphSpacing
+import com.drama.app.ui.components.TypewriterMarkdownText
 import com.drama.app.ui.components.QuoteStyle
 import com.drama.app.ui.theme.ActorPalette
 
@@ -57,7 +58,7 @@ fun DialogueBubble(bubble: SceneBubble.Dialogue) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 12.dp, end = 48.dp, top = 6.dp, bottom = 2.dp),
+            .padding(start = 12.dp, end = 48.dp, top = 4.dp, bottom = 2.dp),
         verticalAlignment = Alignment.Top,
     ) {
         // ★ 角色头像 - 36dp 圆形渐变背景
@@ -174,7 +175,8 @@ fun DialogueBubble(bubble: SceneBubble.Dialogue) {
                     ),
                 )
 
-                MarkdownText(
+                TypewriterMarkdownText(
+                    id = bubble.id,
                     markdown = bubble.text,
                     style = MaterialTheme.typography.bodyLarge.copy(
                         lineHeight = 24.sp,
@@ -182,6 +184,7 @@ fun DialogueBubble(bubble: SceneBubble.Dialogue) {
                     ),
                     config = markdownConfig,
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                    typingSpeedMs = 18L,
                 )
             }
         }
@@ -199,7 +202,7 @@ fun RealtimeDialogueBubble(actorName: String, text: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 12.dp, end = 48.dp, top = 6.dp, bottom = 2.dp),
+            .padding(start = 12.dp, end = 48.dp, top = 4.dp, bottom = 2.dp),
         verticalAlignment = Alignment.Top,
     ) {
         // 角色头像

@@ -302,12 +302,14 @@ async def chat_message(
     """
     async with lock:
         _require_active_drama(tool_context)
+        # ★ D-22-03: 注入发送者标识 — 非"导演"时在消息前标注 [sender_name]
+        sender_prefix = f"[{body.sender_name}]" if body.sender_name != "导演" else ""
         if body.mention:
-            # @提及 → /speak 角色名 情境
-            msg = f"/speak {body.mention} {body.message}"
+            # @提及 → /speak 角色名 情境（含发送者标识）
+            msg = f"/speak {body.mention} {sender_prefix}{body.message}".strip()
         else:
-            # 群消息 → /action（用户以主角身份行动）
-            msg = f"/action {body.message}"
+            # 群消息 → /action（含发送者标识）
+            msg = f"/action {sender_prefix}{body.message}".strip()
         result = await run_command_and_collect(
             runner, msg, USER_ID, SESSION_ID,
             event_callback=_get_event_callback(req),

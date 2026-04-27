@@ -153,11 +153,15 @@ Plans:
 **Requirements:** WS-05, APP-04, APP-15
 **Gap Closure:** Closes CRITICAL Gap 1 (WS Heartbeat Pong Missing)
 **Depends on:** Phase 14, Phase 18
+**Plans:** 1 plan
 **Success Criteria:**
 1. Android WebSocketManager 收到 `{"type":"ping"}` 后立即发送 `{"type":"pong"}`
 2. WS 连接持续稳定 >5 分钟无断连（无心跳超时）
 3. 自动重连后 replay buffer 正确消费，无事件丢失
 4. 心跳超时恢复后 DramaDetailScreen 实时渲染恢复正常
+
+Plans:
+- [x] 19-01-PLAN.md — 客户端JSON解析替换字符串匹配 + 移除自定义心跳死代码 + 服务端heartbeat处理 + 生命周期测试 ✅
 
 ### Phase 20: 命令与 API 接线修复
 
@@ -165,24 +169,56 @@ Plans:
 **Requirements:** APP-05, API-02 (partial)
 **Gap Closure:** Closes CRITICAL Gap 2 (isProcessing Never Resets) + HIGH Gap 3 (4 API Endpoints Unwired)
 **Depends on:** Phase 17, Phase 18, Phase 19
+**Plans:** 1/1 complete* (code verified, no formal PLAN/SUMMARY document)
 **Success Criteria:**
-1. DramaDetailViewModel.sendCommand() 成功路径重置 isProcessing = false
-2. CommandType 枚举添加 STEER/AUTO/STORM，路由到正确 API 端点
-3. DramaRepository 添加 steerDrama()/autoAdvanceDrama()/stormDrama() 方法
-4. 命令端到端流程：/next → /action → /steer → /auto → /storm → /speak → /end 全部可执行
-5. 成功发送命令后输入栏立即可用，无永久禁用
+1. DramaDetailViewModel.sendCommand() 成功路径重置 isProcessing = false ✅
+2. CommandType 枚举添加 STEER/AUTO/STORM，路由到正确 API 端点 ✅
+3. DramaRepository 添加 steerDrama()/autoAdvanceDrama()/stormDrama() 方法 ✅
+4. 命令端到端流程：/next → /action → /steer → /auto → /storm → /speak → /end 全部可执行 ✅
+5. 成功发送命令后输入栏立即可用，无永久禁用 ✅
+
+*\* Phase 20 changes were implemented during Phase 22/23 refactoring but never formally tracked with PLAN/SUMMARY docs. Codebase audit on 2026-04-26 confirmed all success criteria met.*
 
 ### Phase 21: 事件处理与 Export 补全
 
-**Goal:** 补全5种被忽略的 WS 事件类型处理，完成剧本导出功能（Repository + ViewModel + UI）
+**Goal:** 补全3种缺失的 WS 事件类型处理（status/actor_status/progress），完成剧本导出功能（后端返回 content + Repository + ViewModel + Share Intent UI）
 **Requirements:** WS-02, APP-09
-**Gap Closure:** Closes HIGH Gap (5 WS Event Types Unhandled) + APP-09 (Export Incomplete)
+**Gap Closure:** Closes HIGH Gap (3 WS Event Types Unhandled) + APP-09 (Export Incomplete)
 **Depends on:** Phase 19, Phase 20
+**Plans:** 1/1 plan complete
 **Success Criteria:**
-1. Android ViewModel 正确处理 status/actor_status/actor_created/cast_update/progress 5种事件
-2. DramaRepository.exportDramaContent() 调用后端 /export 端点并返回 Markdown 内容
-3. DramaDetailViewModel 包含 export action + loading/success/error 状态管理
-4. DramaDetailScreen overflow menu 包含 Export 按钮，触发 Android Share Intent 分享
+1. Android ViewModel 正确处理 status/actor_status/progress 3种缺失事件（actor_created/cast_update 已在 Phase 18 处理）
+2. 后端 ExportResponse 包含 content 字段，DramaRepository.exportDrama() 返回含 Markdown 内容的响应
+3. DramaDetailViewModel 包含 exportDrama() action + isExporting 状态管理
+4. DramaDetailScreen overflow menu 包含"导出"按钮，触发 Android Share Intent 分享
+
+Plans:
+- [x] 21-01-PLAN.md — 后端 ExportResponse 添加 content + Android 3 事件处理 + Export Repository/ViewModel/Screen 接线
+
+---
+
+## v2.5 技术债务治理 (Phase 23)
+
+**Goal:** 治理Android客户端全面技术评估发现的17个问题，按P0→P1→P2/P3优先级推进
+
+### Phase 23: Android 技术债务治理
+
+**Goal:** 拆分巨型ViewModel、统一WS生命周期、启用代码混淆、修复安全隐患、补全测试覆盖
+**Requirements:** ARCH-01~ARCH-17 (技术评估发现)
+**Depends on:** Phase 19, Phase 20, Phase 21, Phase 22
+**Success Criteria:**
+1. DramaDetailViewModel拆分为5个子组件，单文件<400行
+2. WebSocketManager连接生命周期由ConnectionLifecycleOwner统一管理，无VM间泄露
+3. Release构建启用R8混淆，APK类名/方法名不可读
+4. BaseUrlInterceptor替代runBlocking，切换服务器无需重启
+5. 核心业务逻辑单元测试覆盖率>60%
+6. usesCleartextTraffic=false + network_security_config仅放行本地开发
+7. SingleSourceOfTruth统一REST/WS数据源，消除UI闪烁
+
+Plans:
+- [x] 23-01-PLAN.md — P0歼灭战：VM拆分 + WS生命周期统一 + R8混淆 ✅
+- [x] 23-02-PLAN.md — P1阵地战：动态BaseUrl + 测试覆盖 + 安全加固 + 数据源统一 ✅
+- [x] 23-03-PLAN.md — P2/P3扫荡战：测试补全 ✅
 
 ---
 
@@ -196,17 +232,17 @@ Plans:
 **Requirements:** CHAT-01~CHAT-08
 **Depends on:** Phase 17, Phase 18
 **Success Criteria:**
-1. 用户在输入框发消息，显示为右对齐用户气泡
-2. 输入 @ 弹出角色选择器，选择后 @角色名 插入输入框
-3. @角色 发送消息 → 路由到 /speak，角色回复显示为左对齐气泡
-4. 不 @ 发送消息 → 路由到 /action（群消息）
-5. /next /end 保留为底部快捷按钮
-6. 角色可主动发言（WS 推送 actor_chime_in 事件）
-7. 体验为"和角色们群聊"，而非"导演下指令"
+1. 用户在输入框发消息，显示为右对齐用户气泡 ✅
+2. 输入 @ 弹出角色选择器，选择后 @角色名 插入输入框 ✅
+3. @角色 发送消息 → 路由到 /speak，角色回复显示为左对齐气泡 ✅
+4. 不 @ 发送消息 → 路由到 /action（群消息） ✅
+5. /next /end 保留为底部快捷芯片按钮 ✅
+6. 角色可主动发言（WS 推送 actor_chime_in 事件） ✅
+7. 斜杠命令下拉仅展示功能性命令 ✅
+8. 后端 ChatRequest 包含 sender_name ✅
 
 Plans:
-- [ ] 22-01-PLAN.md — Android群聊UI改造 + @提及 + 用户消息气泡 + 输入框重构
-- [ ] 22-02-PLAN.md — 后端 /drama/chat API + 角色主动插话机制
+- [x] 22-01-PLAN.md — ChatInputBar清理斜杠命令+快捷芯片 + 后端sender_name注入 + 删除旧CommandInputBar ✅
 
 ---
 
@@ -259,13 +295,15 @@ Phase 16 (Android Foundation) ──── Phase 17 (Android Interaction) ──
 | 16. Android Foundation | v2.0 | 3/3 | Complete    | 2026-04-16 |
 | 17. Android Interaction | v2.0 | 3/3 | Complete    | 2026-04-16 |
 | 18. Android Features | v2.0 | 3/3 | Complete    | 2026-04-16 |
-| 19. WS Heartbeat Fix | v2.0-gap | 0/1 | Pending | — |
-| 20. Command & API Wiring Fix | v2.0-gap | 0/1 | Pending | — |
-| 21. Events & Export Completion | v2.0-gap | 0/1 | Pending | — |
-| 22. 群聊模式改造 | v3.0 | 0/2 | In Progress | — |
+| 19. WS Heartbeat Fix | v2.0-gap | 1/1 | Complete | 2026-04-25 |
+| 20. Command & API Wiring Fix | v2.0-gap | 1/1 | Complete* | 2026-04-26 |
+| 21. Events & Export Completion | v2.0-gap | 1/1 | Complete | 2026-04-26 |
+| 22. 群聊模式改造 | v3.0 | 1/1 | Complete | 2026-04-26 |
+| 23. Android技术债务治理 | v2.5 | 3/3 | Complete | 2026-04-26 |
 
 ---
 
 *Roadmap reorganized: 2026-04-14 after v1.0 milestone completion*
 *v2.0 phases added: 2026-04-14*
 *v2.0 gap closure phases 19-21 added: 2026-04-16*
+*v2.5 tech debt phase 23 added: 2026-04-25*

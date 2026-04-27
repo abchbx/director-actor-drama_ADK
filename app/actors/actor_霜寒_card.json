@@ -1,0 +1,26 @@
+{
+  "name": "actor_霜寒",
+  "description": "演员 霜寒，角色：对立者",
+  "url": "http://localhost:9086/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_霜寒",
+      "name": "扮演霜寒",
+      "description": "以霜寒的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

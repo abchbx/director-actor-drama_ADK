@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- D-23-14: Release 配置 — 关闭明文 HTTP + 仅白名单本地调试域名 -->
+<!-- 注意：domain-config 不支持 CIDR（如 192.168.0.0/16），参见 RESEARCH.md Pitfall 4 -->
+<!-- LAN 开发使用 Debug 构建（network_security_config_debug.xml 允许明文） -->
+<network-security-config>
+    <!-- 默认配置：禁止明文流量 -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- 仅允许本地开发环境的明文通信 -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">10.0.2.2</domain>  <!-- Android 模拟器 → 宿主机 -->
+        <domain includeSubdomains="true">localhost</domain>   <!-- 本地回环 -->
+        <domain includeSubdomains="true">127.0.0.1</domain>  <!-- 本地回环 -->
+    </domain-config>
+</network-security-config>

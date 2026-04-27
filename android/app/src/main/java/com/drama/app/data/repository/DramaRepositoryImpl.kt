@@ -7,6 +7,11 @@ import com.drama.app.data.remote.dto.CommandResponseDto
 import com.drama.app.data.remote.dto.LoadRequestDto
 import com.drama.app.data.remote.dto.SaveRequestDto
 import com.drama.app.data.remote.dto.SpeakRequestDto
+import com.drama.app.data.remote.dto.SteerRequestDto
+import com.drama.app.data.remote.dto.AutoRequestDto
+import com.drama.app.data.remote.dto.StormRequestDto
+import com.drama.app.data.remote.dto.ExportRequestDto
+import com.drama.app.data.remote.dto.ExportResponseDto
 import com.drama.app.data.remote.dto.StartDramaRequestDto
 import com.drama.app.domain.model.ActorInfo
 import com.drama.app.domain.model.Drama
@@ -76,6 +81,26 @@ class DramaRepositoryImpl @Inject constructor(
             dramaApiService.endDrama()
         }
 
+    override suspend fun steerDrama(direction: String): Result<CommandResponseDto> =
+        runCatching {
+            dramaApiService.steerDrama(SteerRequestDto(direction))
+        }
+
+    override suspend fun autoAdvanceDrama(numScenes: Int): Result<CommandResponseDto> =
+        runCatching {
+            dramaApiService.autoAdvance(AutoRequestDto(numScenes))
+        }
+
+    override suspend fun stormDrama(focus: String?): Result<CommandResponseDto> =
+        runCatching {
+            dramaApiService.triggerStorm(StormRequestDto(focus))
+        }
+
+    override suspend fun exportDrama(format: String): Result<ExportResponseDto> =
+        runCatching {
+            dramaApiService.exportDrama(ExportRequestDto(format))
+        }
+
     override suspend fun getScenes(): Result<com.drama.app.data.remote.dto.ScenesResponseDto> =
         runCatching {
             dramaApiService.getDramaScenes()
@@ -127,8 +152,18 @@ class DramaRepositoryImpl @Inject constructor(
         }
 
     override suspend fun getMergedCast(): Result<List<ActorInfo>> = runCatching {
-        val cast = dramaApiService.getCast()
-        val status = dramaApiService.getCastStatus()
+        val cast = try {
+            dramaApiService.getCast()
+        } catch (e: Exception) {
+            // /drama/cast 可能因 drama 未初始化而 404 — 返回空列表而非失败
+            return Result.success(emptyList())
+        }
+        // 容错：cast/status 失败不影响 cast 数据展示
+        val status = try {
+            dramaApiService.getCastStatus()
+        } catch (e: Exception) {
+            com.drama.app.data.remote.dto.CastStatusResponseDto()
+        }
         mergeCastWithStatus(cast, status)
     }
 

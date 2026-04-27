@@ -1,5 +1,6 @@
 """Tests for WebSocket lifecycle: replay buffer, reconnect, connection limit, slow clients."""
 
+import asyncio
 import time
 
 import pytest
@@ -207,3 +208,96 @@ class TestSlowClientRemoval:
         # Verify replay_buffer has the event after broadcast
         await manager.broadcast(event)
         assert list(manager.replay_buffer) == [event]
+
+
+class TestHeartbeatRecoveryLifecycle:
+    """Test heartbeat timeout → disconnect → reconnect lifecycle (WS-05, APP-15)."""
+
+    @pytest.mark.asyncio
+    async def test_reconnect_receives_replay_after_heartbeat_timeout(self):
+        """心跳超时断连后重连，replay buffer 自动补发 (WS-05, APP-15)."""
+        manager = ConnectionManager()
+
+        # 客户端 A 连接
+        ws_a = AsyncMock()
+        ws_a.accept = AsyncMock()
+        ws_a.send_json = AsyncMock()
+        await manager.connect(ws_a)
+
+        # 广播一些事件
+        for i in range(5):
+            await manager.broadcast({"type": f"event_{i}", "data": {}})
+
+        # 心跳超时断连
+        manager._last_pong[ws_a] = time.monotonic() - manager.HEARTBEAT_TIMEOUT - 1
+        manager.disconnect(ws_a)
+
+        # 客户端 B（重连）连接
+        ws_b = AsyncMock()
+        ws_b.accept = AsyncMock()
+        ws_b.send_json = AsyncMock()
+        await manager.connect(ws_b)
+
+        # 验证 B 收到 replay 包含所有 5 个事件
+        ws_b.send_json.assert_called_once()
+        sent_data = ws_b.send_json.call_args[0][0]
+        assert sent_data["type"] == "replay"
+        assert len(sent_data["events"]) == 5
+
+    @pytest.mark.asyncio
+    async def test_pong_keeps_connection_alive_through_multiple_cycles(self):
+        """持续 pong 响应使连接在多轮心跳中保持存活 (WS-05)."""
+        manager = ConnectionManager()
+        manager.HEARTBEAT_INTERVAL = 0.05
+        manager.HEARTBEAT_TIMEOUT = 0.15
+        ws = AsyncMock()
+        ws.send_json = AsyncMock()
+        ws.close = AsyncMock()
+        manager.active_connections.add(ws)
+        manager._last_pong[ws] = time.monotonic()
+
+        task = asyncio.create_task(manager.heartbeat(ws))
+
+        # 模拟 3 轮心跳，每轮在超时前 record_pong
+        for _ in range(3):
+            await asyncio.sleep(0.08)  # 等待 ping 发出
+            manager.record_pong(ws)     # 模拟客户端 pong
+
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+        # 连接应仍然存活
+        ws.close.assert_not_called()
+        assert ws in manager.active_connections
+
+    @pytest.mark.asyncio
+    async def test_replay_buffer_no_event_loss_on_reconnect(self):
+        """重连后 replay buffer 无事件丢失 (APP-15)."""
+        manager = ConnectionManager()
+
+        # 广播 10 个事件
+        for i in range(10):
+            await manager.broadcast({"type": f"event_{i}", "data": {}})
+
+        # 断连
+        ws_a = AsyncMock()
+        ws_a.accept = AsyncMock()
+        ws_a.send_json = AsyncMock()
+        await manager.connect(ws_a)
+        manager.disconnect(ws_a)
+
+        # 重连
+        ws_b = AsyncMock()
+        ws_b.accept = AsyncMock()
+        ws_b.send_json = AsyncMock()
+        await manager.connect(ws_b)
+
+        sent_data = ws_b.send_json.call_args[0][0]
+        assert sent_data["type"] == "replay"
+        assert len(sent_data["events"]) == 10
+        # 验证事件顺序正确
+        for i in range(10):
+            assert sent_data["events"][i]["type"] == f"event_{i}"

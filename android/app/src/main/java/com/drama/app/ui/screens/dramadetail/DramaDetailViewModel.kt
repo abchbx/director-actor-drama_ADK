@@ -57,6 +57,8 @@ data class DramaDetailUiState(
     val typingText: String = "AI 正在思考...",
     val isProcessing: Boolean = false,
     val stormPhase: String? = null,
+    val isExporting: Boolean = false,
+    val typingElapsedSeconds: Int = 0,
 
     // === ★ 主角模式 ===
     val protagonistName: String = "主角",
@@ -99,6 +101,8 @@ sealed class DramaDetailEvent {
     data class ShowSnackbar(val message: String) : DramaDetailEvent()
     /** ★ 触觉反馈事件 — AI 回合开始时触发，提示用户后端已开始响应 */
     data object HapticFeedback : DramaDetailEvent()
+    /** ★ 导出分享事件 */
+    data class ShareExport(val title: String, val content: String) : DramaDetailEvent()
 }
 
 @HiltViewModel
@@ -421,6 +425,18 @@ class DramaDetailViewModel @Inject constructor(
         return text.replace("\\n", "\n\n")
     }
 
+    /**
+     * ★ 群聊样式：将多段文本按段落拆分为独立气泡列表。
+     *
+     * 后端返回的 narration/dialogue 常常是一大段混合文本（多段环境描写 + 角色台词挤在一起），
+     * 前端按 \n\n（Markdown 段落分隔符）拆分为多条短消息，让界面呈现出群聊一条一条交替的效果。
+     */
+    private fun splitParagraphs(text: String): List<String> {
+        return text.split("\n\n")
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+    }
+
     private fun handleWsEvent(event: WsEventDto) {
         if (event.type == "replay") return
 
@@ -462,24 +478,29 @@ class DramaDetailViewModel @Inject constructor(
                     return
                 }
 
-                // ★ 防御性去重：跳过与上一个旁白气泡完全相同的重复推送
+                _uiState.update { it.copy(isTyping = false, stormPhase = null) }
+                val normalizedText = normalizeLineBreaks(text)
+                val paragraphs = splitParagraphs(normalizedText)
+
+                if (paragraphs.isEmpty()) return
+
+                // ★ 防御性去重：若整段与上一个旁白气泡完全相同，跳过
                 val lastBubble = _uiState.value.bubbles.lastOrNull()
-                if (lastBubble is SceneBubble.Narration && lastBubble.text == normalizeLineBreaks(text)) {
+                if (lastBubble is SceneBubble.Narration && lastBubble.text == normalizedText) {
                     return
                 }
 
-                _uiState.update { it.copy(isTyping = false, stormPhase = null) }
-                val normalizedText = normalizeLineBreaks(text)
-                if (normalizedText.isNotBlank()) {
-                    val bubble = SceneBubble.Narration(
+                // ★ 群聊样式：多段落拆分为多个独立旁白气泡
+                val newBubbles = paragraphs.map { paragraph ->
+                    SceneBubble.Narration(
                         id = "b_${bubbleCounter++}",
-                        text = normalizedText,
+                        text = paragraph,
                         avatarType = SceneBubble.AvatarType.DIRECTOR,
                         senderType = SceneBubble.SenderType.DIRECTOR,
                         senderName = senderName,
                     )
-                    _uiState.update { it.copy(bubbles = it.bubbles + bubble, typingText = "AI 正在思考...") }
                 }
+                _uiState.update { it.copy(bubbles = it.bubbles + newBubbles, typingText = "AI 正在思考...") }
             }
 
             "dialogue" -> {
@@ -519,16 +540,20 @@ class DramaDetailViewModel @Inject constructor(
                 if (interactionBubble != null) {
                     _uiState.update { it.copy(bubbles = it.bubbles + interactionBubble) }
                 } else {
-                    val bubble = SceneBubble.Dialogue(
-                        id = "b_${bubbleCounter++}",
-                        actorName = actorName,
-                        text = normalizedText,
-                        emotion = emotion,
-                        avatarType = SceneBubble.AvatarType.ACTOR,
-                        senderType = SceneBubble.SenderType.ACTOR,
-                        senderName = senderName,
-                    )
-                    _uiState.update { it.copy(bubbles = it.bubbles + bubble) }
+                    // ★ 群聊样式：多段落拆分为多个独立对话气泡
+                    val paragraphs = splitParagraphs(normalizedText)
+                    val newBubbles = paragraphs.map { paragraph ->
+                        SceneBubble.Dialogue(
+                            id = "b_${bubbleCounter++}",
+                            actorName = actorName,
+                            text = paragraph,
+                            emotion = emotion,
+                            avatarType = SceneBubble.AvatarType.ACTOR,
+                            senderType = SceneBubble.SenderType.ACTOR,
+                            senderName = senderName,
+                        )
+                    }
+                    _uiState.update { it.copy(bubbles = it.bubbles + newBubbles) }
                 }
             }
 
@@ -637,15 +662,19 @@ class DramaDetailViewModel @Inject constructor(
                 if (interactionBubble != null) {
                     _uiState.update { it.copy(bubbles = it.bubbles + interactionBubble) }
                 } else {
-                    val bubble = SceneBubble.Dialogue(
-                        id = "chime_${bubbleCounter++}",
-                        actorName = actorName,
-                        text = normalizedText,
-                        avatarType = SceneBubble.AvatarType.ACTOR,
-                        senderType = SceneBubble.SenderType.ACTOR,
-                        senderName = senderName,
-                    )
-                    _uiState.update { it.copy(bubbles = it.bubbles + bubble) }
+                    // ★ 群聊样式：多段落拆分为多个独立插话气泡
+                    val paragraphs = splitParagraphs(normalizedText)
+                    val newBubbles = paragraphs.map { paragraph ->
+                        SceneBubble.Dialogue(
+                            id = "chime_${bubbleCounter++}",
+                            actorName = actorName,
+                            text = paragraph,
+                            avatarType = SceneBubble.AvatarType.ACTOR,
+                            senderType = SceneBubble.SenderType.ACTOR,
+                            senderName = senderName,
+                        )
+                    }
+                    _uiState.update { it.copy(bubbles = it.bubbles + newBubbles) }
                 }
             }
 
@@ -827,6 +856,23 @@ class DramaDetailViewModel @Inject constructor(
                     _events.emit(DramaDetailEvent.ShowSnackbar("保存失败：${e.message}"))
                 }
             _uiState.update { it.copy(showSaveDialog = false) }
+        }
+    }
+
+    /** 导出剧本为 Markdown 并触发系统分享 */
+    fun exportDrama() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isExporting = true) }
+            dramaRepository.exportDrama("markdown")
+                .onSuccess { resp ->
+                    val title = _uiState.value.theme.ifBlank { "剧本导出" }
+                    val content = resp.content.ifBlank { resp.message }
+                    _events.emit(DramaDetailEvent.ShareExport(title = title, content = content))
+                }
+                .onFailure { e ->
+                    _events.emit(DramaDetailEvent.ShowSnackbar("导出失败：${e.message}"))
+                }
+            _uiState.update { it.copy(isExporting = false) }
         }
     }
 
@@ -1129,6 +1175,11 @@ class DramaDetailViewModel @Inject constructor(
         connectWebSocket()
     }
 
+    /** ★ 前后台切换：通知 WebSocketManager 暂停/恢复重连 */
+    fun setWebSocketForeground(isForeground: Boolean) {
+        webSocketManager.setAppForeground(isForeground)
+    }
+
     // ============================================================
     // 命令发送
     // ============================================================
@@ -1231,6 +1282,9 @@ class DramaDetailViewModel @Inject constructor(
             }
             CommandType.SAVE, CommandType.LOAD, CommandType.LIST, CommandType.DELETE, CommandType.CAST ->
                 ""  // 本地存档命令已在上方处理，/cast 不显示用户气泡
+            CommandType.STEER -> text.removePrefix("/steer").trim()
+            CommandType.AUTO -> text.removePrefix("/auto").trim()
+            CommandType.STORM -> "/storm — 风暴模式"
             CommandType.FREE_TEXT -> text.trim()
         }
 
@@ -1289,6 +1343,9 @@ class DramaDetailViewModel @Inject constructor(
                 }
                 CommandType.SAVE, CommandType.LOAD, CommandType.LIST, CommandType.DELETE, CommandType.CAST ->
                     Result.success(CommandResponseDto())  // 不会到达此处
+                CommandType.STEER -> dramaRepository.steerDrama(text.removePrefix("/steer").trim())
+                CommandType.AUTO -> dramaRepository.autoAdvanceDrama()
+                CommandType.STORM -> dramaRepository.stormDrama()
                 CommandType.FREE_TEXT -> dramaRepository.userAction(text.trim())
             }
 

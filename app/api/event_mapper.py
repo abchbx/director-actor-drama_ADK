@@ -61,7 +61,7 @@ def _extract_call_data(event_type: str, function_call) -> dict:
     elif event_type == "status":
         return {"tool": function_call.name, "sender_type": "director", "sender_name": "旁白"}
     elif event_type == "narration":
-        content = args.get("content", args.get("text", ""))
+        content = args.get("content", args.get("text", args.get("narration", "")))
         return {"tool": function_call.name, "text": content, "sender_type": "director", "sender_name": "旁白"}
     elif event_type == "dialogue":
         return {
@@ -129,8 +129,8 @@ def _extract_response_data(event_type: str, response: dict) -> dict:
         actor_name = response.get("actor_name", "")
         return {
             "actor_name": actor_name,
-            "text": response.get("text", ""),
-            "emotion": response.get("emotion", ""),
+            "text": response.get("text", response.get("dialogue", "")),
+            "emotion": response.get("emotion", response.get("emotions", "")),
             "sender_type": "actor",
             "sender_name": actor_name,
         }
@@ -477,6 +477,36 @@ def map_runner_event(event: Event) -> list[dict]:
                             "type": "director_log",
                             "data": {
                                 "message": f"⚡ 批量对话完成: {len(batch_results)}人并行 {parallel_time}s (提速{speedup})",
+                                "tool": fn_name,
+                                "phase": "done",
+                                "timestamp": time.strftime("%H:%M:%S"),
+                            },
+                        })
+                # ★ actor_chime_in 特殊处理：展开 chime_ins 列表为多个独立 actor_chime_in 事件
+                elif fn_name == "actor_chime_in":
+                    chime_ins = resp.get("chime_ins", [])
+                    for chime in chime_ins:
+                        results.append({
+                            "type": "actor_chime_in",
+                            "data": _extract_response_data("dialogue", chime),
+                        })
+                    # 推送插话汇总 director_log
+                    if chime_ins:
+                        names = "、".join(c.get("actor_name", "?") for c in chime_ins[:3])
+                        results.append({
+                            "type": "director_log",
+                            "data": {
+                                "message": f"✅ 自发插话: {names} 等{len(chime_ins)}人反应",
+                                "tool": fn_name,
+                                "phase": "done",
+                                "timestamp": time.strftime("%H:%M:%S"),
+                            },
+                        })
+                    else:
+                        results.append({
+                            "type": "director_log",
+                            "data": {
+                                "message": "✅ 自发插话检测完毕: 无人插话",
                                 "tool": fn_name,
                                 "phase": "done",
                                 "timestamp": time.strftime("%H:%M:%S"),

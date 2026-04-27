@@ -2,15 +2,19 @@ package com.drama.app.di
 
 import android.content.Context
 import com.drama.app.data.local.SecureStorage
+import com.drama.app.data.local.ServerPreferences
 import com.drama.app.data.remote.api.AuthApiService
 import com.drama.app.data.remote.api.DramaApiService
 import com.drama.app.data.remote.interceptor.AuthInterceptor
+import com.drama.app.data.remote.interceptor.BaseUrlInterceptor
 import com.drama.app.data.remote.interceptor.NetworkExceptionInterceptor
 import com.drama.app.data.remote.ws.WebSocketManager
+import com.drama.app.BuildConfig
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.scopes.ActivityScoped
 import dagger.hilt.components.SingletonComponent
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
@@ -37,6 +41,12 @@ object NetworkModule {
 
     @Provides
     @Singleton
+    fun provideBaseUrlInterceptor(serverPreferences: ServerPreferences): BaseUrlInterceptor {
+        return BaseUrlInterceptor(serverPreferences)
+    }
+
+    @Provides
+    @Singleton
     fun provideAuthInterceptor(secureStorage: SecureStorage): AuthInterceptor {
         return AuthInterceptor(secureStorage)
     }
@@ -44,38 +54,40 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideOkHttpClient(
+        baseUrlInterceptor: BaseUrlInterceptor,
         authInterceptor: AuthInterceptor,
         networkExceptionInterceptor: NetworkExceptionInterceptor,
     ): OkHttpClient {
-        val loggingInterceptor = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
-            // 安全加固：redact Authorization header，防止明文 token 泄露到日志
-            redactHeader("Authorization")
-        }
         return OkHttpClient.Builder()
+            .addInterceptor(baseUrlInterceptor)           // D-23-10: 动态 BaseUrl
             .addInterceptor(authInterceptor)
             .addInterceptor(networkExceptionInterceptor)
-            .addInterceptor(loggingInterceptor)
-            .connectTimeout(15, TimeUnit.SECONDS)
+            .apply {
+                // D-23-15: HttpLoggingInterceptor 仅在 DEBUG 时注入
+                if (BuildConfig.DEBUG) {
+                    val loggingInterceptor = HttpLoggingInterceptor().apply {
+                        level = HttpLoggingInterceptor.Level.BODY
+                        redactHeader("Authorization")
+                    }
+                    addInterceptor(loggingInterceptor)
+                }
+            }
+            .connectTimeout(30, TimeUnit.SECONDS)  // Cloud servers may need cold-start time
             .readTimeout(300, TimeUnit.SECONDS)  // LLM calls can take minutes
             .writeTimeout(30, TimeUnit.SECONDS)
-            .pingInterval(30, TimeUnit.SECONDS)  // WebSocket Ping/Pong 心跳保活
+            .pingInterval(60, TimeUnit.SECONDS)  // TCP keepalive; app-level heartbeat at 15s is authoritative
             .build()
     }
 
-    // Pitfall 1: Retrofit baseUrl 在构建时固定，无法运行时修改
-    // 从 DataStore 读取上次连接的 IP:port 构建 baseUrl
-    // 当用户切换服务器时，需要重启 Activity 让 Hilt 重建 DI graph
+    // D-23-10: BaseUrlInterceptor 动态替换 URL，Retrofit baseUrl 仅作初始占位
     @Provides
     @Singleton
     fun provideRetrofit(
         okHttpClient: OkHttpClient,
         json: Json,
-        serverPreferences: com.drama.app.data.local.ServerPreferences,
+        serverPreferences: ServerPreferences,
     ): Retrofit {
-        val config = runBlocking { serverPreferences.serverConfig.first() }
-        val baseUrl = config?.toApiBaseUrl()
-            ?: "http://127.0.0.1:8000/api/v1/"  // 占位，首次启动未连接时
+        val baseUrl = serverPreferences.currentApiBaseUrl()
         return Retrofit.Builder()
             .baseUrl(baseUrl)
             .client(okHttpClient)
@@ -92,14 +104,24 @@ object NetworkModule {
     // AuthApiService not provided as Singleton here — AuthRepositoryImpl
     // builds temporary Retrofit instances for verification before connection is established.
     // The Hilt-provided AuthApiService is available for post-connection use if needed.
+}
 
+/**
+ * D-23-05: WebSocketModule — 独立 Module，@InstallIn(ActivityComponent::class)
+ * WebSocketManager 从 @Singleton 降级为 @ActivityScoped，连接跟随页面生命周期。
+ * D-23-06: 多 VM 通过 acquire/release 引用计数共享连接。
+ */
+@Module
+@InstallIn(dagger.hilt.android.components.ActivityComponent::class)
+object WebSocketModule {
+
+    @ActivityScoped
     @Provides
-    @Singleton
     fun provideWebSocketManager(
-        okHttpClient: OkHttpClient,
         json: Json,
         @ApplicationContext context: Context,
+        okHttpClient: OkHttpClient,
     ): WebSocketManager {
-        return WebSocketManager(okHttpClient, json, context)
+        return WebSocketManager(json, context, okHttpClient)
     }
 }

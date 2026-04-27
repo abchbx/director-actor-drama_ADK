@@ -1,0 +1,26 @@
+{
+  "name": "actor_苏璃",
+  "description": "演员 苏璃，角色：幽灵/前房客",
+  "url": "http://localhost:9057/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_苏璃",
+      "name": "扮演苏璃",
+      "description": "以苏璃的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

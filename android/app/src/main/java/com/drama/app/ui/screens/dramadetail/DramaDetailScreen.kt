@@ -87,8 +87,10 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.TheaterComedy
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import android.view.HapticFeedbackConstants
+import android.content.Intent
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.runtime.CompositionLocalProvider
 import com.drama.app.data.remote.ws.ConnectionState
@@ -119,14 +121,42 @@ fun DramaDetailScreen(
         }
     }
 
+    // === ★ 前后台感知：暂停后台重连，切前台立即恢复 ===
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            when (event) {
+                androidx.lifecycle.Lifecycle.Event.ON_RESUME ->
+                    viewModel.setWebSocketForeground(true)
+                androidx.lifecycle.Lifecycle.Event.ON_PAUSE ->
+                    viewModel.setWebSocketForeground(false)
+                else -> { /* ignore */ }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     // === 断连时显示 Snackbar 提示"重试" ===
     LaunchedEffect(uiState.connectionState) {
-        if (uiState.connectionState is ConnectionState.Disconnected
+        val state = uiState.connectionState
+        if ((state is ConnectionState.Disconnected || state is ConnectionState.Failed)
             && !uiState.initialSyncing
             && uiState.initError == null
         ) {
+            val message = when {
+                state is ConnectionState.Failed && state.isAuthError ->
+                    "WebSocket 认证失败，请检查 Token 配置后重试"
+                state is ConnectionState.Failed && state.isConnectionRefused ->
+                    "无法连接服务器，请确认服务器正在运行后重试"
+                state is ConnectionState.Failed && state.code == 1013 ->
+                    "服务器连接数已满，请稍后重试"
+                else -> "连接已断开，请重新进入或检查网络"
+            }
             val result = snackbarHostState.showSnackbar(
-                message = "连接已断开，请重新进入或检查网络",
+                message = message,
                 actionLabel = "重试",
                 duration = androidx.compose.material3.SnackbarDuration.Indefinite,
             )
@@ -138,6 +168,7 @@ fun DramaDetailScreen(
 
     // 收集一次性事件
     val view = LocalView.current
+    val context = LocalContext.current
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
@@ -146,6 +177,14 @@ fun DramaDetailScreen(
                 // ★ AI 回合开始时触发触觉反馈
                 is DramaDetailEvent.HapticFeedback ->
                     view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                is DramaDetailEvent.ShareExport -> {
+                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/markdown"
+                        putExtra(Intent.EXTRA_SUBJECT, event.title)
+                        putExtra(Intent.EXTRA_TEXT, event.content)
+                    }
+                    context.startActivity(Intent.createChooser(shareIntent, "分享剧本"))
+                }
             }
         }
     }
@@ -290,6 +329,14 @@ fun DramaDetailScreen(
                                         showOverflowMenu = false
                                     },
                                 )
+                                DropdownMenuItem(
+                                    text = { Text("导出") },
+                                    onClick = {
+                                        viewModel.exportDrama()
+                                        showOverflowMenu = false
+                                    },
+                                    enabled = !uiState.isExporting,
+                                )
                             }
                         }
                     },
@@ -319,6 +366,7 @@ fun DramaDetailScreen(
                                 bubbles = uiState.bubbles,
                                 isTyping = uiState.isTyping,
                                 typingText = uiState.typingText,
+                                typingElapsedSeconds = uiState.typingElapsedSeconds,
                             )
                         }
                     }
@@ -574,9 +622,9 @@ private fun ConnectionStateIndicator(
         }
     }
 
-    // === Disconnected：降级横幅（仅在初始同步完成后显示） ===
+    // === Disconnected/Failed：降级横幅（仅在初始同步完成后显示） ===
     AnimatedVisibility(
-        visible = connectionState is ConnectionState.Disconnected && !isInitialSyncing,
+        visible = (connectionState is ConnectionState.Disconnected || connectionState is ConnectionState.Failed) && !isInitialSyncing,
         enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(tween(200)),
         exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut(tween(200)),
     ) {
@@ -600,7 +648,15 @@ private fun ConnectionStateIndicator(
                 )
                 Spacer(modifier = Modifier.size(8.dp))
                 Text(
-                    text = "WebSocket 连接失败，已降级到 REST 轮询模式",
+                    text = when {
+                        connectionState is ConnectionState.Failed && connectionState.isAuthError ->
+                            "认证失败（Token 无效），已降级到 REST 轮询模式"
+                        connectionState is ConnectionState.Failed && connectionState.isConnectionRefused ->
+                            "服务器无法连接，已降级到 REST 轮询模式"
+                        connectionState is ConnectionState.Failed ->
+                            "WebSocket 连接失败，已降级到 REST 轮询模式"
+                        else -> "WebSocket 已断开，已降级到 REST 轮询模式"
+                    },
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onErrorContainer,
                 )

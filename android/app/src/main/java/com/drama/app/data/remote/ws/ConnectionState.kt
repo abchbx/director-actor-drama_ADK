@@ -21,4 +21,12 @@ sealed class ConnectionState {
         val retry: Int,
         val maxRetry: Int,
     ) : ConnectionState()
+
+    /** 连接失败，携带诊断信息供 UI 展示和用户排查 */
+    data class Failed(
+        val code: Int = 0,
+        val reason: String = "",
+        val isAuthError: Boolean = false,
+        val isConnectionRefused: Boolean = false,
+    ) : ConnectionState()
 }

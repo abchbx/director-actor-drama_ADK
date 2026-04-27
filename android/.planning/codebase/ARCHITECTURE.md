@@ -1,140 +1,158 @@
 # Architecture
 
-**Analysis Date:** 2026-04-25
+**Analysis Date:** 2026-04-27
 
 ## Pattern Overview
 
-**Overall:** Clean Architecture with MVVM (Model-ViewModel-View)
+**Overall:** Clean Architecture with MVVM (Hilt DI + Jetpack Compose)
 
 **Key Characteristics:**
-- Unidirectional data flow: ViewModel emits `StateFlow<UiState>` → Compose UI collects and renders
-- Sealed class hierarchy for message types (`SceneBubble`) enables exhaustive `when` dispatch
-- Dual data source strategy: WebSocket (primary) + REST polling (fallback/degradation)
-- Repository layer maps DTOs → domain models, encapsulating business logic (bubble mapping, cast merging)
-- Single Activity, Compose Navigation with type-safe routes (`@Serializable` objects/data classes)
+- Layered architecture: domain → data → ui, with clear separation
+- Dependency inversion via repository interfaces in domain layer
+- Unidirectional data flow: ViewModel → StateFlow → Composable
+- Network layer uses interceptor chain pattern for cross-cutting concerns
+- WebSocket uses reference-counted Activity-scoped lifecycle management
 
 ## Layers
 
-**UI Layer (Compose Screens + ViewModels):**
-- Purpose: Render UI state and handle user interactions
-- Location: `app/src/main/java/com/drama/app/ui/`
-- Contains: Screen composables, ViewModels, UI state classes, event sealed classes
-- Depends on: Domain layer (models, repositories, use cases), Data layer (ConnectionState)
-- Used by: Nothing — this is the top layer
-
-**Domain Layer (Models + Repository Interfaces + Use Cases):**
-- Purpose: Define business models and contracts
+**Domain Layer:**
+- Purpose: Business models, repository interfaces, use cases
 - Location: `app/src/main/java/com/drama/app/domain/`
-- Contains: `SceneBubble` sealed class, `ActorInfo`, `CommandType`, repository interfaces, `DetectActorInteractionUseCase`
+- Contains: Models (ServerConfig, ConnectionStatus, AuthMode, Drama, SceneBubble, ActorInfo, CommandType), Repository interfaces (DramaRepository, AuthRepository, ServerRepository), Use cases (DetectActorInteractionUseCase)
 - Depends on: Nothing (pure Kotlin)
-- Used by: UI layer, Data layer (implements interfaces)
+- Used by: Data layer (implementations), UI layer (ViewModels)
 
-**Data Layer (Repository Implementations + Remote/Local Data Sources):**
-- Purpose: Implement repository interfaces, manage API calls and local storage
+**Data Layer:**
+- Purpose: Data access, API communication, local persistence
 - Location: `app/src/main/java/com/drama/app/data/`
-- Contains: `DramaRepositoryImpl`, DTOs, `WebSocketManager`, `DramaSaveRepository`, API services
-- Depends on: Domain layer (implements interfaces), external libs (Retrofit, OkHttp, DataStore)
-- Used by: UI layer (via DI)
+- Contains: Repository implementations, API services, DTOs, interceptors, WebSocket manager, local storage (ServerPreferences, SecureStorage, DramaSaveRepository)
+- Depends on: Domain layer (interfaces), OkHttp, Retrofit, DataStore, Security-Crypto
+- Used by: UI layer (via repository interfaces)
 
-**DI Layer (Hilt Modules):**
-- Purpose: Provide dependency injection bindings
+**DI Layer:**
+- Purpose: Dependency injection configuration
 - Location: `app/src/main/java/com/drama/app/di/`
-- Contains: `NetworkModule`, `DramaModule`, `DataStoreModule`, `SavesDataStore`
-- Depends on: Data + Domain layers
+- Contains: Hilt modules (NetworkModule, DataStoreModule, DramaModule, WebSocketModule)
+- Depends on: All other layers (wiring)
+- Used by: Hilt runtime
+
+**UI Layer:**
+- Purpose: Screen rendering, user interaction, view state management
+- Location: `app/src/main/java/com/drama/app/ui/`
+- Contains: Screens (connection, drama create, drama detail), Components, Navigation, Theme
+- Depends on: Domain layer (via ViewModels), Compose framework
+- Used by: Android framework
 
 ## Data Flow
 
-**Chat Message Flow (WebSocket path — primary):**
+**REST API Call Flow:**
 
-1. User types message in `ChatInputBar` → calls `viewModel.sendChatMessage(text, mention)`
-2. ViewModel appends `SceneBubble.UserMessage` to `bubbles` list immediately (optimistic)
-3. ViewModel calls `dramaRepository.sendChatMessageAsBubbles(text, mention)` (REST POST)
-4. REST response bubbles are **discarded** when WS is connected (WS is the single source of truth)
-5. Server processes via ADK Runner → `event_mapper.py` maps tool calls to business events
-6. WebSocket pushes `WsEventDto` events (narration, dialogue, actor_chime_in, etc.)
-7. `WebSocketManager.events` Flow emits events → `handleWsEvent()` in ViewModel
-8. Each event type creates the appropriate `SceneBubble` subclass and appends to state
+1. ViewModel calls repository method
+2. Repository calls Retrofit `DramaApiService` method
+3. OkHttp interceptor chain executes:
+   a. `BaseUrlInterceptor` — replaces request URL scheme/host/port from `ServerPreferences`
+   b. `AuthInterceptor` — injects `Authorization: Bearer {token}` header from `SecureStorage`
+   c. `NetworkExceptionInterceptor` — catches network exceptions, converts to HTTP error responses
+   d. (Debug only) `HttpLoggingInterceptor` — logs request/response body
+4. Retrofit deserializes JSON response to DTOs
+5. Repository maps DTOs to domain models
+6. ViewModel updates StateFlow
+7. Composable recomposes
 
-**Chat Message Flow (REST fallback path — WS disconnected):**
+**WebSocket Connection Flow:**
 
-1. Same steps 1-3 as above
-2. REST response bubbles are **used** when WS is disconnected
-3. If REST response is empty, `startReplyPolling()` begins polling `getDramaStatus()` + `getSceneBubbles()`
-4. Polling continues for up to 20 attempts (1s interval) until new data appears
+1. `ConnectionOrchestrator.connect()` acquires reference on `WebSocketManager`
+2. Reads server config from `ServerPreferences`
+3. `WebSocketManager.connect()` builds WS URL (`ws://` or `wss://`) with token query param
+4. OkHttp creates WebSocket with `WebSocketListener` callbacks
+5. Server heartbeat: ping/pong messages (server sends `{"type":"ping"}`, client replies `{"type":"pong"}`)
+6. Events parsed from JSON → `WsEventDto` → emitted to `SharedFlow`
+7. `ConnectionOrchestrator` forwards events to ViewModel via `ConnectionEvent` sealed class
+8. Reconnection: exponential backoff (2s initial, 30s max, 10 retries max)
+9. Permanent failure → degrade to REST polling
 
-**WS Event → Bubble Mapping:**
+**Server Configuration Flow:**
 
-| WS Event Type | Bubble Created | Notes |
-|---|---|---|
-| `narration` (text non-empty) | `SceneBubble.Narration` | Call phase (text empty) → typing indicator only |
-| `dialogue` (text non-empty) | `SceneBubble.Dialogue` or `ActorInteraction` | `DetectActorInteractionUseCase` decides |
-| `actor_chime_in` (text non-empty) | `SceneBubble.Dialogue` or `ActorInteraction` | Same detection logic |
-| `end_narration` | `SceneBubble.Narration` | Drama ending narration |
-| `scene_end` | `SceneBubble.SceneDivider` | Shows "第 N 场 · 标题" |
-| `tension_update` | Updates `tensionScore` in UiState | No bubble |
-| `typing` | Updates `isTyping` + `typingText` | No bubble |
-| `error` | `SceneBubble.SystemError` + snackbar | Inline error + toast |
-| `director_log` | Updates `stormPhase` | Progress display, no bubble |
-| `command_echo` | Updates `stormPhase` | Confirmation only |
-| `user_message` | `SceneBubble.UserMessage` (deduped) | Backup channel |
+1. User enters IP:port or cloud URL on Connection screen
+2. `ConnectionViewModel.connect()` calls `AuthRepository.verifyServer()`
+3. `AuthRepositoryImpl` creates temporary Retrofit instance (no interceptors) for verification
+4. `GET /api/v1/auth/verify` returns auth mode (Bypass or RequireToken)
+5. If Bypass: save config and connect
+6. If RequireToken: show token input, then save config
+7. `ServerPreferences.saveServerConfig()` persists to DataStore + updates memory cache
+8. Subsequent API calls use `BaseUrlInterceptor` to route to configured server
 
 **State Management:**
-- `MutableStateFlow<DramaDetailUiState>` in ViewModel — single source of truth
-- Compose UI collects via `collectAsStateWithLifecycle()`
-- No shared ViewModel state across screens — each screen has its own ViewModel
+- ViewModel-owned `MutableStateFlow` → `StateFlow` exposed to Composables
+- `ServerPreferences` maintains `@Volatile` memory cache for synchronous reads by interceptors
+- `WebSocketManager.connectionState` is a `StateFlow<ConnectionState>` sealed class
 
 ## Key Abstractions
 
-**SceneBubble (sealed class):**
-- Purpose: Represents all renderable message types in the chat interface
-- Examples: `app/src/main/java/com/drama/app/domain/model/SceneBubble.kt`
-- Pattern: Type-safe discriminated union with `when` exhaustive matching
-- Subtypes: `Narration`, `Dialogue`, `UserMessage`, `ActorInteraction`, `SceneDivider`, `SystemError`
-- Each subtype carries: `id`, `avatarType`, `senderType`, `senderName` — enabling the three-party messaging system (director/actor/user)
+**Repository Pattern:**
+- Purpose: Decouple domain logic from data sources
+- Examples: `DramaRepository`/`DramaRepositoryImpl`, `AuthRepository`/`AuthRepositoryImpl`, `ServerRepository`/`ServerRepositoryImpl`
+- Pattern: Interface in domain layer, implementation in data layer, bound via Hilt
 
-**ConnectionState (sealed class):**
-- Purpose: Represent WebSocket connection lifecycle states
-- Examples: `app/src/main/java/com/drama/app/data/remote/ws/ConnectionState.kt`
-- Pattern: State machine: `Disconnected → Connecting → Connected`, `Connected → Reconnecting → Connected`
+**Interceptor Chain:**
+- Purpose: Cross-cutting HTTP concerns (URL routing, auth, error handling)
+- Examples: `BaseUrlInterceptor`, `AuthInterceptor`, `NetworkExceptionInterceptor`
+- Pattern: OkHttp Interceptor, order matters (BaseUrl → Auth → NetworkException → Logging)
 
-**CommandType (enum):**
-- Purpose: Parse user input into command types for routing
-- Examples: `app/src/main/java/com/drama/app/domain/model/CommandType.kt`
-- Pattern: Prefix matching (`/next`, `/action`, `/speak`, etc.) with `FREE_TEXT` as default
+**WebSocket Manager:**
+- Purpose: Manage WebSocket lifecycle with reconnection, reference counting, and network awareness
+- Examples: `WebSocketManager`
+- Pattern: Activity-scoped singleton with reference counting (acquire/release), exponential backoff reconnection, ConnectivityManager NetworkCallback for network restoration
+
+**Connection Orchestrator:**
+- Purpose: Coordinate WebSocket connection for DramaDetail screen
+- Examples: `ConnectionOrchestrator`
+- Pattern: Injectable sub-component with SharedFlow event bus, bridges WS events to ViewModel
 
 ## Entry Points
 
+**Application:**
+- Location: `app/src/main/java/com/drama/app/DramaApplication.kt`
+- Triggers: Android framework on app launch
+- Responsibilities: Hilt initialization (`@HiltAndroidApp`)
+
 **MainActivity:**
 - Location: `app/src/main/java/com/drama/app/MainActivity.kt`
-- Triggers: Android launcher
-- Responsibilities: Sets up `DramaTheme`, `NavController`, `DramaNavHost`, bottom navigation bar
+- Triggers: Launcher intent
+- Responsibilities: Single-activity host for Compose navigation
 
-**DramaDetailScreen:**
-- Location: `app/src/main/java/com/drama/app/ui/screens/dramadetail/DramaDetailScreen.kt`
-- Triggers: Navigation from DramaList or DramaCreate
-- Responsibilities: Orchestrates the drama chat interface — bubble list, input bar, actor drawer, connection status
+**Connection Screen (User Entry):**
+- Location: `app/src/main/java/com/drama/app/ui/screens/connection/`
+- Triggers: First launch or disconnect
+- Responsibilities: Server URL input, auth verification, token input, connection establishment
 
 ## Error Handling
 
-**Strategy:** Multi-layer error handling with graceful degradation
+**Strategy:** Multi-layer with conversion at boundaries
 
 **Patterns:**
-- **Inline error bubbles:** Server errors become `SceneBubble.SystemError` displayed in the chat flow
-- **Snackbar events:** User-facing errors emit `DramaDetailEvent.ShowSnackbar` via SharedFlow
-- **WS degradation:** On permanent WS failure, app falls back to REST polling with banner notification
-- **Init error blocking:** If `switchToDramaAndWait()` fails during init, `initError` blocks the UI with retry button
-- **Deduplication:** `addedErrorIds` set prevents the same error message from creating duplicate bubbles
+- `NetworkExceptionInterceptor` converts network exceptions (SocketTimeoutException → 504, UnknownHostException → 503, ConnectException → 503, SSLException → 503, IOException → 503) to synthetic HTTP responses with JSON error bodies
+- `AuthRepositoryImpl.verifyServer()` catches exceptions and wraps in `Result.failure(Exception("ERROR_TYPE"))` where ERROR_TYPE is TIMEOUT/NETWORK_UNREACHABLE/AUTH_FAILED/UNKNOWN:code
+- `DramaRepositoryImpl` uses `runCatching {}` for all API calls, converting Retrofit exceptions to `Result<T>`
+- WebSocket failures are classified (connection refused, auth error, generic) and surfaced via `ConnectionState.Failed` sealed class
+- `ConnectionStatus.Error` with `ErrorType` enum for UI-level error display
+
+**The "UNKNOWN:504" error path:**
+1. `NetworkExceptionInterceptor` catches `SocketTimeoutException` → builds response with code 504
+2. Retrofit receives 504 response → throws `retrofit2.HttpException` with code 504
+3. `AuthRepositoryImpl` catches `HttpException` → `Result.failure(Exception("UNKNOWN:504"))`
+4. OR: Server-side `runner_utils.py` raises real HTTP 504 on command timeout
+5. Either way, the client receives 504 and the error bubbles up as "UNKNOWN:504"
 
 ## Cross-Cutting Concerns
 
-**Logging:** Android `Log` with TAG constants (e.g., `TAG = "DramaDetailViewModel"`)
-
-**Validation:** Input validation in ViewModel (`text.isBlank()` checks before sending)
-
-**Authentication:** Token-based via `AuthInterceptor`, stored in `SecureStorage`, passed through `ServerConfig.token`
-
-**Local Saves:** DataStore-based local save/load system (independent of server saves), with `/save`, `/load`, `/list`, `/delete` commands handled entirely client-side
+**Logging:** `android.util.Log` with tag constants per class; HttpLoggingInterceptor (BODY level) in debug builds only
+**Validation:** Server URL validation via `toHttpUrlOrNull()` in BaseUrlInterceptor; auth verification before connection
+**Authentication:** Bearer token via AuthInterceptor for REST, query param for WebSocket; encrypted storage via SecureStorage
+**Network Security:** Dual network_security_config (strict for release, permissive for debug); `usesCleartextTraffic=false` in manifest
+**Timeout Configuration:** connect=15s, read=300s (LLM calls), write=30s, pingInterval=60s (TCP keepalive)
+**ProGuard:** Keep rules for DTO serialization, Retrofit interfaces, OkHttp interceptors, Hilt/Dagger, Compose
 
 ---
 
-*Architecture analysis: 2026-04-25*
+*Architecture analysis: 2026-04-27*

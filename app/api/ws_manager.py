@@ -7,9 +7,12 @@ D-14: Application-level heartbeat with 15s ping, 30s timeout.
 """
 
 import asyncio
+import logging
 import time
 from collections import deque
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 from fastapi import WebSocket
 
@@ -80,6 +83,11 @@ class ConnectionManager:
                 # Check timeout before sending ping
                 if self.is_pong_expired(websocket):
                     # D-14: 30s timeout — close connection
+                    logger.warning(
+                        "Heartbeat timeout: closing WS connection (last_pong=%.1fs ago, active=%d)",
+                        time.monotonic() - self._last_pong.get(websocket, 0),
+                        len(self.active_connections),
+                    )
                     try:
                         await websocket.close(code=1000, reason="Heartbeat timeout")
                     except Exception:
@@ -91,6 +99,8 @@ class ConnectionManager:
                     await websocket.send_json({"type": "ping"})
                 except Exception:
                     # Connection already broken
+                    logger.info("Heartbeat ping failed: connection already broken, disconnecting (active=%d)",
+                                len(self.active_connections))
                     self.disconnect(websocket)
                     break
         except asyncio.CancelledError:

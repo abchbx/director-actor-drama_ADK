@@ -1,70 +1,58 @@
 # External Integrations
 
-**Analysis Date:** 2026-04-25
+**Analysis Date:** 2026-04-27
 
 ## APIs & External Services
 
-**Backend REST API:**
-- Base URL: Configurable via `ServerPreferences` (IP + port + optional baseUrl)
-- SDK/Client: Retrofit (`DramaApiService`)
-- Auth: Bearer token via `AuthInterceptor` (from `SecureStorage`)
-- Key endpoints:
-  - `POST /drama/start` — Start new drama
-  - `GET /drama/status` — Get current drama status
-  - `POST /drama/chat` — Send chat message
-  - `POST /drama/next` — Advance to next scene
-  - `POST /drama/action` — User action
-  - `POST /drama/speak` — Actor speak
-  - `POST /drama/end` — End drama
-  - `GET /drama/scenes` — Get scene list
-  - `GET /drama/scenes/{n}` — Get scene detail
-  - `GET /drama/cast` — Get cast info
-  - `GET /drama/cast/status` — Get cast status
-  - `POST /drama/save` — Save drama (server-side)
-  - `POST /drama/load` — Load drama (server-side)
-  - `DELETE /drama/{folder}` — Delete drama
+**Director-Actor-Drama Backend (FastAPI):**
+- REST API - All drama operations (start, next, action, speak, steer, auto, storm, chat, end, status, cast, scenes, save/load/export)
+  - SDK/Client: Retrofit (`DramaApiService`, `AuthApiService`)
+  - Base URL: Dynamic — stored in `ServerPreferences` DataStore, can be IP:port or cloud URL
+  - Auth: Bearer token in `Authorization` header (injected by `AuthInterceptor`)
+  - API path prefix: `/api/v1/`
+  - Example: `http://192.168.1.100:8000/api/v1/drama/start`
 
-**Backend WebSocket:**
-- URL: `ws://{ip}:{port}/ws` (constructed from ServerConfig)
-- SDK/Client: OkHttp `WebSocket` via `WebSocketManager`
-- Auth: Token passed as query parameter on connect
-- Protocol: JSON frames with `type` + `data` fields (`WsEventDto`)
-- Event types: narration, dialogue, actor_chime_in, scene_end, scene_start, tension_update, typing, error, storm_discover, storm_research, storm_outline, director_log, command_echo, actor_created, cast_update, user_message, save_confirm, load_confirm
-- Auto-reconnect: Exponential backoff with max 5 retries (`ConnectionState.Reconnecting`)
-- Heartbeat: Ping/pong frames
-
-**Google ADK (Agent Development Kit) — Backend:**
-- Server-side framework for AI agent orchestration
-- `event_mapper.py` maps ADK `Event` → business WebSocket events
-- Tools mapped: start_drama, next_scene, director_narrate, actor_speak, actor_chime_in, user_action, write_scene, update_emotion, create_actor, storm_*, save/load/end_drama, steer_drama, auto_advance
+- WebSocket - Real-time drama events (scene updates, actor dialogue, heartbeat)
+  - SDK/Client: OkHttp `WebSocket` via `WebSocketManager`
+  - URL pattern: `ws://{host}:{port}/api/v1/ws?token={token}` or `wss://` for cloud
+  - Auth: Token as query parameter on connection
+  - Heartbeat: Server-driven ping every 15s, client replies `{"type":"pong"}`
 
 ## Data Storage
 
 **Databases:**
 - None (no Room/SQLite)
 
-**Local Storage:**
-- DataStore Preferences — Local drama saves (bubble JSON serialization), server preferences
-  - Connection: `DataStoreModule` provides instances
-  - Client: `DramaSaveRepository`, `ServerPreferences`
-- EncryptedSharedPreferences — Auth tokens, server credentials
-  - Connection: `SecureStorage`
-  - Client: `AuthRepositoryImpl`
+**Preferences:**
+- DataStore Preferences (`drama_settings`) - Server IP, port, base URL, last connected timestamp
+  - Location: `com.drama.app.data.local.ServerPreferences`
+  - File: `app/src/main/java/com/drama/app/data/local/ServerPreferences.kt`
+
+- DataStore Preferences (`drama_saves`) - Drama save/load metadata
+  - Location: `com.drama.app.data.local.DramaSaveRepository`
+  - Qualified with `@SavesDataStore` annotation
+
+- EncryptedSharedPreferences (`drama_secure_prefs`) - Auth token
+  - Location: `com.drama.app.data.local.SecureStorage`
+  - File: `app/src/main/java/com/drama/app/data/local/SecureStorage.kt`
+  - Encryption: MasterKey AES256_GCM + PrefValueEncryption AES256_GCM + PrefKeyEncryption AES256_SIV
 
 **File Storage:**
-- Local filesystem only (DataStore files in app sandbox)
+- Local filesystem only (no cloud storage)
 
 **Caching:**
-- None (no in-memory cache, no LRU cache)
+- None (no HTTP cache configured on OkHttpClient)
 
 ## Authentication & Identity
 
 **Auth Provider:**
-- Custom token-based
-  - Implementation: `AuthRepository` → `AuthRepositoryImpl` → `AuthApiService`
-  - Token stored in `SecureStorage` (EncryptedSharedPreferences)
-  - Token injected via `AuthInterceptor` on all API requests
-  - Token passed as query parameter on WebSocket connection
+- Custom token-based (server-side)
+  - Implementation: Bearer token in `Authorization` header via `AuthInterceptor`
+  - Token stored encrypted in `SecureStorage` (EncryptedSharedPreferences)
+  - Auth modes: `Bypass` (no token needed) or `RequireToken` (token required)
+  - Verification: `GET /api/v1/auth/verify` returns auth mode
+  - WebSocket auth: Token passed as query parameter `?token={token}`
+  - WebSocket auth error: Server closes with code 4001
 
 ## Monitoring & Observability
 
@@ -72,38 +60,81 @@
 - None (no Crashlytics, Sentry, etc.)
 
 **Logs:**
-- Android `Log` (Logcat) with TAG-based filtering
-- `DramaDetailViewModel` uses `TAG = "DramaDetailViewModel"`
+- `android.util.Log` with tag-based filtering
+  - `NetworkException` tag - Network errors from `NetworkExceptionInterceptor`
+  - `WebSocketManager` tag - WebSocket lifecycle events
+  - `ConnectionOrchestrator` tag - Connection orchestration events
+  - `HttpLoggingInterceptor` - Full HTTP request/response logging (DEBUG builds only)
+  - Authorization header redacted in logs via `redactHeader("Authorization")`
 
 ## CI/CD & Deployment
 
 **Hosting:**
-- Android app (client-side only)
+- Server component: Self-hosted FastAPI (uvicorn), typically on developer machine or Cloud Studio
 
 **CI Pipeline:**
-- None detected (no `.github/workflows`, no `fastlane`, no CI config)
+- None detected in Android project
 
-**Build:**
-- `build_apk.sh` script exists for APK generation
+**Build Script:**
+- `android/build_apk.sh` - Shell script for building debug APK
 
 ## Environment Configuration
 
-**Required env vars:**
-- None on Android side (all config via UI setup in `ConnectionGuideDialog`)
+**Required env vars (server-side, not Android):**
+- `OPENAI_API_KEY` - LLM API key
+- `OPENAI_BASE_URL` - LLM endpoint
+- `MODEL_NAME` - Model identifier
+- `API_TOKEN` - Auth token for server
+- Source: `/workspace/director-actor-drama/app/.env.example`
 
 **Secrets location:**
-- `SecureStorage` (EncryptedSharedPreferences) — stores auth token
-- `ServerPreferences` (DataStore) — stores server IP, port, baseUrl
+- Server-side: `.env` file (gitignored)
+- Android-side: `EncryptedSharedPreferences` (hardware-backed keystore)
+- No `.env` files in Android project directory
+
+**Android runtime config (no env vars):**
+- Server IP: User-entered, stored in DataStore
+- Server Port: Default `8000`, stored in DataStore
+- Base URL: Optional cloud URL, stored in DataStore
+- Auth Token: Stored encrypted in SecureStorage
 
 ## Webhooks & Callbacks
 
 **Incoming:**
-- WebSocket events from server (real-time push)
+- None
 
 **Outgoing:**
-- REST API calls to server
-- WebSocket messages to server (chat, commands)
+- None
+
+## Network Security Configuration
+
+**Release builds** (`network_security_config.xml`):
+- `cleartextTrafficPermitted="false"` by default
+- Exception: localhost/127.0.0.1/10.0.2.2 allowed for cleartext (emulator → host)
+- Trust anchors: System certificates only
+- `android:usesCleartextTraffic="false"` in manifest
+
+**Debug builds** (`network_security_config_debug.xml`):
+- `cleartextTrafficPermitted="true"` globally (allows LAN development)
+- Trust anchors: System + User certificates
+- Supports connecting to LAN development servers (192.168.x.x)
+
+**Manifest placeholder** (`${networkSecurityConfig}`):
+- Debug → `@xml/network_security_config_debug`
+- Release → `@xml/network_security_config`
+
+## Key Error Code Mapping
+
+| Code | Source | Meaning |
+|------|--------|---------|
+| 504 | `NetworkExceptionInterceptor` | SocketTimeoutException → "网络连接超时" |
+| 503 | `NetworkExceptionInterceptor` | UnknownHostException/ConnectException/SSLException/IOException → various messages |
+| 504 | Server `runner_utils.py` | `asyncio.TimeoutError` → "Command execution timed out" |
+| 401 | Server | Auth failure |
+| 4001 | Server WebSocket | Auth error (WS close code) |
+
+**Critical finding**: The `NetworkExceptionInterceptor` converts `SocketTimeoutException` to HTTP 504. The server-side `runner_utils.py` also raises HTTP 504 on command timeout. Both sources produce "UNKNOWN:504" in `AuthRepositoryImpl`'s error handling pattern `UNKNOWN:${e.code()}`.
 
 ---
 
-*Integration audit: 2026-04-25*
+*Integration audit: 2026-04-27*

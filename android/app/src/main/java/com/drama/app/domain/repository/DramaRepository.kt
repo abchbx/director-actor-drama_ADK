@@ -4,6 +4,7 @@ import com.drama.app.data.remote.dto.CastResponseDto
 import com.drama.app.data.remote.dto.CastStatusResponseDto
 import com.drama.app.data.remote.dto.CommandResponseDto
 import com.drama.app.data.remote.dto.DramaStatusResponseDto
+import com.drama.app.data.remote.dto.ExportResponseDto
 import com.drama.app.data.remote.dto.SaveLoadResponseDto
 import com.drama.app.data.remote.dto.SceneDetailDto
 import com.drama.app.data.remote.dto.ScenesResponseDto
@@ -27,6 +28,10 @@ interface DramaRepository {
     suspend fun getCastStatus(): Result<CastStatusResponseDto>
     suspend fun getCast(): Result<CastResponseDto>
     suspend fun sendChatMessage(message: String, mention: String? = null): Result<CommandResponseDto>
+    suspend fun steerDrama(direction: String): Result<CommandResponseDto>
+    suspend fun autoAdvanceDrama(numScenes: Int = 3): Result<CommandResponseDto>
+    suspend fun stormDrama(focus: String? = null): Result<CommandResponseDto>
+    suspend fun exportDrama(format: String = "markdown"): Result<ExportResponseDto>
 
     // ===== 业务逻辑下沉：返回领域模型而非 DTO =====
 

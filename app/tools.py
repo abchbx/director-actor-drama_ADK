@@ -461,8 +461,12 @@ async def actor_speak(
         f"{coref_annotations}\n\n"
         f"{memory_context}\n\n"
         f"请以「{actor_name}」的身份回应上述情境。"
-        f"保持角色一致性，不要跳出角色。"
-        f"如有内心独白，用（内心：...）格式。\n\n"
+        f"保持角色一致性，不要跳出角色。\n\n"
+        f"⚠️ 输出格式约束（严格遵守）：\n"
+        f"1. 你只负责说出台词（对话内容）。动作、神态、环境描写由导演旁白负责，你不需要写。\n"
+        f"2. 直接输出角色要说的对白，不要加任何动作描述前缀（如'他缓缓说道'、'（冷笑）'等）。\n"
+        f"3. 如有内心独白，用（内心：...）格式，但尽量克制使用。\n"
+        f"4. 不要在台词中描述自己的动作或神态——这些由导演在旁白中呈现。\n\n"
         f"【重要：代词消解规则】\n"
         f"1. 情境中若出现「他（实体名）」这样的括号标注，括号内即为该代词的真实指代\n"
         f"2. 绝对不要将别人话语中的「他/她」默认理解为指代你自己，除非括号标注明确写了你的名字\n"
@@ -680,8 +684,12 @@ async def actor_speak_batch(
             f"{coref_annotations}\n\n"
             f"{memory_context}\n\n"
             f"请以「{actor_name}」的身份回应上述情境。"
-            f"保持角色一致性，不要跳出角色。"
-            f"如有内心独白，用（内心：...）格式。\n\n"
+            f"保持角色一致性，不要跳出角色。\n\n"
+            f"⚠️ 输出格式约束（严格遵守）：\n"
+            f"1. 你只负责说出台词（对话内容）。动作、神态、环境描写由导演旁白负责，你不需要写。\n"
+            f"2. 直接输出角色要说的对白，不要加任何动作描述前缀（如'他缓缓说道'、'（冷笑）'等）。\n"
+            f"3. 如有内心独白，用（内心：...）格式，但尽量克制使用。\n"
+            f"4. 不要在台词中描述自己的动作或神态——这些由导演在旁白中呈现。\n\n"
             f"【重要：代词消解规则】\n"
             f"1. 情境中若出现「他（实体名）」这样的括号标注，括号内即为该代词的真实指代\n"
             f"2. 绝对不要将别人话语中的「他/她」默认理解为指代你自己，除非括号标注明确写了你的名字\n"
@@ -1059,8 +1067,11 @@ async def actor_chime_in(
             f"{coref_annotations}\n\n"
             f"{memory_context}\n\n"
             f"请以「{actor_name}」的身份，做出简短的自发反应。"
-            f'你可以简短评论、低声自语、做出反应动作、或选择沉默（说"无反应"即可）。\n'
-            f"保持角色一致性，不要跳出角色。发言要简短（1-2句），这是插话不是长篇大论。"
+            f"保持角色一致性，不要跳出角色。发言要简短（1-2句），这是插话不是长篇大论。\n\n"
+            f"⚠️ 输出格式约束（严格遵守）：\n"
+            f"1. 只输出纯台词（对话内容），不要写动作或神态描述。\n"
+            f"2. 动作、神态由导演旁白负责呈现，你不需要写。\n"
+            f"3. 直接说角色该说的话，不要加前缀如'（冷笑）'、'他低声说'等。"
         )
 
         saved_port = actor_data.get("port")
@@ -1298,6 +1309,17 @@ def next_scene(tool_context: ToolContext) -> dict:
     state = tool_context.state.get("drama", {})
     scene_num = state.get("current_scene", 0)
     scenes = state.get("scenes", [])
+
+    # ★ 代码级兜底：防止 LLM 在同一次响应中连续调用多次 next_scene()
+    import time as _time
+    last_advance = state.get("_last_scene_advance_time", 0)
+    if _time.time() - last_advance < 10:
+        return {
+            "status": "error",
+            "message": "🚫 场景推进过于频繁。请完成当前场景的演出（director_narrate → actor_speak → write_scene）后再发送 /next。",
+            "current_scene": scene_num,
+        }
+    state["_last_scene_advance_time"] = _time.time()
 
     # Anti-skip guard: if current_scene > 0 but no recorded scene data,
     # the previous run timed out before write_scene. Don't advance;

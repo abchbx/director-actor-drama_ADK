@@ -1586,6 +1586,7 @@ def export_script(tool_context=None) -> dict:
         "drama_folder": dirs["root"],
         "total_scenes": len(scenes),
         "total_actors": len(actors),
+        "content": markdown,
     }
 
 

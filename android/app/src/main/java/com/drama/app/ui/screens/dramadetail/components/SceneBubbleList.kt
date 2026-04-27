@@ -79,6 +79,7 @@ fun SceneBubbleList(
     bubbles: List<SceneBubble>,
     isTyping: Boolean,
     typingText: String = "AI 正在思考...",
+    typingElapsedSeconds: Int = 0,
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
@@ -130,7 +131,7 @@ fun SceneBubbleList(
                             animationSpec = tween(350, easing = LinearOutSlowInEasing),
                         ),
                     ) {
-                        TypingIndicator(typingText = typingText)
+                        TypingIndicator(typingText = typingText, elapsedSeconds = typingElapsedSeconds)
                     }
                 }
             }

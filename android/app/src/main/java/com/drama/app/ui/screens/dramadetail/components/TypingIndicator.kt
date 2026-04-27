@@ -73,7 +73,7 @@ fun getTypingText(toolName: String?): String = when (toolName) {
  * - 容器固定 minHeight，避免 scale 动画引起整体布局跳动
  */
 @Composable
-fun TypingIndicator(typingText: String = "AI 正在思考...") {
+fun TypingIndicator(typingText: String = "AI 正在思考...", elapsedSeconds: Int = 0) {
     val infiniteTransition = rememberInfiniteTransition(label = "typing-dots")
 
     // 三个点错开相位，形成波浪效果
@@ -106,6 +106,15 @@ fun TypingIndicator(typingText: String = "AI 正在思考...") {
         label = "dot3",
     )
 
+    // 格式化耗时文本
+    val timerText = if (elapsedSeconds > 0) {
+        val min = elapsedSeconds / 60
+        val sec = elapsedSeconds % 60
+        if (min > 0) "${min}m${sec}s" else "${sec}s"
+    } else null
+
+    val displayText = if (timerText != null) "$typingText ($timerText)" else typingText
+
     // 固定高度行容器，防止 scale 动画导致布局跳动
     Row(
         modifier = Modifier
@@ -130,7 +139,7 @@ fun TypingIndicator(typingText: String = "AI 正在思考...") {
         Spacer(modifier = Modifier.width(10.dp))
 
         Text(
-            text = typingText,
+            text = displayText,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
         )

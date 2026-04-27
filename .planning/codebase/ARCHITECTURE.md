@@ -1,184 +1,136 @@
 # Architecture
 
-**Analysis Date:** 2026-04-25
+**Analysis Date:** 2026-04-26
 
 ## Pattern Overview
 
-**Overall:** Multi-Agent Drama Director with A2A (Agent-to-Agent) Isolation
+**Overall:** Client-Server with WebSocket real-time events + REST API fallback
 
 **Key Characteristics:**
-- **Director-Actor Pattern**: A central Director agent orchestrates multiple isolated Actor agents via A2A protocol
-- **User-as-Protagonist**: The human user is a special "User-Controlled" actor named "你" (You), not driven by AI
-- **STORM Framework**: Multi-perspective discovery and synthesis for story creation (Discovery → Research → Outline → Directing)
-- **State-Centric Design**: All modules are pure functions receiving `state: dict`, ensuring testability without ToolContext dependency
-- **Token-Budget Context Assembly**: Priority-based section truncation ensures LLM prompts stay within budget
+- Android (Kotlin/Jetpack Compose) frontend with Hilt DI, MVVM + unidirectional state flow
+- Python (FastAPI) backend with ADK (Agent Development Kit) runner orchestrating AI agents
+- WebSocket-first real-time communication with REST API for commands/queries and fallback
+- Event-driven architecture: ADK tool calls → event_mapper → WS events → Android UI bubbles
+- State hoisted in ViewModel as `MutableStateFlow<DramaDetailUiState>`
 
 ## Layers
 
-**API Layer:**
-- Purpose: HTTP/WS endpoints for Android clients and web UI
-- Location: `app/api/routers/`, `app/api/models.py`
-- Contains: FastAPI routers, Pydantic models, WebSocket event models
-- Depends on: ADK Runner, state_manager
-- Used by: Android app, web clients
+**Android Presentation Layer:**
+- Purpose: UI rendering and user interaction
+- Location: `android/app/src/main/java/com/drama/app/ui/screens/`
+- Contains: Composable screens, ViewModel, UI state classes
+- Depends on: Domain layer (Repository interfaces), Data layer (WebSocketManager)
+- Used by: End user
 
-**Director Agent Layer:**
-- Purpose: Core orchestration — scene advancement, conflict injection, STORM triggers, actor coordination
-- Location: `app/tools.py`, `app/agent.py`
-- Contains: Tool functions (start_drama, next_scene, actor_speak, user_action, etc.), agent definition
-- Depends on: All service modules (arc_tracker, conflict_engine, dynamic_storm, context_builder, memory_manager, state_manager)
-- Used by: API layer via ADK Runner
+**Android Domain Layer:**
+- Purpose: Business logic interfaces and models
+- Location: `android/app/src/main/java/com/drama/app/domain/`
+- Contains: Repository interfaces, domain models (Drama, SceneBubble, ActorInfo)
+- Depends on: Nothing (pure Kotlin)
+- Used by: Presentation layer
 
-**Service Modules (Pure Functions):**
-- Purpose: Domain logic as testable pure functions accepting `state: dict`
-- Location: `app/arc_tracker.py`, `app/conflict_engine.py`, `app/dynamic_storm.py`, `app/coherence_checker.py`, `app/timeline_tracker.py`, `app/context_builder.py`
-- Contains: Constants, validation, state mutation logic, prompt construction
-- Depends on: Each other via imports (arc_tracker → conflict_engine context, etc.)
-- Used by: Director agent (tools.py)
+**Android Data Layer:**
+- Purpose: API calls, WS connection, DTO mapping
+- Location: `android/app/src/main/java/com/drama/app/data/`
+- Contains: API service (Retrofit), Repository implementations, WS manager, DTOs
+- Depends on: Domain layer (implements interfaces), external (Retrofit, OkHttp, kotlinx.serialization)
+- Used by: Presentation layer via DI
 
-**Memory Management:**
-- Purpose: 4-tier memory system for actors (working → scene summaries → arc summary → vector)
-- Location: `app/memory_manager.py`, `app/semantic_retriever.py`, `app/vector_memory.py`
-- Contains: Memory CRUD, compression, decay, semantic retrieval, ChromaDB vector store
-- Depends on: state_manager, LLM for compression
-- Used by: context_builder, tools.py
+**Backend API Layer:**
+- Purpose: HTTP endpoints, WS broadcast, auth
+- Location: `app/api/`
+- Contains: FastAPI routers, Pydantic models, event_mapper, WS endpoint
+- Depends on: Backend core (state_manager, tools, vector_memory)
+- Used by: Android client
 
-**State Persistence:**
-- Purpose: Drama state save/load with debounced disk persistence
-- Location: `app/state_manager.py`
-- Contains: SceneContext (coreference resolution), state CRUD, scene archival, STORM state management
-- Depends on: File system, vector_memory
-- Used by: All layers
-
-**Actor Service Layer:**
-- Purpose: A2A agent lifecycle management — create, start, stop, restart
-- Location: `app/actor_service.py`
-- Contains: Process management, AgentCard generation, port allocation
-- Depends on: google-adk, a2a-sdk
-- Used by: tools.py
-
-**Android UI Layer:**
-- Purpose: Native Android client with Compose UI
-- Location: `android/app/src/main/java/com/drama/app/`
-- Contains: Screens, ViewModels, components (DialogueBubble), domain models (SceneBubble)
-- Depends on: Backend API via HTTP/WebSocket
-- Used by: End users
+**Backend Core Layer:**
+- Purpose: Drama state management, AI tool execution, agent orchestration
+- Location: `app/` (state_manager.py, tools.py, agents/)
+- Contains: State management, tool definitions, ADK agent configuration
+- Depends on: Google ADK, ChromaDB, LLM providers
+- Used by: Backend API layer
 
 ## Data Flow
 
-**Scene Lifecycle:**
+**Real-time Drama Interaction (WS):**
 
-1. User sends `/next` → `next_scene()` in tools.py
-2. `advance_scene()` increments current_scene, updates dynamic_storm counter
-3. `_extract_scene_transition()` builds transition context from previous scene
-4. Director generates narration via `director_narrate()`
-5. Director calls `actor_speak()` for each actor → A2A call to isolated agent
-6. `chime_in()` triggers spontaneous reactions from related actors
-7. `write_scene()` records scene data to state
-8. `archive_old_scenes()` archives scenes beyond threshold (20)
+1. User taps action → ViewModel calls `dramaRepository.sendChatMessage()`
+2. Repository → Retrofit POST `/drama/chat` → Backend
+3. Backend routes to ADK runner → tool calls execute (narrate, actor_speak, etc.)
+4. `event_mapper.py` converts each ADK `function_call`/`function_response` to business events
+5. Business events broadcast via WebSocket as `WsEvent(type, timestamp, data)`
+6. `WebSocketManager.onMessage()` → deserializes `WsEventDto` → emits to `SharedFlow`
+7. ViewModel `handleWsEvent()` → pattern-matches event type → updates `MutableStateFlow<UiState>`
+8. Compose recomposes UI (bubbles, typing indicators, etc.)
 
-**User-as-Protagonist Flow:**
+**REST Fallback Flow:**
 
-1. User sends chat message or `/action` → `user_action()` or `/drama/chat` endpoint
-2. Chat messages without @mention route to `/action` (user acts as protagonist)
-3. Chat messages with @mention route to `/speak {actor} {message}`
-4. `add_conversation(speaker="主角", ...)` records user action in conversation log
-5. Director responds by narrating and having actors react
-6. UI: Android ViewModel creates local user bubble immediately; backend doesn't push user_message event
+1. WS connection fails after MAX_RETRIES → `onPermanentFailure` callback
+2. ViewModel switches to REST-only mode
+3. Each user action still calls REST API → but must manually poll `getDramaStatus()` + `getSceneBubbles()` for updates
 
-**Arc Tracking Flow:**
+**Export Flow (backend only, no Android integration):**
 
-1. Director calls `create_thread()` → `create_thread_logic()` generates thread with auto-ID
-2. `update_thread()` / `update_thread_logic()` adds progress notes (FIFO capped at 10)
-3. `resolve_thread()` marks resolved, checks for linked conflicts
-4. `set_actor_arc()` / `set_actor_arc_logic()` tracks character arc (type/stage/progress)
-5. `context_builder._build_arc_tracking_section()` shows threads in director context
-6. `context_builder._assemble_actor_sections()` includes actor's threads in their prompt
-
-**Dynamic STORM Flow:**
-
-1. `dynamic_storm()` called on interval (every 8 scenes) or tension-low trigger
-2. `discover_perspectives_prompt()` builds LLM prompt from state
-3. LLM generates 1-2 new perspectives
-4. `check_keyword_overlap()` deduplicates against existing perspectives
-5. `suggest_conflict_types()` maps perspective keywords to conflict types
-6. `parse_llm_perspectives()` validates and structures response
-7. `update_dynamic_storm_state()` updates counter, records trigger history
+1. Backend: `POST /drama/export` → `export_drama()` tool → `export_script()` + `export_conversations()`
+2. Generates Markdown files in `{drama_folder}/exports/`
+3. Returns `{status, message, export_path}` — file stays server-side
+4. Android: API endpoint exists in `DramaApiService.exportDrama()` but NO Repository/ViewModel/Screen code
 
 **State Management:**
-- All state lives in `tool_context.state["drama"]` (in-memory)
-- `_set_state()` writes to context immediately, persists to disk via 5-second debounce
-- `flush_state_sync()` forces immediate write (called at exit, save, load)
-- Atomic file writes via temp-file + rename pattern
+- Single `MutableStateFlow<DramaDetailUiState>` in ViewModel
+- All WS events and REST responses converge to state updates
+- Compose observes state via `collectAsStateWithLifecycle()`
 
 ## Key Abstractions
 
-**SceneContext (Coreference Resolution):**
-- Purpose: Maintains shared cognitive state of the current scene — tracks entities, pronoun mappings
-- Examples: `app/state_manager.py` (class SceneContext)
-- Pattern: Singleton per drama state, mutated by director, consumed by `resolve_coreferences()` before actor prompts
-- Resolution order: speaker-specific → global pronoun_map → last_mentioned → unresolvable
+**SceneBubble (sealed class):**
+- Purpose: Union type for all chat-bubble renderable content
+- Examples: `android/app/src/main/java/com/drama/app/domain/model/SceneBubble.kt`
+- Pattern: Sealed class hierarchy — Narration, Dialogue, UserMessage, SceneDivider, ErrorBubble
 
-**User Protagonist ("你"):**
-- Purpose: The human user is a special actor with `is_user_protagonist: True` and `control_type: "User-Controlled"`
-- Examples: `app/state_manager.py` (init_drama_state, load_progress), `app/tools.py` (actor_speak, create_actor)
-- Pattern: Auto-injected on drama init, cannot be deleted/overwritten, excluded from A2A calls, excluded from chime_in
-- Backward compat: `load_progress()` auto-injects user protagonist into old saves missing it
+**WsEventDto:**
+- Purpose: Generic WS event envelope (type + timestamp + data map)
+- Examples: `android/app/src/main/java/com/drama/app/data/remote/dto/WsEventDto.kt`
+- Pattern: Single DTO for all 18+ event types; `type` field dispatches handling
 
-**Arc Progress:**
-- Purpose: Track character arc for each actor
-- Examples: `app/arc_tracker.py` (set_actor_arc_logic), `app/state_manager.py` (actor data)
-- Pattern: Dict on each actor with arc_type (growth/fall/transformation/redemption), arc_stage (setup/development/climax/resolution), progress (0-100), related_threads
-
-**Plot Threads:**
-- Purpose: Track story arcs as first-class entities
-- Examples: `app/arc_tracker.py` (create_thread_logic, update_thread_logic, resolve_thread_logic)
-- Pattern: Auto-generated thread IDs (thread_{scene}_{keyword}_{index}), status lifecycle (active → dormant → resolving → resolved), FIFO progress_notes
+**DramaRepository (interface):**
+- Purpose: Clean architecture boundary between domain and data layers
+- Examples: `android/app/src/main/java/com/drama/app/domain/repository/DramaRepository.kt`
+- Pattern: Interface with DTO-returning and domain-model-returning methods
 
 ## Entry Points
 
+**Android Activity:**
+- Location: `android/app/src/main/java/com/drama/app/MainActivity.kt`
+- Triggers: App launch
+- Responsibilities: NavHost setup, Hilt entry point
+
 **Backend API:**
-- Location: `app/api/routers/commands.py`
-- Triggers: HTTP POST endpoints (/drama/start, /next, /action, /speak, /steer, /auto, /end, /storm, /chat)
-- Responsibilities: Acquire asyncio lock, validate active drama, route to ADK Runner, return CommandResponse
+- Location: `app/api/routers/commands.py`, `app/api/routers/queries.py`
+- Triggers: HTTP requests from Android
+- Responsibilities: Route to state_manager/tools, return JSON responses
 
-**WebSocket:**
-- Location: `app/api/routers/` (WS connection manager)
-- Triggers: Real-time scene events pushed to Android clients
-- Responsibilities: Broadcast director_log, actor_dialogue, narration events
-
-**ADK Agent:**
-- Location: `app/agent.py`
-- Triggers: Runner.run_async() called by API endpoints
-- Responsibilities: LLM-powered director agent with tool access
-
-**Android App:**
-- Location: `android/app/src/main/java/com/drama/app/`
-- Triggers: User interactions (chat input, scene navigation)
-- Responsibilities: Display drama UI, manage local state, communicate with backend
+**Backend WS:**
+- Location: `app/api/routers/ws.py` (inferred)
+- Triggers: WS connection from Android
+- Responsibilities: Accept connection, broadcast mapped events, handle replay buffer
 
 ## Error Handling
 
-**Strategy:** Graceful degradation with auto-recovery
+**Strategy:** Layered error handling with graceful degradation
 
 **Patterns:**
-- **Crash Recovery (D-16~D-19)**: Passive detection when A2A call fails → auto-restart actor (max 3 crashes), retry once after restart
-- **State Corruption Protection**: Atomic file writes (temp + rename), backward-compatible migration on load
-- **LLM Parse Failures**: `parse_llm_perspectives()` returns empty list on JSON decode failure; `parse_contradictions()` returns empty on malformed LLM output
-- **Actor Validation**: `create_thread_logic()` checks actors exist; `set_actor_arc_logic()` validates arc_type/stage enums; `register_actor()` prevents overwriting user protagonist
+- Repository wraps all API calls in `Result<T>` (Kotlin runCatching)
+- WS errors emit "error" event type → ViewModel shows error bubble + snackbar
+- WS disconnection: exponential backoff reconnect → permanent failure → REST fallback
+- Backend errors: `{"status": "error", "message": "..."}` in responses → event_mapper emits "error" event
 
 ## Cross-Cutting Concerns
 
-**Logging:** Python `logging` module, `[DIRECTOR-LOG]` prefix for server console, optional WS push as 'director_log' events for Android
-
-**Validation:** Pydantic v2 models for API layer, manual validation in pure functions (arc_tracker, conflict_engine)
-
-**Authentication:** Token-based auth via `require_auth` dependency; bypass mode available
-
-**Debounced Persistence:** 5-second debounce timer for state writes; `flush_state_sync()` for immediate writes
-
-**Token Budget Control:** Priority-based section truncation in `context_builder.py` — actor budget 8000 tokens, director budget 30000 tokens
+**Logging:** Android uses `android.util.Log` with TAG constants; Python uses `logging.getLogger(__name__)`
+**Validation:** Pydantic models on backend; DTO serialization on Android
+**Authentication:** Token-based via query param on WS URL and header on REST
 
 ---
 
-*Architecture analysis: 2026-04-25*
+*Architecture analysis: 2026-04-26*

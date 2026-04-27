@@ -10,6 +10,9 @@ enum class CommandType(val prefix: String, val needsArgument: Boolean) {
     LOAD("/load", true),
     LIST("/list", false),
     DELETE("/delete", true),
+    STEER("/steer", true),
+    AUTO("/auto", true),
+    STORM("/storm", false),
     FREE_TEXT("", false);
 
     companion object {

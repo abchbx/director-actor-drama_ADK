@@ -1,0 +1,26 @@
+{
+  "name": "actor_饕餮",
+  "description": "演员 饕餮，角色：贵客",
+  "url": "http://localhost:9059/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_饕餮",
+      "name": "扮演饕餮",
+      "description": "以饕餮的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

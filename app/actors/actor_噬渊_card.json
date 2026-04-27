@@ -1,0 +1,26 @@
+{
+  "name": "actor_噬渊",
+  "description": "演员 噬渊，角色：常客恶魔",
+  "url": "http://localhost:9032/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_噬渊",
+      "name": "扮演噬渊",
+      "description": "以噬渊的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

@@ -34,6 +34,7 @@ import com.drama.app.ui.components.MarkdownConfig
 import com.drama.app.ui.components.MarkdownText
 import com.drama.app.ui.components.ParagraphSpacing
 import com.drama.app.ui.components.QuoteStyle
+import com.drama.app.ui.components.TypewriterMarkdownText
 import com.drama.app.ui.theme.MarkdownColors
 
 /** 导演头像颜色 - 专属配色 */
@@ -58,18 +59,18 @@ fun NarrationBubble(bubble: SceneBubble.Narration) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp),
+            .padding(horizontal = 16.dp, vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         // ★ 导演标签行 — 头像 + 名称 + 旁白标签
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(bottom = 6.dp),
+            modifier = Modifier.padding(bottom = 4.dp),
         ) {
-            // ★ 导演专属头像（小尺寸，36dp）
+            // ★ 导演专属头像（小尺寸，24dp）
             Box(
                 modifier = Modifier
-                    .size(28.dp)
+                    .size(24.dp)
                     .clip(CircleShape)
                     .background(
                         brush = Brush.linearGradient(
@@ -85,11 +86,11 @@ fun NarrationBubble(bubble: SceneBubble.Narration) {
                     imageVector = Icons.Filled.TheaterComedy,
                     contentDescription = cleanDisplayName,
                     tint = Color.White,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(14.dp),
                 )
             }
 
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(6.dp))
 
             Text(
                 text = cleanDisplayName,
@@ -100,22 +101,22 @@ fun NarrationBubble(bubble: SceneBubble.Narration) {
 
             // ★ "旁白"标签
             Surface(
-                shape = RoundedCornerShape(8.dp),
+                shape = RoundedCornerShape(6.dp),
                 color = DirectorAvatarColor.copy(alpha = 0.1f),
             ) {
                 Text(
                     text = "旁白",
                     style = MaterialTheme.typography.labelSmall,
                     color = DirectorAvatarColor.copy(alpha = 0.7f),
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
                 )
             }
 
             // ★ 若针对主角，显示特殊标记
             if (isDirectedAtProtagonist) {
-                Spacer(modifier = Modifier.width(6.dp))
+                Spacer(modifier = Modifier.width(4.dp))
                 Surface(
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(6.dp),
                     color = Color(0xFFB71C1C).copy(alpha = 0.1f),
                 ) {
                     Text(
@@ -123,18 +124,18 @@ fun NarrationBubble(bubble: SceneBubble.Narration) {
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Medium,
                         color = Color(0xFFB71C1C).copy(alpha = 0.7f),
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
                     )
                 }
             }
         }
 
-        // ★ 叙述气泡 — 居中，半透明背景，斜体风格
+        // ★ 叙述气泡 — 群聊样式：居中，自适应宽度，小圆角，更紧凑
         Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
             shadowElevation = 0.dp,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.padding(horizontal = 32.dp),
         ) {
             // ★ Markdown 渲染：支持 **加粗**、*斜体*、`代码`、[链接](url) 等
             // 旁白专用配置：斜体风格 + 更大的段落间距 + 淡雅配色
@@ -168,15 +169,17 @@ fun NarrationBubble(bubble: SceneBubble.Narration) {
                 ),
             )
 
-            MarkdownText(
+            TypewriterMarkdownText(
+                id = bubble.id,
                 markdown = bubble.text,
-                style = MaterialTheme.typography.bodyLarge.copy(
+                style = MaterialTheme.typography.bodyMedium.copy(
                     fontStyle = FontStyle.Italic,
-                    lineHeight = 24.sp,
+                    lineHeight = 20.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 ),
                 config = narrationConfig,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                typingSpeedMs = 22L,
             )
         }
     }

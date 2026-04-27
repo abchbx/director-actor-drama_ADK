@@ -13,16 +13,20 @@ import java.net.SocketTimeoutException
 import javax.inject.Inject
 
 class AuthRepositoryImpl @Inject constructor(
-    private val okHttpClient: OkHttpClient,
     private val json: Json,
+    private val okHttpClient: OkHttpClient,
 ) : AuthRepository {
 
     override suspend fun verifyServer(ip: String, port: String, baseUrl: String?): Result<AuthMode> {
         return try {
             // 临时构建 Retrofit 实例用于验证（连接前不知道最终服务器）
-            // 验证请求不注入 token，使用无拦截器的 OkHttpClient
-            val noAuthClient = okHttpClient.newBuilder()
-                .addInterceptor { chain -> chain.proceed(chain.request()) }
+            // 使用全局 OkHttpClient.newBuilder() 继承超时/日志/异常拦截器，
+            // 但移除 BaseUrlInterceptor（index=0），避免其用缓存旧值覆盖验证 URL。
+            val verifyClient = okHttpClient.newBuilder()
+                .apply {
+                    // 移除 BaseUrlInterceptor（动态替换 URL 的拦截器）
+                    interceptors().removeIf { it is com.drama.app.data.remote.interceptor.BaseUrlInterceptor }
+                }
                 .build()
             val apiBaseUrl = if (!baseUrl.isNullOrBlank()) {
                 val base = baseUrl.trimEnd('/')
@@ -32,7 +36,7 @@ class AuthRepositoryImpl @Inject constructor(
             }
             val retrofit = Retrofit.Builder()
                 .baseUrl(apiBaseUrl)
-                .client(noAuthClient)
+                .client(verifyClient)
                 .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
                 .build()
             val authApi = retrofit.create(AuthApiService::class.java)
@@ -46,11 +50,16 @@ class AuthRepositoryImpl @Inject constructor(
             Result.failure(Exception("TIMEOUT"))
         } catch (e: ConnectException) {
             Result.failure(Exception("NETWORK_UNREACHABLE"))
+        } catch (e: javax.net.ssl.SSLException) {
+            Result.failure(Exception("SSL_ERROR:${e.message}"))
+        } catch (e: java.net.UnknownHostException) {
+            Result.failure(Exception("DNS_ERROR:${e.message}"))
         } catch (e: retrofit2.HttpException) {
-            if (e.code() == 401) {
-                Result.failure(Exception("AUTH_FAILED"))
-            } else {
-                Result.failure(Exception("UNKNOWN:${e.code()}"))
+            when (e.code()) {
+                401 -> Result.failure(Exception("AUTH_FAILED"))
+                504 -> Result.failure(Exception("TIMEOUT"))  // NetworkExceptionInterceptor 合成的 504
+                503 -> Result.failure(Exception("NETWORK_UNREACHABLE"))  // NetworkExceptionInterceptor 合成的 503
+                else -> Result.failure(Exception("UNKNOWN:${e.code()}"))
             }
         } catch (e: Exception) {
             Result.failure(Exception("UNKNOWN:${e.message}"))

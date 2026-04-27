@@ -65,13 +65,21 @@ async def websocket_endpoint(websocket: WebSocket):
     _validate_ws_token(websocket)
 
     manager = websocket.app.state.connection_manager
+    auth_enabled = getattr(websocket.app.state, "auth_enabled", False)
+    client_ip = websocket.client.host if websocket.client else "unknown"
+    logger.info("WS connection request: client=%s, auth_enabled=%s", client_ip, auth_enabled)
+
     try:
         accepted = await manager.connect(websocket)
     except Exception as e:
-        logger.error("WS accept/replay failed: %s", e, exc_info=True)
+        logger.error("WS accept/replay failed: %s (client=%s)", e, client_ip, exc_info=True)
         return
     if not accepted:
-        return  # Connection rejected — limit exceeded
+        logger.warning("WS connection rejected — limit exceeded (client=%s, active=%d)",
+                        client_ip, len(manager.active_connections))
+        return
+
+    logger.info("WS connected: client=%s, active_connections=%d", client_ip, len(manager.active_connections))
 
     # D-14: Start heartbeat as background task
     heartbeat_task = asyncio.create_task(manager.heartbeat(websocket))
@@ -103,12 +111,19 @@ async def websocket_endpoint(websocket: WebSocket):
             msg_type = data.get("type", "")
             if msg_type == "pong":
                 manager.record_pong(websocket)
-            # Ignore unknown message types — WS is pure receiver (D-11)
+            elif msg_type == "heartbeat":
+                # 兼容旧版客户端自定义心跳 — 回复 pong 并记录
+                manager.record_pong(websocket)
+                try:
+                    await websocket.send_json({"type": "pong"})
+                except Exception:
+                    pass
+            # 其他类型消息忽略 — WS 是纯接收通道 (D-11)
     except WebSocketDisconnect:
-        logger.info("WS client disconnected normally")
+        logger.info("WS client disconnected normally (client=%s)", client_ip)
     except Exception as e:
         # Unexpected error — still clean up
-        logger.warning("WS receive loop error: %s", e, exc_info=True)
+        logger.warning("WS receive loop error: %s (client=%s)", e, client_ip, exc_info=True)
     finally:
         heartbeat_task.cancel()
         try:

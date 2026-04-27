@@ -23,8 +23,21 @@ android {
 
     buildTypes {
         release {
+            // D-23-08: 启用 R8 混淆 + 资源压缩
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+            // D-23-14: Release 使用严格网络安全配置
+            manifestPlaceholders["networkSecurityConfig"] = "@xml/network_security_config"
+        }
+        debug {
             isMinifyEnabled = false
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // debug 不启用混淆，保持开发体验
+            // D-23-14: Debug 使用宽松网络安全配置（允许 LAN 明文）
+            manifestPlaceholders["networkSecurityConfig"] = "@xml/network_security_config_debug"
         }
     }
 
@@ -39,6 +52,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -83,4 +97,10 @@ dependencies {
 
     // Security — EncryptedSharedPreferences for token storage (D-04)
     implementation(libs.security.crypto)
+
+    // D-23-12: 单元测试依赖
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.mockito.kotlin:mockito-kotlin:5.4.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
 }

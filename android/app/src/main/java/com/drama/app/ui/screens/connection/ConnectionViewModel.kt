@@ -84,10 +84,11 @@ class ConnectionViewModel @Inject constructor(
                 }
             }.onFailure { error ->
                 // D-03: 区分错误类型
-                val errorType = when (error.message) {
-                    "TIMEOUT" -> ErrorType.TIMEOUT
-                    "NETWORK_UNREACHABLE" -> ErrorType.NETWORK_UNREACHABLE
-                    "AUTH_FAILED" -> ErrorType.AUTH_FAILED
+                val errorType = when {
+                    error.message == "TIMEOUT" || error.message?.startsWith("TIMEOUT") == true -> ErrorType.TIMEOUT
+                    error.message == "NETWORK_UNREACHABLE" || error.message?.startsWith("DNS_ERROR") == true -> ErrorType.NETWORK_UNREACHABLE
+                    error.message == "AUTH_FAILED" -> ErrorType.AUTH_FAILED
+                    error.message?.startsWith("SSL_ERROR") == true -> ErrorType.NETWORK_UNREACHABLE
                     else -> ErrorType.UNKNOWN
                 }
                 _uiState.value = _uiState.value.copy(

@@ -1,0 +1,26 @@
+{
+  "name": "actor_郭嘉",
+  "description": "演员 郭嘉，角色：谋士（Supporting）",
+  "url": "http://localhost:9031/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_郭嘉",
+      "name": "扮演郭嘉",
+      "description": "以郭嘉的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

@@ -37,19 +37,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 
-// Slash commands supported by the input bar
+// ★ D-22-01: 功能性斜杠命令（有聊天等价物的命令已移除：/action→自由文本, /speak→@提及, /steer→/action, /auto→/action, /storm→/action, /cast→演员面板）
 private val SLASH_COMMANDS = listOf(
-    SlashCommand("/start", "<主题>", "开始一个新戏剧场景"),
     SlashCommand("/next", "", "推进到下一个情节"),
-    SlashCommand("/action", "<描述>", "以主角身份执行动作"),
-    SlashCommand("/cast", "", "查看当前演员阵容及状态"),
+    SlashCommand("/end", "", "落幕，结束当前剧本"),
     SlashCommand("/save", "[名称]", "保存当前场景到本地"),
     SlashCommand("/load", "<名称>", "加载已保存的本地场景"),
     SlashCommand("/list", "", "列出所有本地存档"),
     SlashCommand("/delete", "<名称>", "删除指定的本地存档"),
-    SlashCommand("/export", "", "导出当前场景"),
-    SlashCommand("/status", "", "查看当前状态"),
-    SlashCommand("/quit", "", "退出当前场景"),
 )
 
 private data class SlashCommand(
@@ -59,6 +54,18 @@ private data class SlashCommand(
 ) {
     val display: String get() = if (args.isNotEmpty()) "$command $args" else command
 }
+
+private data class QuickAction(
+    val label: String,
+    val command: String,
+    val icon: String,
+)
+
+// ★ D-22-02: 快捷操作芯片 — 高频命令的一键入口
+private val QUICK_ACTIONS = listOf(
+    QuickAction("下一场", "/next", "»"),
+    QuickAction("落幕", "/end", "🏁"),
+)
 
 @Composable
 fun ChatInputBar(
@@ -124,6 +131,29 @@ fun ChatInputBar(
             }
         }
 
+        // ★ D-22-02: Quick action chips — /next /end shortcuts
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.Start),
+        ) {
+            QUICK_ACTIONS.forEach { action ->
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.tertiaryContainer,
+                    onClick = { onCommand(action.command) },
+                ) {
+                    Text(
+                        text = "${action.icon} ${action.label}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                    )
+                }
+            }
+        }
+
         // Slash command dropdown menu (shown above the input row)
         Box(modifier = Modifier.fillMaxWidth()) {
             // Input row
@@ -154,7 +184,7 @@ fun ChatInputBar(
                                 isLocked -> "AI 正在思考，请稍候..."
                                 isReconnecting -> "正在重新连接..."
                                 !isWsConnected -> "离线模式 — 消息将通过 REST 发送"
-                                else -> "以主角身份发言或输入命令..."
+                                else -> "发消息给角色们..."
                             },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),

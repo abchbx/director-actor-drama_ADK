@@ -1,0 +1,26 @@
+{
+  "name": "actor_暗羽",
+  "description": "演员 暗羽，角色：潜伏的威胁",
+  "url": "http://localhost:9061/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_暗羽",
+      "name": "扮演暗羽",
+      "description": "以暗羽的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

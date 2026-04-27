@@ -15,8 +15,13 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import kotlinx.coroutines.delay
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalUriHandler
@@ -394,4 +399,41 @@ private fun androidx.compose.ui.text.AnnotatedString.Builder.processInlineMarkdo
     if (text.isEmpty()) {
         append("")
     }
+}
+
+/**
+ * ★ 打字机效果 Markdown 文本 — 逐字显示，营造流式输出感
+ *
+ * @param id 气泡唯一 ID，用于保持打字状态
+ * @param markdown 完整 Markdown 文本
+ * @param typingSpeedMs 每字符延迟（默认 20ms）
+ */
+@Composable
+fun TypewriterMarkdownText(
+    id: String,
+    markdown: String,
+    modifier: Modifier = Modifier,
+    style: TextStyle = MaterialTheme.typography.bodyLarge,
+    enableLinks: Boolean = true,
+    config: MarkdownConfig = MarkdownConfig(),
+    typingSpeedMs: Long = 20L,
+) {
+    var visibleLength by remember(id) { mutableIntStateOf(0) }
+    val targetLength = markdown.length
+
+    LaunchedEffect(id, markdown) {
+        visibleLength = 0
+        while (visibleLength < targetLength) {
+            delay(typingSpeedMs)
+            visibleLength = (visibleLength + 1).coerceAtMost(targetLength)
+        }
+    }
+
+    MarkdownText(
+        markdown = markdown.take(visibleLength),
+        modifier = modifier,
+        style = style,
+        enableLinks = enableLinks,
+        config = config,
+    )
 }
