@@ -1,0 +1,26 @@
+{
+  "name": "actor_野比大雄",
+  "description": "演员 野比大雄，角色：主角",
+  "url": "http://localhost:9047/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_野比大雄",
+      "name": "扮演野比大雄",
+      "description": "以野比大雄的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

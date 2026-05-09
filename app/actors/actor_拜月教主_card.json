@@ -1,0 +1,26 @@
+{
+  "name": "actor_拜月教主",
+  "description": "演员 拜月教主，角色：反派",
+  "url": "http://localhost:9077/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_拜月教主",
+      "name": "扮演拜月教主",
+      "description": "以拜月教主的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

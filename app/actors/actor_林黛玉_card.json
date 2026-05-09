@@ -1,6 +1,6 @@
 {
   "name": "actor_林黛玉",
-  "description": "演员 林黛玉，角色：女主 · 贾府表小姐",
+  "description": "演员 林黛玉，角色：女主角",
   "url": "http://localhost:9079/",
   "version": "1.0.0",
   "capabilities": {

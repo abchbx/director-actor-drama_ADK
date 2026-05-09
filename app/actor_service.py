@@ -87,8 +87,7 @@ def generate_actor_agent_code(
                 if actor.get("is_user_protagonist") or actor.get("control_type") == "User-Controlled":
                     user_protagonist_info = (
                         f"- **{actor['name']}**（{actor['role']}，用户控制）："
-                        f"这是本剧的头号主角，由用户实时控制。你必须主动与「{actor['name']}」互动——"
-                        f"向其提问、挑战、寻求协作或回应其行为。不要等待，主动发起对话。"
+                        f"由用户实时控制，其行动和台词由用户输入决定。"
                     )
                 else:
                     actors_info.append(

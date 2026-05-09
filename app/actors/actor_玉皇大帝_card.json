@@ -1,0 +1,26 @@
+{
+  "name": "actor_玉皇大帝",
+  "description": "演员 玉皇大帝，角色：对立面",
+  "url": "http://localhost:9067/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_玉皇大帝",
+      "name": "扮演玉皇大帝",
+      "description": "以玉皇大帝的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "name": "actor_曹孟",
+  "description": "演员 曹孟，角色：对手——曹操的梦境化身，权谋枭雄",
+  "url": "http://localhost:9063/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_曹孟",
+      "name": "扮演曹孟",
+      "description": "以曹孟的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

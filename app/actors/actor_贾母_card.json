@@ -1,0 +1,26 @@
+{
+  "name": "actor_贾母",
+  "description": "演员 贾母，角色：荣国府老太君，元婴期大修士，家族定海神针",
+  "url": "http://localhost:9074/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_贾母",
+      "name": "扮演贾母",
+      "description": "以贾母的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

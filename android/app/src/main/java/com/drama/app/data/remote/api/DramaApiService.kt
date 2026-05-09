@@ -29,6 +29,9 @@ interface DramaApiService {
     @POST("drama/chat")
     suspend fun chatMessage(@Body request: ChatRequestDto): CommandResponseDto
 
+    @POST("drama/free_chat")
+    suspend fun freeChatMessage(@Body request: FreeChatRequestDto): CommandResponseDto
+
     @POST("drama/end")
     suspend fun endDrama(): CommandResponseDto
 

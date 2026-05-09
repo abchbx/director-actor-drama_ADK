@@ -300,6 +300,45 @@ Phase 16 (Android Foundation) ──── Phase 17 (Android Interaction) ──
 | 21. Events & Export Completion | v2.0-gap | 1/1 | Complete | 2026-04-26 |
 | 22. 群聊模式改造 | v3.0 | 1/1 | Complete | 2026-04-26 |
 | 23. Android技术债务治理 | v2.5 | 3/3 | Complete | 2026-04-26 |
+| 24. 场景级演员调度 | v3.0 | 2/2 | Complete | 2026-04-29 |
+| 25. 双模式聊天切换 | v3.0 | 1/1 | Complete | 2026-04-29 |
+| 26. MVI 架构演进 | v3.5 | 2/2 | Complete | 2026-05-01 |
+| 27. 命令队列解耦 | v3.5 | 1/1 | Complete | 2026-05-02 |
+
+### Phase 24: 场景级演员调度
+
+**Goal:** 导演控制每场戏上场演员名单，未上场演员进入待机状态。后端引入 scene_cast 机制，Android 客户端区分在场/待机演员，WS 推送演员上下场事件。
+**Requirements:** CAST-01~CAST-06
+**Depends on:** Phase 22 (群聊模式), Phase 23 (Android 技术债务治理)
+**Plans:** 2 plans defined
+
+**Success Criteria:**
+1. 后端 state 新增 `scene_cast` 字段，记录当前场景上场演员名单
+2. `next_scene()` 支持导演指定本场演员名单，默认所有 AI 演员上场
+3. `actor_speak_batch()` 仅调用 `scene_cast` 中的上场演员，待机演员不参与
+4. 新增 `set_scene_cast(actor_names)` 工具，让导演手动调整上场演员
+5. Android `ActorInfo` 增加 `onStage: Boolean` 字段，WS 事件推送上下场变更
+6. Android 演员面板区分在场（高亮）和待机（灰显），支持导演手动切换上下场
+7. 场景切换时自动推送 `cast_change` WS 事件，包含上场/下场演员列表
+
+Plans:
+- [x] 24-01-PLAN.md — 后端 scene_cast 机制 + set_scene_cast 工具 + next_scene/actor_speak_batch 改造
+- [x] 24-02-PLAN.md — Android ActorInfo 扩展 + cast_change WS 事件 + 演员面板 UI 改造
+
+---
+
+### Phase 27: 命令队列解耦 + 锁粒度细化
+
+**Goal:** 解决 Python 后端全局 `asyncio.Lock` 阻塞问题：导演命令端点改为异步入队，后台 Worker 串行消费执行。
+**Requirements:** CQ-01~CQ-05
+**Depends on:** Phase 13 (API Foundation)
+**Plans:** 1/1 plan complete
+**Success Criteria:
+1. API 端点 <50ms 返回 `status=queued`
+2. Worker 单协程串行持有 `runner_lock`，ADK 状态安全
+3. WS 事件推送随命令入队，执行期间正常推送
+4. GET `/command/{id}` 支持轮询命令状态
+5. 已完成命令 5 分钟后自动清理
 
 ---
 
@@ -307,3 +346,73 @@ Phase 16 (Android Foundation) ──── Phase 17 (Android Interaction) ──
 *v2.0 phases added: 2026-04-14*
 *v2.0 gap closure phases 19-21 added: 2026-04-16*
 *v2.5 tech debt phase 23 added: 2026-04-25*
+*v3.0 phase 24 (场景级演员调度) added: 2026-04-29*
+
+### Phase 25: 双模式聊天切换
+
+|**Goal:** 在 Android 剧本详情页实现显式的双模式聊天切换：群聊模式（导演控制）与自由模式（A2A 直接调用演员）。
+|**Requirements:** DUAL-01~DUAL-08
+|**Depends on:** Phase 22 (群聊模式), Phase 24 (场景级演员调度)
+|**Plans:** 1/1 plan complete
+|**Success Criteria:**
+1. Android 聊天界面顶部/输入区有显眼的模式切换控件
+2. 剧情推进模式下，消息走导演 Agent
+3. 自由模式下，消息直接通过 A2A 发给演员，无导演干预
+4. 自由模式支持 `@提及`，无提及时广播给所有在场演员
+5. 两种模式的消息在同一个会话中混排显示
+6. 模式切换时，输入框 placeholder、快捷芯片、发送行为同步变化
+7. 后端 `/drama/free_chat` 能正确返回演员回应，并通过 WS 推送 `dialogue` 事件
+
+Plans:
+- [x] 25-01-PLAN.md — 后端 `/drama/free_chat` + `free_chat_service.py` + Android 模式切换 UI + 发送逻辑分离
+
+---
+
+## v3.5 架构升级 (Phase 26)
+
+**Goal:** 将现有 MVVM + StateFlow 架构演进为严格 MVI（Model-View-Intent），实现 Intent → Reducer → State → Effect 单向数据流，消除多并发 WebSocket 消息推送导致的 UI 闪烁和状态不一致。
+
+### Phase 26: MVI 架构演进
+
+|**Goal:** 建立 MVI 基座（BaseMviViewModel + 标记接口），三屏全部迁移为 Intent → Reducer → State → Effect 严格单向数据流。
+|**Requirements:** MVI-01~MVI-07
+|**Depends on:** Phase 23 (tech-debt 子组件化), Phase 25 (dual-chat-mode)
+|**Plans:** 2 plans defined
+
+|**Success Criteria:**
+1. 所有 ViewModel 只有一个 public 方法：`processIntent()`
+2. WebSocket 事件、用户操作、系统回调全部经 Intent 队列顺序处理
+3. Reducer 为纯函数，无副作用，可直接单元测试
+4. 多并发 WS 消息推送时 UI 无闪烁、state 无竞态
+5. 现有 orchestrator 子组件职责不变，输出通过 Intent 入队
+6. DramaList / DramaCreate / DramaDetail 三屏全部完成迁移，编译通过
+7. 单元测试覆盖 Reducer 关键路径
+
+Plans:
+- [x] 26-01-PLAN.md — MVI 基座搭建：BaseMviViewModel + MviIntent/State/Effect 标记接口 + DramaListScreen 低风险验证
+- [x] 26-02-PLAN.md — 核心攻坚：DramaDetailViewModel 完整 MVI 迁移（WS 事件 Intent 化 + Reducer 纯函数）+ DramaCreateViewModel 迁移
+
+### Phase 28: 分层记忆机制重构：引入 Mem0/Letta/ReMe 式三层记忆架构
+
+**Goal:** 将现有四层记忆架构重构为三层清晰边界的记忆系统，提高 LLM 召回精度并节省 Token
+**Requirements**: MEM-01~MEM-05
+**Depends on:** Phase 27
+**Plans:** 1/1 plans complete
+
+**Success Criteria:**
+1. `build_actor_context()` 输出明确包含【工作记忆】【短期记忆】【长期记忆】三个区块
+2. 向量记忆召回支持按 RIR（Recency + Importance + Relevance）综合评分排序
+3. 工作记忆容量收紧为 3 条，场景切换时自动迁移至短期记忆
+4. 回归测试全部通过（25 项新测试 + 原有测试不破坏）
+5. 向后兼容：旧存档通过 `ensure_actor_memory_fields` 自动初始化 `short_term_memory`
+
+Plans:
+- [x] 28-01-PLAN.md — 新建 `short_term_memory.py` L2 模块 + RIR 评分 + `memory_manager.py` 集成 + `context_builder.py` 三层组装 + 回归测试
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 28 to break down)
+
+---
+
+*v3.0 phase 25 (双模式聊天切换) added: 2026-04-29*
+*v3.5 phase 26 (MVI 架构演进) added: 2026-05-01*

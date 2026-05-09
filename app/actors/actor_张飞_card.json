@@ -1,6 +1,6 @@
 {
   "name": "actor_张飞",
-  "description": "演员 张飞，角色：义弟/武将",
+  "description": "演员 张飞，角色：刘备义弟",
   "url": "http://localhost:9026/",
   "version": "1.0.0",
   "capabilities": {

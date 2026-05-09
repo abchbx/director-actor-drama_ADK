@@ -75,17 +75,51 @@ async def get_drama_scene_detail(
         if scene_number == current_scene and current_scene > 0:
             return SceneDetailResponse(
                 scene_number=scene_number,
-                title=f"第{scene_number}场",
+                title="",
                 narration="",
                 dialogue=[],
                 raw={"status": "pending", "message": "Scene content not yet generated"},
             )
         raise HTTPException(status_code=404, detail=result["message"])
+    narration = result.get("narration", "")
+    dialogue = result.get("dialogue", [])
+
+    # ★ 修复：scene 归档数据只有 content（导演完整输出），没有分离的 narration/dialogue。
+    # 从 conversation_log 中按 scene 过滤，重建分离的 narration 和 dialogue 列表。
+    if not dialogue:
+        from app.state_manager import get_conversation_log
+        conv_result = get_conversation_log(scene=scene_number, tool_context=tool_context)
+        conv_entries = conv_result.get("entries", [])
+
+        narration_parts = []
+        dialogue_list = []
+
+        for entry in conv_entries:
+            entry_type = entry.get("type", "")
+            if entry_type == "narration":
+                narration_parts.append(entry.get("content", ""))
+            elif entry_type == "dialogue":
+                dialogue_list.append({
+                    "actor_name": entry.get("speaker", ""),
+                    "text": entry.get("content", ""),
+                    "emotion": "",
+                    "sender_name": entry.get("speaker", ""),
+                })
+
+        if narration_parts:
+            narration = "\n\n".join(narration_parts)
+        if dialogue_list:
+            dialogue = dialogue_list
+
+    # 兜底：如果 narration 仍为空，回退到 content
+    if not narration:
+        narration = result.get("content", "")
+
     return SceneDetailResponse(
         scene_number=scene_number,
         title=result.get("title", ""),
-        narration=result.get("narration", "") or result.get("content", ""),
-        dialogue=result.get("dialogue", []),
+        narration=narration,
+        dialogue=dialogue,
         raw=result,
     )
 
@@ -134,6 +168,9 @@ async def get_cast_status(
     _require_active_drama(tool_context)
     from app.actor_service import list_running_actors
     result = list_running_actors()
+    # Phase 24: Include scene_cast in response
+    drama_state = tool_context.state.get("drama", {})
+    result["scene_cast"] = drama_state.get("scene_cast")
     return CastStatusResponse(**result)
 
 

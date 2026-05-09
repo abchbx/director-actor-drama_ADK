@@ -1,6 +1,6 @@
 {
   "name": "actor_贾宝玉",
-  "description": "演员 贾宝玉，角色：主角 · 荣国府嫡孙",
+  "description": "演员 贾宝玉，角色：主角",
   "url": "http://localhost:9017/",
   "version": "1.0.0",
   "capabilities": {

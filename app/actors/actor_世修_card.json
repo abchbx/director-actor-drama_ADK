@@ -1,0 +1,26 @@
+{
+  "name": "actor_世修",
+  "description": "演员 世修，角色：特殊角色",
+  "url": "http://localhost:9094/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_世修",
+      "name": "扮演世修",
+      "description": "以世修的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

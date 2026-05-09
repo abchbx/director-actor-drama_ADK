@@ -1,0 +1,26 @@
+{
+  "name": "actor_阿奴",
+  "description": "演员 阿奴，角色：配角",
+  "url": "http://localhost:9073/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_阿奴",
+      "name": "扮演阿奴",
+      "description": "以阿奴的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

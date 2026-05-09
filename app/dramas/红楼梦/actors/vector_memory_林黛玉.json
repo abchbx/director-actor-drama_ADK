@@ -1,0 +1,178 @@
+[
+  {
+    "id": "31fe0c14-bffb-44f6-a67e-5e1b7bb4c7ad",
+    "content": "面对情境: 见宝玉来访，心中泛起涟漪，却又故作嗔怪，问他为何又来打扰自己读书。",
+    "metadata": {
+      "type": "working_memory",
+      "actor_name": "林黛玉",
+      "scene": 1,
+      "stored_at": "2026-05-08T01:38:36.040823",
+      "importance": "normal"
+    }
+  },
+  {
+    "id": "a6c1b914-671b-467f-9a08-55b7799bc5cf",
+    "content": "我说：宝二爷今日怎么又得闲了？我这潇湘馆的清净，怕是要被你搅得七零八落了。你且说来，又是为何而来？",
+    "metadata": {
+      "importance": "normal",
+      "scene": 1,
+      "type": "working_memory",
+      "stored_at": "2026-05-08T01:38:46.711636",
+      "actor_name": "林黛玉"
+    }
+  },
+  {
+    "id": "812ef8d0-44c4-4ba9-9152-1e60c4357c5b",
+    "content": "面对情境: 见宝玉凑近，有些心虚地将书藏到身后，嘴硬说不过是些闲书杂书，没什么好看的。",
+    "metadata": {
+      "type": "working_memory",
+      "importance": "normal",
+      "actor_name": "林黛玉",
+      "stored_at": "2026-05-08T01:38:54.619637",
+      "scene": 1
+    }
+  },
+  {
+    "id": "401fb594-659c-4834-a7ae-b2931762926e",
+    "content": "我说：你凑这么近做什么？我又没做什么见不得人的事，不过是随手翻翻罢了。你若不信，尽管去问紫鹃，这潇湘馆里有什么值当你这般鬼鬼祟祟地来查的。",
+    "metadata": {
+      "importance": "normal",
+      "actor_name": "林黛玉",
+      "stored_at": "2026-05-08T01:39:01.025447",
+      "type": "working_memory",
+      "scene": 1
+    }
+  },
+  {
+    "id": "ec2f490c-1b70-4c22-a295-a625cbc252b2",
+    "content": "面对情境: 见瞒不过，便将书递给宝玉，却叮嘱他不可告诉他人。两人临窗共读，春光与情思交织。",
+    "metadata": {
+      "type": "working_memory",
+      "stored_at": "2026-05-08T01:39:10.319888",
+      "scene": 1,
+      "importance": "normal",
+      "actor_name": "林黛玉"
+    }
+  },
+  {
+    "id": "71d486db-6955-4431-89e7-44f4454f4403",
+    "content": "我说：宝二爷，你可记着了，这书的事只许你一人知道。若是传出去半个字，我可再不理会你了。",
+    "metadata": {
+      "importance": "normal",
+      "scene": 1,
+      "stored_at": "2026-05-08T01:39:18.640728",
+      "type": "working_memory",
+      "actor_name": "林黛玉"
+    }
+  },
+  {
+    "id": "11fb3eab-3053-4833-ac3f-c6905c04fc9e",
+    "content": "面对情境: 听宝玉如此说，心中微动，却又添了几分愁绪。轻声道：'这世间才子佳人的故事，往往以悲剧收场……'说罢，眼眶竟有些红了。",
+    "metadata": {
+      "actor_name": "林黛玉",
+      "type": "working_memory",
+      "stored_at": "2026-05-08T01:39:29.822117",
+      "importance": "normal",
+      "scene": 1
+    }
+  },
+  {
+    "id": "97242cb2-e941-4589-a0a9-a34daee2bd1a",
+    "content": "我说：我不过是随口说说罢了……你又何必这般看着我。",
+    "metadata": {
+      "importance": "normal",
+      "type": "working_memory",
+      "stored_at": "2026-05-08T01:39:40.906818",
+      "scene": 1,
+      "actor_name": "林黛玉"
+    }
+  },
+  {
+    "id": "e6edec39-f771-48dc-a2be-aaad7544b297",
+    "content": "面对情境: 见宝钗问起，有些心虚地将书藏到身后，嘴上却说不过是诗词歌赋，有什么可看的。",
+    "metadata": {
+      "importance": "normal",
+      "stored_at": "2026-05-08T01:40:17.627050",
+      "actor_name": "林黛玉",
+      "type": "working_memory",
+      "scene": 1
+    }
+  },
+  {
+    "id": "8e38e869-32a2-4136-9985-30728858c25e",
+    "content": "我说：不过是些诗词歌赋罢了，宝姐姐若是爱看，回头我借你便是。只是这书……你既没瞧见，我也没说过。",
+    "metadata": {
+      "type": "working_memory",
+      "importance": "normal",
+      "stored_at": "2026-05-08T01:40:23.491287",
+      "scene": 1,
+      "actor_name": "林黛玉"
+    }
+  },
+  {
+    "id": "a194c96e-24f5-4de9-a108-268de143a866",
+    "content": "面对情境: 黛玉见宝玉在宝钗面前这般乖顺，心中酸涩，面上却冷笑道：'宝姐姐自然比我懂得多，知道怎么讨老爷欢心。'",
+    "metadata": {
+      "scene": 2,
+      "importance": "normal",
+      "actor_name": "林黛玉",
+      "stored_at": "2026-05-08T01:43:41.719743",
+      "type": "working_memory"
+    }
+  },
+  {
+    "id": "fddaa525-2fc8-4d96-be2e-0a352e5db9a2",
+    "content": "我说：（内心：虽知不该如此刻薄，可这话说出口，心里却更难受了。）",
+    "metadata": {
+      "actor_name": "林黛玉",
+      "stored_at": "2026-05-08T01:44:08.799633",
+      "type": "working_memory",
+      "importance": "normal",
+      "scene": 2
+    }
+  },
+  {
+    "id": "6e04ce5e-f8f7-4b64-97c3-17f36e3909c0",
+    "content": "面对情境: 黛玉话一出口便觉后悔，却又不肯低头，只别过脸去望着窗外翠竹，手指无意识地绞着手帕。",
+    "metadata": {
+      "actor_name": "林黛玉",
+      "importance": "normal",
+      "scene": 2,
+      "type": "working_memory",
+      "stored_at": "2026-05-08T01:44:17.024320"
+    }
+  },
+  {
+    "id": "5b584fce-0319-4a1e-84b9-f487738584e8",
+    "content": "我说：（内心：罢了罢了，说都说了，他若要恼便恼去，我又何须在意……可这心里，为何这般难安……）\n\n你既要去找宝姐姐，便去罢。我这潇湘馆庙小，容不下你这尊大佛。",
+    "metadata": {
+      "actor_name": "林黛玉",
+      "stored_at": "2026-05-08T01:44:28.558126",
+      "importance": "normal",
+      "type": "working_memory",
+      "scene": 2
+    }
+  },
+  {
+    "id": "30078644-a58f-4f8b-b207-0c5de4d5c9cb",
+    "content": "面对情境: 见贾政突然驾临，心下大惊，见宝玉那般惶恐模样，又心疼又担忧，却又不敢出声。",
+    "metadata": {
+      "importance": "normal",
+      "stored_at": "2026-05-08T01:48:40.520419",
+      "type": "working_memory",
+      "actor_name": "林黛玉",
+      "scene": 2
+    }
+  },
+  {
+    "id": "debc8804-99b9-4376-89ec-d1f3ab2c75b6",
+    "content": "我说：（内心：老爷来了，他这般惶恐模样……我的心都揪起来了。可恨我又能说什么呢，只盼他今日能平安过去……）",
+    "metadata": {
+      "stored_at": "2026-05-08T01:48:53.596206",
+      "scene": 2,
+      "importance": "normal",
+      "type": "working_memory",
+      "actor_name": "林黛玉"
+    }
+  }
+]

@@ -18,7 +18,7 @@ from typing import Optional
 
 from google.adk.tools import ToolContext
 
-from .memory_manager import _merge_pending_compression
+from .memory_manager import _merge_pending_compression, WORKING_MEMORY_LIMIT
 from .state_manager import _get_state, _set_state
 from .semantic_retriever import retrieve_relevant_scenes, _extract_auto_tags, _normalize_scene_range
 from .conflict_engine import CONFLICT_TEMPLATES
@@ -46,9 +46,11 @@ DEFAULT_DIRECTOR_TOKEN_BUDGET = 30000
 
 # Section priorities for actor context (higher = less likely to truncate)
 _ACTOR_SECTION_PRIORITIES = {
-    "working_memory": 1,
+    "working_memory": 1,       # L1: current scene (Phase 28)
+    "short_term_memory": 2,    # L2: recent scene summaries (Phase 28)
     "pending_memory": 1,
-    "scene_summaries": 2,
+    "scene_summaries": 2,      # Legacy: same priority as short_term
+    "vector_memory": 2,        # L3: long-term semantic recall (Phase 28)
     "arc_summary": 3,
     "critical_memories": 4,
     "emotion": 5,
@@ -422,9 +424,10 @@ def _assemble_actor_sections(
         })
 
     # Tier 1: Working memory (priority 1, truncatable with items)
+    # Phase 28: working_memory is now strictly L1 — current scene only, max 3 entries
     working = actor_data.get("working_memory", [])
     if working:
-        recent = working[-5:]
+        recent = working[-WORKING_MEMORY_LIMIT:]  # tightened to 3
         items = []
         for e in recent:
             scene_str = f"第{e.get('scene', '?')}场"
@@ -435,11 +438,29 @@ def _assemble_actor_sections(
             items.append(f"  {scene_str}: {e['entry']}")
         sections.append({
             "key": "working_memory",
-            "text": "【最近的经历（详细）】\n" + "\n".join(items),
+            "text": "【工作记忆（当前场景）】\n" + "\n".join(items),
             "priority": _ACTOR_SECTION_PRIORITIES["working_memory"],
             "truncatable": True,
-            "header": "【最近的经历（详细）】",
+            "header": "【工作记忆（当前场景）】",
             "items": items,
+        })
+
+    # Phase 28: Tier 2 — Short-term memory (priority 2, truncatable with items)
+    short_term = actor_data.get("short_term_memory", [])
+    if short_term:
+        recent_stm = short_term[-5:]
+        stm_items = []
+        for entry in recent_stm:
+            scene_range = entry.get("scene_range", "")
+            summary = entry.get("summary", "")
+            stm_items.append(f"  第{scene_range}场：{summary}")
+        sections.append({
+            "key": "short_term_memory",
+            "text": "【短期记忆（近期场景摘要）】\n" + "\n".join(stm_items),
+            "priority": _ACTOR_SECTION_PRIORITIES.get("short_term_memory", 2),
+            "truncatable": True,
+            "header": "【短期记忆（近期场景摘要）】",
+            "items": stm_items,
         })
 
     # Fallback: pending entries not yet compressed (D-09)
@@ -456,6 +477,41 @@ def _assemble_actor_sections(
             "truncatable": True,
         })
 
+    # Phase 28: Tier 3 — Long-term vector memory (L3)
+    # RIR-ranked semantic recall from vector store
+    try:
+        from .short_term_memory import rank_vector_results_by_rir
+        from .vector_memory import search_actor_memory
+        state_ref = _get_state(tool_context)
+        current_scene_num = state_ref.get("current_scene", 0)
+        vector_results = search_actor_memory(
+            actor_name=actor_name,
+            query=f"第{current_scene_num}场 {actor_name}的经历",
+            n_results=6,
+            tool_context=tool_context,
+        )
+        if vector_results:
+            ranked = rank_vector_results_by_rir(vector_results, current_scene_num)
+            l3_lines = []
+            for r in ranked[:3]:
+                meta = r.get("metadata", {})
+                scene = meta.get("scene", "")
+                rir = r.get("rir_score", 0)
+                scene_label = f"[第{scene}场] " if scene else ""
+                l3_lines.append(
+                    f"- {scene_label}{r.get('content', '')[:120]} "
+                    f"(相关度:{r.get('relevance', 0):.0%}, RIR:{rir:.2f})"
+                )
+            if l3_lines:
+                sections.append({
+                    "key": "vector_memory",
+                    "text": "【长期记忆（语义检索）】\n" + "\n".join(l3_lines),
+                    "priority": _ACTOR_SECTION_PRIORITIES.get("vector_memory", 2),
+                    "truncatable": True,
+                })
+    except Exception:
+        pass  # Vector memory optional
+
     # Semantic recall section (priority 0, lowest — D-14/D-16)
     auto_tags = _extract_auto_tags(actor_data, tool_context)
     if auto_tags:
@@ -465,7 +521,7 @@ def _assemble_actor_sections(
         # Collect scene ranges already in sections to avoid duplication (Pitfall 2)
         existing_scene_ranges = set()
         for sec in sections:
-            if sec.get("key") == "scene_summaries":
+            if sec.get("key") in ("scene_summaries", "short_term_memory"):
                 # Parse scene ranges from the section text (e.g., "第3-5场")
                 for match in re.finditer(r'第(\d+)(?:-(\d+))?场', sec.get("text", "")):
                     start = int(match.group(1))

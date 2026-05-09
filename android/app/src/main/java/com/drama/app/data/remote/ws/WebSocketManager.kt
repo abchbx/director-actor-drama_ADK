@@ -169,6 +169,14 @@ class WebSocketManager @Inject constructor(
     }
 
     fun connect(host: String, port: String, token: String?, baseUrl: String? = null): Flow<WsEventDto> {
+        // ★ 修复：如果参数相同且已连接，直接复用现有连接，避免重复建立
+        if (currentHost == host && currentPort == port && currentToken == token
+            && currentBaseUrl == baseUrl && _connectionState.value == ConnectionState.Connected
+            && webSocket != null) {
+            Log.d(TAG, "WS connect: reusing existing connection")
+            return _events.asSharedFlow()
+        }
+
         currentHost = host
         currentPort = port
         currentToken = token
@@ -187,8 +195,13 @@ class WebSocketManager @Inject constructor(
     }
 
     private fun connectInternal() {
-        // Close existing connection before creating a new one
-        webSocket?.close(1000, "Replacing with new connection")
+        // ★ 修复：彻底清理现有连接，避免 active_connections 中出现重复连接
+        webSocket?.let { oldWs ->
+            oldWs.close(1000, "Replacing with new connection")
+            // 立即从 active_connections 中移除，防止广播时发送到旧连接
+            // Note: active_connections 是 ConnectionManager 管理的，这里无法直接访问
+            // 但关闭后 onClosed 会将其移除。关键是不要让它在关闭期间接收新消息。
+        }
         webSocket = null
 
         val thisGeneration = ++connectGeneration

@@ -1,31 +1,31 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.5
-milestone_name: Android 技术债务治理
-current_phase: 23
-status: complete
-last_updated: "2026-04-26T16:00:00.000Z"
-last_activity: 2026-04-26 -- Phase 23 complete (3/3 plans done)
+milestone: v3.5
+milestone_name: Android MVI 架构升级
+current_phase: 28
+status: executing
+last_updated: "2026-05-02T12:00:00.000Z"
+last_activity: 2026-05-02 -- Phase 28 tiered memory architecture implemented (short_term_memory.py + memory_manager.py + context_builder.py + tests)
 progress:
-  total_phases: 11
-  completed_phases: 11
-  total_plans: 26
-  completed_plans: 26
+  total_phases: 1
+  completed_phases: 0
+  total_plans: 1
+  completed_plans: 1
   percent: 100
 ---
 
 # State
 
 **Project:** Director-Actor-Drama 无限畅写版
-**Milestone:** v2.5 Android 技术债务治理
-**Current Phase:** 23 (android-tech-debt) — COMPLETE
-**Status:** All plans executed
+**Milestone:** v3.5 Android MVI 架构升级
+**Current Phase:** 26 (mvi-architecture) — PLANNING (0/2 plans)
+**Status:** Phase 26 planning complete. Ready for execution.
 
 ## Current Position
 
-Phase: 23 (android-tech-debt) — 3/3 plans complete ✅
-Status: Phase 23 COMPLETE
-Last activity: 2026-04-26 -- Phase 23-03 P2/P3 测试补全 complete
+Phase: 26 (mvi-architecture) — 0/2 plans
+Status: PLANNING
+Last activity: 2026-05-01 -- Phase 26 MVI architecture planning created
 
 ## Progress
 
@@ -43,6 +43,10 @@ Last activity: 2026-04-26 -- Phase 23-03 P2/P3 测试补全 complete
 - [x] Phase 21: Events & Export Completion — 1/1 plans complete ✅
 - [x] Phase 22: 群聊模式改造 — 1/1 plans complete ✅
 - [x] Phase 23: Android 技术债务治理 — 3/3 plans complete ✅
+- [x] Phase 24: 场景级演员调度 — 2 plans complete (24-01 backend + 24-02 Android) ✅
+- [x] Phase 25: 双模式聊天切换 — 1 plan complete ✅
+- [x] Phase 26: MVI 架构演进 — 2 plans complete ✅
+- [x] Phase 28: 分层记忆机制重构 — implemented ✅
 
 ## Decisions
 
@@ -160,4 +164,9 @@ All 23-02 deliverables from the original gap analysis have been implemented:
 
 See: .planning/PROJECT.md (updated 2026-04-16)
 **Core value:** 无限畅写，逻辑不断
-**Current focus:** v2.5 milestone complete — ready for v3.0 planning or archive
+**Current focus:** v3.0 Phase 24 — 场景级演员调度 (planning)
+
+## Roadmap Evolution
+
+- Phase 24 added: 场景级演员调度 - 导演控制每场戏上场演员，其余待机
+- Phase 28 added: 分层记忆机制重构 — 引入 Mem0/Letta/ReMe 式三层记忆架构（L1 工作记忆 + L2 短期记忆 + L3 长期记忆）

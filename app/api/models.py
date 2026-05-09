@@ -18,6 +18,7 @@ class StartDramaRequest(BaseModel):
     """Request to start a new drama."""
 
     theme: str = Field(..., min_length=1, max_length=200, description="Drama theme/premise")
+    director_style: str = Field(default="default", description="Director style: default, jiang-wen")
 
 
 class ActionRequest(BaseModel):
@@ -63,6 +64,18 @@ class ChatRequest(BaseModel):
     sender_name: str = Field(default="导演", description="Name of the message sender")
 
 
+class FreeChatRequest(BaseModel):
+    """Request to send a free-chat message directly to actors (bypassing Director).
+
+    Phase 25: Free chat mode — messages go directly to A2A actors without
+    going through the ADK Runner / Director agent.
+    """
+
+    message: str = Field(..., min_length=1, description="Chat message text")
+    mention: str | None = Field(default=None, description="Optional @mention actor name")
+    sender_name: str = Field(default="用户", description="Name of the message sender")
+
+
 class SaveRequest(BaseModel):
     """Request to save drama progress."""
 
@@ -87,12 +100,29 @@ class ExportRequest(BaseModel):
 
 
 class CommandResponse(BaseModel):
-    """Response for command-style endpoints (D-02/D-03)."""
+    """Response for command-style endpoints (D-02/D-03).
+
+    Phase 27: When a command is queued (status="queued"), command_id is set
+    and the client should wait for WebSocket events or poll /command/{id}.
+    """
 
     final_response: str = Field(default="", description="Director's final text response")
     tool_results: list[dict] = Field(default_factory=list, description="Structured results from tool calls")
     status: str = Field(default="success")
     message: str = Field(default="", description="Status message")
+    command_id: str = Field(default="", description="Tracking ID when status=queued")
+
+
+class CommandStatusResponse(BaseModel):
+    """Response for polling command execution status (Phase 27)."""
+
+    command_id: str
+    status: str = Field(..., description="pending | running | completed | failed")
+    command_text: str = ""
+    result: dict = Field(default_factory=dict, description="CommandResponse dict when completed")
+    error: str = ""
+    queue_depth: int = 0
+    elapsed_seconds: float = 0.0
 
 
 class DramaStatusResponse(BaseModel):
@@ -108,6 +138,7 @@ class DramaStatusResponse(BaseModel):
     arc_progress: list[dict] = Field(default_factory=list, description="Per-actor arc progress")
     time_period: str = Field(default="", description="Current time period description")
     has_outline: bool = Field(default=False, description="Whether STORM outline has been synthesized")
+    director_style: str = Field(default="default", description="Current director style")
 
 
 class CastResponse(BaseModel):
@@ -122,6 +153,7 @@ class CastStatusResponse(BaseModel):
 
     status: str = "success"
     actors: dict = Field(default_factory=dict, description="Per-actor A2A status: {name: {pid, running, port}}")
+    scene_cast: list[str] | None = Field(default=None, description="Current scene cast (actor names on stage). None = all actors on stage")
 
 
 class SaveLoadResponse(BaseModel):

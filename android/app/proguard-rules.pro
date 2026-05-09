@@ -1,18 +1,15 @@
-# D-23-09: 保守 keep 策略 — 只 keep DTO 和接口，其余交给 R8 自动分析
+# D-23-09 / Phase 21: 精简 keep 策略 — 移除库自带的冗余规则，只保留应用特有逻辑
+
+-keepattributes *Annotation*, InnerClasses, Signature
 
 # ===== DTO 层 =====
-# 所有 kotlinx.serialization 的 @Serializable 类必须 keep（序列化反射）
--keepattributes *Annotation*, InnerClasses, Signature
--keep class kotlinx.serialization.** { *; }
--keepclassmembers class kotlinx.serialization.** {
-    *** Companion;
-}
+# kotlinx.serialization 通过 @Serializable 反射访问字段，保留 DTO 字段
 -keepclasseswithmembers class **.data.remote.dto.** {
     <fields>;
 }
 
 # ===== API 接口 =====
-# Retrofit 接口方法必须 keep
+# Retrofit 需要保留接口类名和方法签名以便运行时生成代理
 -keep,allowobfuscation interface **.data.remote.api.** {
     *** *(...);
 }
@@ -25,31 +22,34 @@
 -keep class com.drama.app.domain.model.SceneBubble$* { *; }
 -keep class com.drama.app.domain.model.InteractionType { *; }
 
-# ===== OkHttp / Retrofit =====
--dontwarn okhttp3.**
--dontwarn okio.**
--dontwarn retrofit2.**
+# ===== Application 类 =====
+-keep class com.drama.app.DramaApplication { *; }
 
 # ===== Hilt / Dagger =====
+# Hilt 生成的代码及内部类在运行时通过反射访问，需保留
 -keep class dagger.hilt.** { *; }
 -keep class javax.inject.** { *; }
 -keep class * extends dagger.hilt.android.internal.managers.ViewComponentManager$FragmentContextWrapper { *; }
 
-# ===== Compose =====
--keep class androidx.compose.** { *; }
+# ===== kotlinx.serialization =====
+# 内部类在序列化/反序列化时通过反射访问
+-keep class kotlinx.serialization.** { *; }
+-keepclassmembers class kotlinx.serialization.** {
+    *** Companion;
+}
+
+# ===== OkHttp / Retrofit 警告抑制 =====
+-dontwarn okhttp3.**
+-dontwarn okio.**
+-dontwarn retrofit2.**
 -dontwarn androidx.compose.**
 
-# ===== Coroutines =====
--keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
--keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
-
-# ===== Application 类 =====
--keep class com.drama.app.DramaApplication { *; }
--keep class com.drama.app.di.** { *; }
-
-# ===== OkHttp Interceptors (D-23-10) =====
-# Interceptors instantiated by Hilt need their class names preserved
--keep class com.drama.app.data.remote.interceptor.** { *; }
+# ===== Tink / security-crypto (D-04) =====
+# error_prone_annotations 是 Tink 的可选依赖，R8 缺少类检测报错
+-dontwarn com.google.errorprone.annotations.CanIgnoreReturnValue
+-dontwarn com.google.errorprone.annotations.CheckReturnValue
+-dontwarn com.google.errorprone.annotations.Immutable
+-dontwarn com.google.errorprone.annotations.RestrictedApi
 
 # ===== WebView / JS Bridge (if any) =====
 -keepclassmembers class * {

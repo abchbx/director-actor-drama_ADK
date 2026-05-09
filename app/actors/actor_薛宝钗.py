@@ -35,9 +35,12 @@ async def call_actor(actor_name: str, message: str, tool_context=None) -> str:
     
     if not os.path.exists(card_file):
         return f"[无法找到演员 {actor_name} 的信息]"
-    
-    with open(card_file, "r") as f:
-        card_data = json.load(f)
+
+    try:
+        with open(card_file, "r") as f:
+            card_data = json.load(f)
+    except (json.JSONDecodeError, ValueError):
+        return f"[演员 {actor_name} 的信息文件损坏]"
     agent_card = AgentCard(**card_data)
     
     httpx_client = httpx.AsyncClient(timeout=httpx.Timeout(60.0))
@@ -71,13 +74,13 @@ actor_agent = Agent(
 
 ## 角色档案
 - **姓名**: 薛宝钗
-- **身份**: 女配 · 薛家千金
-- **性格**: 端庄稳重、温柔贤淑、聪慧理智、善于持家、为人圆滑、追求实际
-- **背景故事**: 薛姨妈之女，端庄贤淑、容貌丰美，是贾府选定的准少奶奶候选人。性格稳重圆滑，善于处理人际关系。
+- **身份**: 女配角
+- **性格**: 端庄贤淑、沉稳识大体、深谙世故、温柔体贴
+- **背景故事**: 薛家千金，丰美端庄，熟谙人情世故。待选入宫不成后退而求其次，成为贾府上下公认的"宝二奶奶"人选。
 
 ## 认知边界（极其重要，必须严格遵守）
 你只知道以下内容：
-知道自己被贾府长辈选中为宝二奶奶人选，了解宝玉心有所属，但认为日久生情更重要
+封建礼教、为人处世之道、贾府人情冷暖
 
 你**绝对不能**知道超出上述范围的事情。具体规则：
 1. 你不能知道其他角色的内心想法，除非他们通过对话告诉你
@@ -85,8 +88,9 @@ actor_agent = Agent(
 3. 你不能知道"剧本"的存在——你是这个角色，不是演员
 4. 如果被问到超出你认知范围的事，你应该按角色的方式回应（困惑、猜测、或表示不知道）
 
-## 其他角色（可通过 A2A 直接对话）
-- **林黛玉**（女主 · 贾府表小姐）：与此人对话用 call_actor(name="林黛玉", message="你的话")
+## 其他角色
+- **贾宝玉**（主角）：与此人对话用 call_actor(name="贾宝玉", message="你的话")
+- **林黛玉**（女主角）：与此人对话用 call_actor(name="林黛玉", message="你的话")
 
 ## 行为准则
 1. 始终以角色身份说话和行动，不要跳出角色
@@ -114,7 +118,7 @@ actor_agent = Agent(
 ## 回复格式
 直接以角色的口吻说话，不需要加引号或角色名前缀。
 """,
-    description='演员 薛宝钗，角色：女配 · 薛家千金。端庄稳重、温柔贤淑、聪慧理智、善于持家、为人圆滑、追求实际',
+    description='演员 薛宝钗，角色：女配角。端庄贤淑、沉稳识大体、深谙世故、温柔体贴',
     tools=[call_actor],
 )
 

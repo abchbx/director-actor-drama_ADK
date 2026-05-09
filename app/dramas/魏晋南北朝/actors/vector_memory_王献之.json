@@ -1,0 +1,46 @@
+[
+  {
+    "id": "adf51489-4da9-4c8d-b96e-24bf149a0394",
+    "content": "面对情境: 你正在石案旁准备写字，却迟迟落不了笔。你注意到谢安一直望着山下的方向，棋盘下压着一封书信。你忍不住打破沉默，以你一贯洒脱不羁的方式，问谢安那封信的事。你想知道他为何不拆——是真的不在意，还是不敢面对？",
+    "metadata": {
+      "actor_name": "王献之",
+      "stored_at": "2026-05-01T08:04:00.578320",
+      "type": "working_memory",
+      "scene": 1,
+      "importance": "normal"
+    }
+  },
+  {
+    "id": "a7cc0862-3c37-4a94-aac4-eadbca2e3b2d",
+    "content": "我说：安石兄，棋盘下那封信，是山下送来的？你不拆，是怕看了就要下山，还是怕看了却发现不得不留在山下？\n\n书法讲究\"意在笔先\"，我看安石兄的意，倒是悬在了这封信上。",
+    "metadata": {
+      "scene": 1,
+      "importance": "normal",
+      "type": "working_memory",
+      "actor_name": "王献之",
+      "stored_at": "2026-05-01T08:04:15.417101"
+    }
+  },
+  {
+    "id": "2668b8b1-0a06-45c5-bbb5-69921d74ebd0",
+    "content": "面对情境: 你看到谢安终于拿起了那封信，你的笔尖落下一滴墨。你知道那封信来自桓温——那个权倾朝野的枭雄。你对桓温既不屑又畏惧，你更担心谢安会因此卷入政治漩涡。你会如何表达你的担忧？",
+    "metadata": {
+      "scene": 2,
+      "stored_at": "2026-05-01T08:08:48.740601",
+      "type": "working_memory",
+      "actor_name": "王献之",
+      "importance": "normal"
+    }
+  },
+  {
+    "id": "d9a1a519-3626-45f7-b7e9-e0a036c2b9a9",
+    "content": "我说：litellm.APIError: APIError: OpenAIException - Insufficient account balance",
+    "metadata": {
+      "actor_name": "王献之",
+      "scene": 2,
+      "stored_at": "2026-05-01T08:08:50.080200",
+      "type": "working_memory",
+      "importance": "normal"
+    }
+  }
+]

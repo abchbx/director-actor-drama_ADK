@@ -1,0 +1,26 @@
+{
+  "name": "actor_骨川小夫",
+  "description": "演员 骨川小夫，角色：配角",
+  "url": "http://localhost:9074/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_骨川小夫",
+      "name": "扮演骨川小夫",
+      "description": "以骨川小夫的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

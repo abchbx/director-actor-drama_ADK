@@ -16,11 +16,19 @@
   "tests/unit/test_event_mapper.py::TestMapRunnerEvent::test_start_drama_emits_typing_and_scene_start_and_status": true,
   "tests/unit/test_event_mapper.py::TestMapRunnerEvent::test_next_scene_function_call_emits_typing_and_scene_start": true,
   "tests/unit/test_event_mapper.py::TestMapRunnerEvent::test_multiple_events_from_one_function_call": true,
-  "tests/unit/test_event_mapper.py::TestAll18EventTypes::test_exactly_18_event_types_defined": true,
   "tests/unit/test_event_mapper.py::TestStartDramaMultiEvent::test_start_drama_function_call_produces_typing_scene_start_status": true,
   "tests/unit/test_tools_phase12.py::TestNextSceneArchival::test_next_scene_calls_archive_old_scenes": true,
   "tests/unit/test_tools_phase5.py::TestNextSceneEnhancements::test_next_scene_decrement_auto": true,
   "tests/unit/test_tools_phase5.py::TestNextSceneEnhancements::test_next_scene_decrement_to_zero": true,
   "tests/unit/test_tools_phase5.py::TestNextSceneEnhancements::test_next_scene_clears_steer": true,
-  "tests/unit/test_tools_phase5.py::TestNextSceneEnhancements::test_next_scene_no_auto_no_steer": true
+  "tests/unit/test_tools_phase5.py::TestNextSceneEnhancements::test_next_scene_no_auto_no_steer": true,
+  "tests/unit/test_event_mapper.py::TestMapRunnerEvent::test_create_actor_emits_typing_actor_created_cast_update": true,
+  "tests/unit/test_event_mapper.py::TestDirectorNarrateMapping::test_director_narrate_function_call_emits_typing_and_narration": true,
+  "tests/unit/test_event_mapper.py::TestActorSpeakMapping::test_actor_speak_function_call_emits_typing_and_dialogue": true,
+  "tests/test_command_queue.py::test_worker_executes_serially": true,
+  "tests/test_command_queue.py::test_status_polling": true,
+  "tests/unit/test_memory_manager.py::TestBuildActorContext::test_build_actor_context_working_only": true,
+  "tests/unit/test_memory_manager.py::TestBuildActorContext::test_build_actor_context_all_layers": true,
+  "tests/unit/test_memory_manager.py::TestCheckAndCompress::test_check_and_compress_working_overflow": true,
+  "tests/unit/test_context_builder.py::TestBuildActorContextFromMemory::test_includes_working_memory": true
 }

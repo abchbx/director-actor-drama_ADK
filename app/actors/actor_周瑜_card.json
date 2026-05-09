@@ -1,0 +1,26 @@
+{
+  "name": "actor_周瑜",
+  "description": "演员 周瑜，角色：东吴大都督，美周郎",
+  "url": "http://localhost:9003/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_周瑜",
+      "name": "扮演周瑜",
+      "description": "以周瑜的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

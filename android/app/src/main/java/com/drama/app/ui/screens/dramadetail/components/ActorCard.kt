@@ -33,6 +33,7 @@ import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -60,13 +61,16 @@ import com.drama.app.ui.theme.ActorPalette
 fun ActorCard(
     actor: ActorInfo,
     onClick: ((ActorInfo) -> Unit)? = null,
+    onToggleCast: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
+    val alpha = if (actor.onStage) 1f else 0.5f
 
     ElevatedCard(
         modifier = modifier
             .fillMaxWidth()
+            .alpha(alpha)
             .then(
                 if (onClick != null) {
                     Modifier.clickable(
@@ -143,7 +147,7 @@ fun ActorCard(
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // ── 右侧：状态标签 + 思考进度 ──
+            // ── 右侧：状态标签 + toggle ──
             Column(
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.Center,
@@ -157,8 +161,14 @@ fun ActorCard(
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                // 思考进度数字
-                if (actor.isA2ARunning && actor.thinkingProgress > 0) {
+                // Phase 24: 上下场 toggle
+                if (onToggleCast != null) {
+                    Switch(
+                        checked = actor.onStage,
+                        onCheckedChange = { onToggleCast(actor.name) },
+                        modifier = Modifier.size(width = 36.dp, height = 20.dp),
+                    )
+                } else if (actor.isA2ARunning && actor.thinkingProgress > 0) {
                     Text(
                         text = "${actor.thinkingProgress}",
                         style = MaterialTheme.typography.labelSmall,
@@ -243,36 +253,24 @@ private fun PersonalityChip(text: String) {
 // 状态标签
 // ═══════════════════════════════════════════════════════════
 
-/** 思考中状态 — 带旋转动画的 AssistChip */
+/** 在线状态 — 静态绿点指示 A2A 服务就绪 */
 @Composable
 private fun ThinkingStatusChip() {
-    val infiniteTransition = rememberInfiniteTransition(label = "thinking-pulse")
-    val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.4f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(800, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "pulse",
-    )
-
     AssistChip(
         onClick = {},
         label = {
             Text(
-                text = "思考中…",
+                text = "在线",
                 style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.alpha(pulseAlpha),
             )
         },
         leadingIcon = {
-            CircularProgressIndicator(
-                modifier = Modifier.size(AssistChipDefaults.IconSize),
-                strokeWidth = 2.dp,
-                strokeCap = StrokeCap.Round,
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = Color.Transparent,
+            // 绿色圆点表示 A2A 服务在线
+            Box(
+                modifier = Modifier
+                    .size(AssistChipDefaults.IconSize)
+                    .clip(CircleShape)
+                    .background(Color(0xFF4CAF50)),
             )
         },
         modifier = Modifier.height(28.dp),

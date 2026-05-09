@@ -1,0 +1,26 @@
+{
+  "name": "actor_渊默",
+  "description": "演员 渊默，角色：归墟的化身/守护者，执行宇宙循环法则",
+  "url": "http://localhost:9080/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_渊默",
+      "name": "扮演渊默",
+      "description": "以渊默的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

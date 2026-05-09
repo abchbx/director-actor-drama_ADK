@@ -46,6 +46,11 @@ def get_runner_lock(request: Request) -> asyncio.Lock:
     return request.app.state.runner_lock
 
 
+def get_command_queue(request: Request):
+    """Get the CommandQueue for asynchronous command enqueueing (Phase 27)."""
+    return request.app.state.command_queue
+
+
 async def get_tool_context(
     session_service: InMemorySessionService = Depends(get_session_service),
 ) -> ToolContextAdapter:

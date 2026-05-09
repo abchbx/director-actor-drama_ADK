@@ -1,0 +1,26 @@
+{
+  "name": "actor_岩心",
+  "description": "演员 岩心，角色：山脉之灵，代表大地意志",
+  "url": "http://localhost:9058/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_岩心",
+      "name": "扮演岩心",
+      "description": "以岩心的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

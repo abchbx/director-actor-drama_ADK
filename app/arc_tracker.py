@@ -285,11 +285,20 @@ def set_actor_arc_logic(
         }
 
     # Validate progress if provided
-    if progress is not None and (progress < 0 or progress > 100):
-        return {
-            "status": "error",
-            "message": f"弧线进展必须在 0-100 之间，当前值：{progress}",
-        }
+    # ★ 修复：LLM 可能传入字符串类型的 progress，先尝试转换为整数
+    if progress is not None:
+        try:
+            progress = int(progress)
+        except (ValueError, TypeError):
+            return {
+                "status": "error",
+                "message": f"弧线进展必须是数字，当前值：{progress}",
+            }
+        if progress < 0 or progress > 100:
+            return {
+                "status": "error",
+                "message": f"弧线进展必须在 0-100 之间，当前值：{progress}",
+            }
 
     # Initialize arc_progress if not exists
     actor_data = actors[actor_name]

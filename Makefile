@@ -35,6 +35,17 @@ api:
 	@echo "==============================================================================="
 	uv run uvicorn app.api.app:create_app --factory --host 0.0.0.0 --port 8000 --reload --reload-exclude 'app/actors' --reload-exclude 'app/actors/**'
 
+# ★ DEBUG 模式：启动 API 服务器并输出详细日志（用于排查 WS 事件流问题）
+api-debug:
+	@echo "==============================================================================="
+	@echo "| 🎭 Starting Director-Actor Drama API server (DEBUG MODE)...                |"
+	@echo "|                                                                             |"
+	@echo "| 📡 API: http://0.0.0.0:8000/api/v1                                         |"
+	@echo "| 🔌 WebSocket: ws://0.0.0.0:8000/api/v1/ws                                 |"
+	@echo "| 🐛 Log level: DEBUG                                                        |"
+	@echo "==============================================================================="
+	uv run uvicorn app.api.app:create_app --factory --host 0.0.0.0 --port 8000 --reload --reload-exclude 'app/actors' --reload-exclude 'app/actors/**' --log-level debug
+
 # Launch CLI interactive mode
 cli:
 	@echo "==============================================================================="

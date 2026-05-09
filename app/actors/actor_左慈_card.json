@@ -1,0 +1,26 @@
+{
+  "name": "actor_左慈",
+  "description": "演员 左慈，角色：引路人——梦境中的仙人，超然伦理与命运",
+  "url": "http://localhost:9002/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_左慈",
+      "name": "扮演左慈",
+      "description": "以左慈的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

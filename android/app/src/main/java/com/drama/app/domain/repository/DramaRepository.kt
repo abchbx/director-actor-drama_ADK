@@ -13,7 +13,7 @@ import com.drama.app.domain.model.Drama
 import com.drama.app.domain.model.SceneBubble
 
 interface DramaRepository {
-    suspend fun startDrama(theme: String): Result<CommandResponseDto>
+    suspend fun startDrama(theme: String, directorStyle: String = "default"): Result<CommandResponseDto>
     suspend fun listDramas(): Result<List<Drama>>
     suspend fun deleteDrama(folder: String): Result<String>
     suspend fun saveDrama(saveName: String = ""): Result<SaveLoadResponseDto>
@@ -27,7 +27,9 @@ interface DramaRepository {
     suspend fun getSceneDetail(sceneNumber: Int): Result<SceneDetailDto>
     suspend fun getCastStatus(): Result<CastStatusResponseDto>
     suspend fun getCast(): Result<CastResponseDto>
+    suspend fun setSceneCast(cast: List<String>): Result<CommandResponseDto>
     suspend fun sendChatMessage(message: String, mention: String? = null): Result<CommandResponseDto>
+    suspend fun sendFreeChatMessage(message: String, mention: String? = null, senderName: String = "用户"): Result<CommandResponseDto>
     suspend fun steerDrama(direction: String): Result<CommandResponseDto>
     suspend fun autoAdvanceDrama(numScenes: Int = 3): Result<CommandResponseDto>
     suspend fun stormDrama(focus: String? = null): Result<CommandResponseDto>
@@ -43,6 +45,14 @@ interface DramaRepository {
      * @param senderName 发送者名称（主角名），附带到请求体中
      */
     suspend fun sendChatMessageAsBubbles(message: String, mention: String? = null, senderName: String = "主角"): Result<List<SceneBubble>>
+
+    /**
+     * 发送自由聊天消息（绕过导演，直接A2A发给演员）并返回 SceneBubble 列表。
+     * @param message 消息内容
+     * @param mention @提及角色名
+     * @param senderName 发送者名称
+     */
+    suspend fun sendFreeChatMessageAsBubbles(message: String, mention: String? = null, senderName: String = "用户"): Result<List<SceneBubble>>
 
     /**
      * 获取场景详情并转换为可渲染的 SceneBubble 列表。

@@ -1,0 +1,26 @@
+{
+  "name": "actor_酒剑仙",
+  "description": "演员 酒剑仙，角色：配角",
+  "url": "http://localhost:9003/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_酒剑仙",
+      "name": "扮演酒剑仙",
+      "description": "以酒剑仙的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "name": "actor_刚田武（胖虎）",
+  "description": "演员 刚田武（胖虎），角色：配角",
+  "url": "http://localhost:9079/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_刚田武_胖虎_",
+      "name": "扮演刚田武（胖虎）",
+      "description": "以刚田武（胖虎）的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

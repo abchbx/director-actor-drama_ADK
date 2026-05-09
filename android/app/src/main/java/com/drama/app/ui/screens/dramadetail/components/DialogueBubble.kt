@@ -30,7 +30,6 @@ import com.drama.app.ui.components.ActorEmphasizeColor
 import com.drama.app.ui.components.MarkdownConfig
 import com.drama.app.ui.components.MarkdownText
 import com.drama.app.ui.components.ParagraphSpacing
-import com.drama.app.ui.components.TypewriterMarkdownText
 import com.drama.app.ui.components.QuoteStyle
 import com.drama.app.ui.theme.ActorPalette
 
@@ -175,8 +174,7 @@ fun DialogueBubble(bubble: SceneBubble.Dialogue) {
                     ),
                 )
 
-                TypewriterMarkdownText(
-                    id = bubble.id,
+                MarkdownText(
                     markdown = bubble.text,
                     style = MaterialTheme.typography.bodyLarge.copy(
                         lineHeight = 24.sp,
@@ -184,7 +182,6 @@ fun DialogueBubble(bubble: SceneBubble.Dialogue) {
                     ),
                     config = markdownConfig,
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                    typingSpeedMs = 18L,
                 )
             }
         }

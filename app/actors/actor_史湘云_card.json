@@ -1,0 +1,26 @@
+{
+  "name": "actor_史湘云",
+  "description": "演员 史湘云，角色：史家千金，豪爽洒脱的风系修仙天才",
+  "url": "http://localhost:9034/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_史湘云",
+      "name": "扮演史湘云",
+      "description": "以史湘云的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

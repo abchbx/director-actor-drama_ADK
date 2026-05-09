@@ -72,9 +72,9 @@ object NetworkModule {
                     addInterceptor(loggingInterceptor)
                 }
             }
-            .connectTimeout(30, TimeUnit.SECONDS)  // Cloud servers may need cold-start time
-            .readTimeout(300, TimeUnit.SECONDS)  // LLM calls can take minutes
-            .writeTimeout(30, TimeUnit.SECONDS)
+            .connectTimeout(60, TimeUnit.SECONDS)  // ★ 延长：Cloud servers may need cold-start time
+            .readTimeout(0, TimeUnit.SECONDS)  // ★ 无读取超时：LLM 长思考/流式输出不中断
+            .writeTimeout(60, TimeUnit.SECONDS)  // ★ 延长：大请求体上传不中断
             .pingInterval(60, TimeUnit.SECONDS)  // TCP keepalive; app-level heartbeat at 15s is authoritative
             .build()
     }

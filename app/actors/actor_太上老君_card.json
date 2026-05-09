@@ -1,0 +1,26 @@
+{
+  "name": "actor_太上老君",
+  "description": "演员 太上老君，角色：谋士",
+  "url": "http://localhost:9079/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_太上老君",
+      "name": "扮演太上老君",
+      "description": "以太上老君的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

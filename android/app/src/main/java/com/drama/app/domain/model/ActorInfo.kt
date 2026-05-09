@@ -10,4 +10,5 @@ data class ActorInfo(
     val isA2ARunning: Boolean = false,
     val a2aPort: Int = 0,
     val thinkingProgress: Int = 0,
+    val onStage: Boolean = true,
 )

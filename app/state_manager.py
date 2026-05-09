@@ -152,8 +152,18 @@ DEBOUNCE_SECONDS = 5
 
 
 def _sanitize_name(name: str) -> str:
-    """Sanitize a name for use as filename."""
-    return "".join(c if c.isalnum() or c in "-_" else "_" for c in name)
+    """Sanitize a name for use as filename.
+
+    Replaces illegal chars with '_', then truncates to MAX_FILENAME_LEN (100)
+    to avoid "File name too long" (Errno 36) on Linux ext4 (limit 255 bytes).
+    """
+    MAX_FILENAME_LEN = 100
+    sanitized = "".join(c if c.isalnum() or c in "-_" else "_" for c in name)
+    # Strip leading/trailing underscores to keep it clean
+    sanitized = sanitized.strip("_")
+    if len(sanitized) > MAX_FILENAME_LEN:
+        sanitized = sanitized[:MAX_FILENAME_LEN].rstrip("_")
+    return sanitized if sanitized else "untitled"
 
 
 def _write_active_theme(theme: str):
@@ -314,8 +324,8 @@ def add_conversation(
 
     state.setdefault("conversation_log", []).append(entry)
 
-    # Trigger debounced save instead of immediate _save_conversations
-    _set_state(state, tool_context)
+    # ★ 立即 flush：对话和旁白需要立即持久化，确保前端能立即看到
+    _set_state(state, tool_context, immediate_flush=True)
     _write_active_theme(state.get("theme", ""))
 
     return {"status": "success", "entry": entry}
@@ -507,13 +517,14 @@ def _get_current_theme(tool_context=None) -> str:
     return tool_context.state.get("drama", {}).get("theme", "")
 
 
-def init_drama_state(theme: str, tool_context=None) -> dict:
+def init_drama_state(theme: str, tool_context=None, director_style: str = "default") -> dict:
     """Initialize a new drama with the given theme.
 
     Creates a dedicated folder for this drama with proper structure.
 
     Args:
         theme: The theme/premise of the drama.
+        director_style: Director style identifier (default, jiang-wen, etc.)
 
     Returns:
         dict with initialization status.
@@ -523,6 +534,7 @@ def init_drama_state(theme: str, tool_context=None) -> dict:
 
     state = _get_state(tool_context)
     state["theme"] = theme
+    state["director_style"] = director_style
     state["status"] = "setup"
     state["current_scene"] = 0
     state["scenes"] = []
@@ -573,40 +585,10 @@ def init_drama_state(theme: str, tool_context=None) -> dict:
     state["conversation_log"] = []
     # SceneContext: shared cognitive state for coreference resolution
     state["scene_context"] = {}
+    # Phase 24: scene_cast — 当前场景上场演员名列表，None=全员上场
+    state["scene_cast"] = None
 
-    # ★ 用户即主角：将用户作为特殊角色加入 Cast，标记为 User-Controlled
-    state["actors"] = {
-        "用户": {
-            "role": "主角（Protagonist）",
-            "personality": "由用户实时定义——导演应根据用户输入推断性格特征",
-            "background": "用户自己的故事——导演应根据剧情发展逐步揭示",
-            "knowledge_scope": "用户所知范围——导演应根据用户输入动态推断",
-            "control_type": "User-Controlled",  # ★ 标记为用户控制的角色
-            "memory": [],
-            "working_memory": [],
-            "scene_summaries": [],
-            "arc_summary": {
-                "structured": {
-                    "theme": "",
-                    "key_characters": [],
-                    "unresolved": [],
-                    "resolved": [],
-                },
-                "narrative": "",
-            },
-            "critical_memories": [],
-            "memorySummary": "用户是本剧头号主角，行为由用户输入驱动。",
-            "emotions": "neutral",
-            "arc_progress": {
-                "arc_type": "",
-                "arc_stage": "",
-                "progress": 0,
-                "related_threads": [],
-            },
-            "is_user_protagonist": True,  # ★ 标记此角色为用户主角，不可删除
-            "created_at": datetime.now().isoformat(),
-        }
-    }
+    state["actors"] = {}
 
     _set_state(state, tool_context)
     _save_state_to_file(theme, state)
@@ -999,31 +981,8 @@ def load_progress(save_name: str, tool_context=None) -> dict:
     )
     # SceneContext backward compatibility
     state.setdefault("scene_context", {})
-
-    # ★ 用户即主角：向后兼容——旧存档若无用户主角，自动注入
-    actors = state.get("actors", {})
-    if "你" not in actors or not actors.get("你", {}).get("is_user_protagonist"):
-        actors["你"] = {
-            "role": "主角（Protagonist）",
-            "personality": "由用户实时定义——导演应根据用户输入推断性格特征",
-            "background": "用户自己的故事——导演应根据剧情发展逐步揭示",
-            "knowledge_scope": "用户所知范围——导演应根据用户输入动态推断",
-            "control_type": "User-Controlled",
-            "memory": [],
-            "working_memory": [],
-            "scene_summaries": [],
-            "arc_summary": {
-                "structured": {"theme": "", "key_characters": [], "unresolved": [], "resolved": []},
-                "narrative": "",
-            },
-            "critical_memories": [],
-            "memorySummary": "用户是本剧头号主角，行为由用户输入驱动。",
-            "emotions": "neutral",
-            "arc_progress": {"arc_type": "", "arc_stage": "", "progress": 0, "related_threads": []},
-            "is_user_protagonist": True,
-            "created_at": datetime.now().isoformat(),
-        }
-        state["actors"] = actors
+    # Phase 24: scene_cast backward compatibility
+    state.setdefault("scene_cast", None)
 
     # Tier 4: Restore actor vector memory from backup files
     vector_restore_result = _restore_vector_memory(state, theme)
@@ -1188,7 +1147,7 @@ def add_narration(narration_text: str, tool_context=None) -> dict:
         }
     )
     state["narration_log"] = narration_log
-    _set_state(state, tool_context)
+    _set_state(state, tool_context, immediate_flush=True)
     return {"status": "success", "message": "Narration added."}
 
 
@@ -1421,6 +1380,7 @@ def get_current_state(tool_context=None) -> dict:
         "time_period": time_period,
         "has_outline": has_outline,
         "outline_summary": outline_summary,
+        "director_style": state.get("director_style", "default"),
     }
 
 
@@ -1597,12 +1557,18 @@ def _get_state(tool_context) -> dict:
     return {}
 
 
-def _set_state(state: dict, tool_context):
+def _set_state(state: dict, tool_context, immediate_flush: bool = False):
     """Set drama state in tool context with debounced disk persistence.
 
     State is written to tool_context immediately but only persisted to
-    disk after DEBOUNCE_SECONDS. Use flush_state_sync() to force immediate
-    write (e.g. before program exit).
+    disk after DEBOUNCE_SECONDS by default. Use immediate_flush=True
+    to force immediate write (e.g. after critical tool calls like
+    director_narrate, actor_speak that need to be visible immediately).
+
+    Args:
+        state: The drama state dict.
+        tool_context: Tool context for state access.
+        immediate_flush: If True, flush to disk immediately instead of debouncing.
     """
     global _save_dirty, _save_timer, _latest_theme, _latest_state_ref
     if tool_context is not None:
@@ -1611,14 +1577,18 @@ def _set_state(state: dict, tool_context):
         if theme:
             _latest_theme = theme
             _latest_state_ref = state
-            _save_dirty = True
-            # Cancel existing timer if any
-            if _save_timer is not None:
-                _save_timer.cancel()
-            # Create new debounced timer
-            _save_timer = threading.Timer(DEBOUNCE_SECONDS, _flush_state)
-            _save_timer.daemon = True
-            _save_timer.start()
+            if immediate_flush:
+                # ★ 立即持久化：关键工具调用后确保状态落盘
+                flush_state_sync()
+            else:
+                _save_dirty = True
+                # Cancel existing timer if any
+                if _save_timer is not None:
+                    _save_timer.cancel()
+                # Create new debounced timer
+                _save_timer = threading.Timer(DEBOUNCE_SECONDS, _flush_state)
+                _save_timer.daemon = True
+                _save_timer.start()
 
 
 # ============================================================================
@@ -1913,3 +1883,42 @@ def get_scene_detail(theme: str, scene_num: int) -> dict:
         return full_scene
 
     return {"status": "error", "message": f"Scene {scene_num} not found"}
+
+
+# ============================================================================
+# Phase 24: Scene Cast Helpers (场景卡司辅助函数)
+# ============================================================================
+
+
+def get_ai_actors(state: dict) -> list[str]:
+    """Return names of all AI-controlled actors (excluding user protagonist).
+
+    Args:
+        state: The drama state dict.
+
+    Returns:
+        List of AI actor names.
+    """
+    return [
+        name
+        for name, data in state.get("actors", {}).items()
+        if not data.get("is_user_protagonist")
+    ]
+
+
+def get_scene_cast(state: dict) -> list[str]:
+    """Return the effective scene_cast list.
+
+    - If state["scene_cast"] is None → returns all AI actor names (default: everyone on stage)
+    - If state["scene_cast"] is a list → returns it as-is
+
+    Args:
+        state: The drama state dict.
+
+    Returns:
+        List of actor names currently on stage.
+    """
+    scene_cast = state.get("scene_cast")
+    if scene_cast is None:
+        return get_ai_actors(state)
+    return list(scene_cast)

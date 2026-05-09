@@ -1,0 +1,26 @@
+{
+  "name": "actor_哆啦A梦",
+  "description": "演员 哆啦A梦，角色：主角配角",
+  "url": "http://localhost:9020/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_哆啦A梦",
+      "name": "扮演哆啦A梦",
+      "description": "以哆啦A梦的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "name": "actor_猪八戒",
+  "description": "演员 猪八戒，角色：配角",
+  "url": "http://localhost:9019/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_猪八戒",
+      "name": "扮演猪八戒",
+      "description": "以猪八戒的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

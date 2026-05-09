@@ -1,0 +1,68 @@
+[
+  {
+    "id": "002fde71-40b6-47f8-9430-6d60eea58036",
+    "content": "[插话触发] 林黛玉听闻宝玉愿为心上人折寿十年，心中五味杂陈——感动、不安、还有隐隐的忧虑。她眼眶微红，低下头去。",
+    "metadata": {
+      "importance": "normal",
+      "actor_name": "贾政",
+      "stored_at": "2026-05-08T01:39:47.543225",
+      "type": "working_memory",
+      "scene": 1
+    }
+  },
+  {
+    "id": "102f3c28-708e-425e-adc9-4f065a7dd984",
+    "content": "[插话] 我说：宝玉又在那里胡言乱语了！什么折寿十年，荒唐！",
+    "metadata": {
+      "type": "working_memory",
+      "importance": "normal",
+      "stored_at": "2026-05-08T01:39:59.579031",
+      "actor_name": "贾政",
+      "scene": 1
+    }
+  },
+  {
+    "id": "b59750fd-cd70-405b-a3ec-11fbbb8398f9",
+    "content": "面对情境: 听闻宝玉又整日在姐妹堆里厮混，不读功课，正往潇湘馆方向走来。远远望见宝钗在座，便沉声呵斥宝玉：整日不思进取，只知与姐妹们调笑玩笑，成何体统！",
+    "metadata": {
+      "stored_at": "2026-05-08T01:48:22.625675",
+      "type": "working_memory",
+      "scene": 2,
+      "importance": "normal",
+      "actor_name": "贾政"
+    }
+  },
+  {
+    "id": "faadda4e-09c3-4042-89c4-7b38c1355d0b",
+    "content": "我说：孽障！整日不思进取，只知与姐妹们调笑玩笑，成何体统！",
+    "metadata": {
+      "scene": 2,
+      "importance": "normal",
+      "stored_at": "2026-05-08T01:48:30.684200",
+      "actor_name": "贾政",
+      "type": "working_memory"
+    }
+  },
+  {
+    "id": "c4cacff8-6d57-4ee0-9ab8-19dbcd17afa2",
+    "content": "面对情境: 贾政冷哼一声，说宝钗不必替他遮掩。指着宝玉道：你整日在这温柔乡里厮混，圣贤书都读到狗肚子里去了！限你三日内把《大学》《中庸》默写一遍，否则家法伺候！",
+    "metadata": {
+      "actor_name": "贾政",
+      "type": "working_memory",
+      "stored_at": "2026-05-08T01:49:00.119640",
+      "importance": "normal",
+      "scene": 2
+    }
+  },
+  {
+    "id": "c9b184d1-6a5c-429d-b3f6-8a0ace79a4bc",
+    "content": "我说：孽障！还不低头认错？宝钗这般为你遮掩，你倒好意思在此处混迹！我且问你，这几日见了几个字？做了几篇文章？那《四书》可曾背得一句？\n\n（内心：想我贾门世代忠良，我亦蒙受皇恩，你却如此不争气，叫我如何有脸面去见先人！）",
+    "metadata": {
+      "actor_name": "贾政",
+      "scene": 2,
+      "type": "working_memory",
+      "importance": "normal",
+      "stored_at": "2026-05-08T01:49:09.074435"
+    }
+  }
+]

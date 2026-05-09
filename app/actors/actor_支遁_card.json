@@ -1,0 +1,26 @@
+{
+  "name": "actor_支遁",
+  "description": "演员 支遁，角色：旁观者/社会视角 —— 高僧、清谈名士",
+  "url": "http://localhost:9087/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_支遁",
+      "name": "扮演支遁",
+      "description": "以支遁的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

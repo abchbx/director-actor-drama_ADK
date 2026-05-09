@@ -1,0 +1,26 @@
+{
+  "name": "actor_沙悟净",
+  "description": "演员 沙悟净，角色：配角",
+  "url": "http://localhost:9047/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_沙悟净",
+      "name": "扮演沙悟净",
+      "description": "以沙悟净的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

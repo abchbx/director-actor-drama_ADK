@@ -520,7 +520,7 @@ async def actor_speak(
         state = _get_state(tool_context)
         if actor_name in state.get("actors", {}):
             state["actors"][actor_name]["crash_count"] = 0
-            _set_state(state, tool_context)
+            _set_state(state, tool_context, immediate_flush=True)
 
     # Build a formatted version that the director can directly use
     formatted_lines = []
@@ -598,11 +598,21 @@ async def actor_speak_batch(
     start = _time.monotonic()
 
     # ── Phase 1: 为每个演员准备上下文（同步，快） ──
+    # Phase 24: Read scene_cast for standby filtering
+    state = tool_context.state.get("drama", {})
+    scene_cast = state.get("scene_cast")  # None = no filter (backward compat)
+
     prep_list = []
+    skipped_standby = []
     for entry in actors:
         actor_name = entry.get("actor_name", "")
         situation = entry.get("situation", "")
         if not actor_name or not situation:
+            continue
+
+        # Phase 24: Skip standby actors (not in scene_cast)
+        if scene_cast is not None and actor_name not in scene_cast:
+            skipped_standby.append(actor_name)
             continue
 
         actor_info = get_actor_info(actor_name, tool_context)
@@ -765,7 +775,7 @@ async def actor_speak_batch(
             state = _get_state(tool_context)
             if actor_name in state.get("actors", {}):
                 state["actors"][actor_name]["crash_count"] = 0
-                _set_state(state, tool_context)
+                _set_state(state, tool_context, immediate_flush=True)
 
         # Format dialogue
         dialogue_lines = []
@@ -814,7 +824,7 @@ async def actor_speak_batch(
 
     formatted_output = "\n".join(formatted_lines)
 
-    return {
+    result_dict = {
         "status": "success",
         "id": f"batch_{uuid.uuid4().hex[:8]}",
         "message": formatted_output,
@@ -824,6 +834,10 @@ async def actor_speak_batch(
         "estimated_serial_sec": estimated_serial,
         "speedup": f"{estimated_serial / max(elapsed, 0.1):.1f}x",
     }
+    # Phase 24: Include skipped standby actors info
+    if skipped_standby:
+        result_dict["skipped_standby"] = skipped_standby
+    return result_dict
 
 
 async def _call_a2a_sdk(card_file: str, prompt: str, actor_name: str, port: str) -> str:
@@ -1364,6 +1378,14 @@ def next_scene(tool_context: ToolContext) -> dict:
     state = tool_context.state.get("drama", {})
     scene_num = state.get("current_scene", 1)
 
+    # Phase 28: Migrate working memory → short-term memory on scene transition
+    try:
+        from .short_term_memory import migrate_working_to_short_term
+        for actor_name in state.get("actors", {}):
+            migrate_working_to_short_term(actor_name, tool_context)
+    except Exception:
+        pass  # Best-effort migration
+
     # Extract transition info (D-08/D-09/D-10/D-13)
     transition = _extract_scene_transition(state)
 
@@ -1418,6 +1440,15 @@ def next_scene(tool_context: ToolContext) -> dict:
     actor_names = list(actors_data.keys())
     actor_list = "、".join(actor_names) if actor_names else "（尚无演员）"
 
+    # Phase 24: Reset scene_cast to all actors on new scene (default: everyone on stage)
+    state["scene_cast"] = actor_names
+    _set_state(state, tool_context)
+
+    # Phase 24: Compute scene_cast and standby lists
+    from .state_manager import get_scene_cast as _get_scene_cast, get_ai_actors as _get_ai_actors
+    scene_cast_names = _get_scene_cast(state)
+    standby_names = [n for n in _get_ai_actors(state) if n not in scene_cast_names]
+
     # Phase 12: Archive old scenes to reduce state size (D-10)
     from .state_manager import archive_old_scenes
     state = archive_old_scenes(state)
@@ -1429,7 +1460,9 @@ def next_scene(tool_context: ToolContext) -> dict:
         "is_first_scene": transition["is_first_scene"],
         "transition": transition,
         "transition_text": transition_text,
-        "actors_available": actor_names,
+        "actors_available": scene_cast_names,
+        "scene_cast": scene_cast_names,
+        "standby": standby_names,
         "director_context": director_ctx,
         "auto_remaining": auto_remaining,
         "steer_direction": steer_info,
@@ -1568,6 +1601,76 @@ def auto_advance(scenes: int, tool_context: ToolContext) -> dict:
             f"输入任何内容即可中断，回到手动模式。"
         ),
         "remaining_auto_scenes": scenes,
+    }
+
+
+def set_scene_cast(cast: list[str], tool_context: ToolContext) -> dict:
+    """Set which actors are on stage for the current scene. Use when the director wants to control who participates.
+
+    设置当前场景上场演员（场景卡司）。不在 cast 中的 AI 演员进入待机状态，
+    不参与 A2A 调用。用户主角始终在场，自动包含。
+
+    Args:
+        cast: List of AI actor names who should be on stage. Must be non-empty.
+        tool_context: Tool context for state access.
+
+    Returns:
+        dict with scene_cast, standby list, and confirmation message.
+    """
+    state = _get_state(tool_context)
+
+    # Validate non-empty
+    if not cast:
+        return {
+            "status": "error",
+            "message": "❌ 上场演员列表不能为空。至少需要一个演员在场。",
+        }
+
+    actors = state.get("actors", {})
+
+    # Validate all names exist
+    invalid_names = [name for name in cast if name not in actors]
+    if invalid_names:
+        return {
+            "status": "error",
+            "message": f"❌ 以下演员不存在：{'、'.join(invalid_names)}",
+            "invalid_names": invalid_names,
+        }
+
+    # Auto-include user protagonist(s)
+    user_protagonists = [
+        name for name, data in actors.items()
+        if data.get("is_user_protagonist") or data.get("control_type") == "User-Controlled"
+    ]
+
+    # Deduplicate while preserving order
+    full_cast = []
+    seen = set()
+    for name in cast + user_protagonists:
+        if name not in seen:
+            full_cast.append(name)
+            seen.add(name)
+
+    # Calculate standby list
+    all_names = list(actors.keys())
+    standby = [name for name in all_names if name not in seen]
+
+    # Persist
+    state["scene_cast"] = full_cast
+    _set_state(state, tool_context)
+
+    cast_str = "、".join(full_cast)
+    standby_str = "、".join(standby) if standby else "无"
+
+    return {
+        "status": "success",
+        "scene_cast": full_cast,
+        "standby": standby,
+        "message": (
+            f"🎭 场景卡司已更新\n"
+            f"上场：{cast_str}\n"
+            f"待机：{standby_str}"
+        ),
     }
 
 

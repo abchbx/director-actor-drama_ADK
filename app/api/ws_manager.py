@@ -113,15 +113,21 @@ class ConnectionManager:
         T-14-04: asyncio.wait_for with 5s timeout per send; remove slow clients.
         """
         self.replay_buffer.append(event)
+        event_type = event.get("type", "unknown")
+        logger.debug("[WS-BROADCAST] 广播 %s 事件到 %d 个连接", event_type, len(self.active_connections))
         disconnected: set[WebSocket] = set()
         for connection in self.active_connections:
             try:
                 await asyncio.wait_for(connection.send_json(event), timeout=5.0)
-            except Exception:
+                logger.debug("[WS-BROADCAST] → 发送成功: %s", event_type)
+            except Exception as e:
+                logger.warning("[WS-BROADCAST] → 发送失败: %s | %s", event_type, e)
                 disconnected.add(connection)
         for conn in disconnected:
             self.active_connections.discard(conn)
             self._last_pong.pop(conn, None)
+        if disconnected:
+            logger.warning("[WS-BROADCAST] 移除 %d 个断连客户端", len(disconnected))
 
     def create_broadcast_callback(self, flush_fn=None):
         """Create an event_callback for run_command_and_collect (D-02).
@@ -143,19 +149,27 @@ class ConnectionManager:
         # ★ WS 去重：滑动窗口，记录最近推送的内容型事件摘要
         # key = (event_type, content_fingerprint), 防止同一段文本被推送两次
         _seen_content_keys: dict[tuple[str, str], float] = {}
-        _DEDUP_WINDOW = 10.0  # 10秒内的重复事件视为去重对象
+        _DEDUP_WINDOW = 60.0  # ★ 延长至 60 秒，防止长文本生成过程中重复渲染
         # 这些事件类型包含实际文本内容，客户端会创建气泡，需要去重
         _CONTENT_EVENT_TYPES = {"dialogue", "narration", "actor_chime_in", "end_narration"}
+        # ★ 已 committed 的内容指纹，永久去重（防止滑动窗口过期后重复）
+        _committed_content_keys: set[tuple[str, str]] = set()
 
         async def _callback(event) -> None:
             # Only broadcast if there are active WS connections
             if not self.active_connections:
+                logger.debug("[WS-CALLBACK] 无活跃 WS 连接，跳过事件推送")
                 return
 
             import time as _time
             now = _time.monotonic()
 
-            ws_events = map_runner_event(event)
+            try:
+                ws_events = map_runner_event(event)
+            except Exception as e:
+                logger.exception("[WS-CALLBACK] map_runner_event 异常: %s", e)
+                return
+            logger.debug("[WS-CALLBACK] 映射生成 %d 个 WS 事件", len(ws_events))
             for ws_event in ws_events:
                 event_type = ws_event.get("type", "")
                 data = ws_event.get("data", {})
@@ -166,15 +180,23 @@ class ConnectionManager:
                     actor = data.get("actor_name", data.get("sender_name", ""))
                     dedup_key = (event_type, f"{actor}:{text}")
 
+                    # ★ 永久去重检查：已 committed 的内容不再推送
+                    if dedup_key in _committed_content_keys:
+                        logger.debug("[WS-CALLBACK] 跳过已 committed 事件: %s", dedup_key)
+                        continue
+
                     # 清理过期的去重记录
                     expired = [k for k, t in _seen_content_keys.items() if now - t > _DEDUP_WINDOW]
                     for k in expired:
                         del _seen_content_keys[k]
 
                     if dedup_key in _seen_content_keys:
-                        # 跳过重复内容事件
+                        # 跳过重复内容事件，并标记为永久 committed
+                        logger.debug("[WS-CALLBACK] 跳过重复事件: %s", dedup_key)
                         continue
                     _seen_content_keys[dedup_key] = now
+                    # ★ 标记为 committed，防止窗口过期后重复
+                    _committed_content_keys.add(dedup_key)
 
                 # D-16: flush state before push
                 if flush_fn:
@@ -182,6 +204,7 @@ class ConnectionManager:
                         flush_fn()
                     except Exception:
                         pass
+                logger.debug("[WS-CALLBACK] 广播事件: type=%s", event_type)
                 await self.broadcast(ws_event)
 
         return _callback

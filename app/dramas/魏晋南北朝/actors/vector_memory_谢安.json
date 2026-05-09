@@ -1,0 +1,46 @@
+[
+  {
+    "id": "62aafed5-f92a-4b96-b1b6-aaf851dee4bb",
+    "content": "面对情境: 你斜倚竹榻，手中《庄子》半卷，目光却望向山下建康的方向。棋盘下压着一封来自朝廷的书信——你已经知道里面写的什么：朝廷再次征召你出仕，而桓温的权势已如泰山压顶。支遁和王献之都在等你开口。你会如何回应？是继续沉默，还是终于面对这个你逃避了半生的问题？",
+    "metadata": {
+      "importance": "normal",
+      "stored_at": "2026-05-01T08:04:02.243389",
+      "type": "working_memory",
+      "scene": 1,
+      "actor_name": "谢安"
+    }
+  },
+  {
+    "id": "ceeb8dd8-1fdf-40a5-a959-875e09d30dcc",
+    "content": "我说：（目光仍落在山下，声音如常平静）风从山下来，总是带着建康的尘土味。\n\n（将《庄子》轻轻放在棋盘旁，书页正好压住那封信的一角）\n\n支道林常与我说“即色游玄”，可色与玄之间，究竟隔着几重山水？",
+    "metadata": {
+      "actor_name": "谢安",
+      "stored_at": "2026-05-01T08:04:14.897157",
+      "scene": 1,
+      "type": "working_memory",
+      "importance": "normal"
+    }
+  },
+  {
+    "id": "c3d473f4-ff68-4346-ae22-0c894b9babb3",
+    "content": "面对情境: 你终于拿起了那封信。信封上有建康的官印和桓温的私章——这意味着这不仅是一封朝廷征召，更是桓温的亲自邀约。你将信举到夕阳下，没有拆开，但你已经知道里面的内容。支遁和王献之都在看着你。你会说什么？是在这个时刻，终于说出你内心的挣扎？还是继续用平静的话语掩饰？",
+    "metadata": {
+      "scene": 2,
+      "actor_name": "谢安",
+      "stored_at": "2026-05-01T08:08:47.952523",
+      "type": "working_memory",
+      "importance": "normal"
+    }
+  },
+  {
+    "id": "ef5f5e13-0013-4fb7-b251-bce170fbbedb",
+    "content": "我说：litellm.APIError: APIError: OpenAIException - Insufficient account balance",
+    "metadata": {
+      "importance": "normal",
+      "scene": 2,
+      "type": "working_memory",
+      "actor_name": "谢安",
+      "stored_at": "2026-05-01T08:08:50.816672"
+    }
+  }
+]

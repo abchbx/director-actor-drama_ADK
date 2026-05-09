@@ -1,0 +1,26 @@
+{
+  "name": "actor_观音菩萨",
+  "description": "演员 观音菩萨，角色：配角",
+  "url": "http://localhost:9094/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_观音菩萨",
+      "name": "扮演观音菩萨",
+      "description": "以观音菩萨的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

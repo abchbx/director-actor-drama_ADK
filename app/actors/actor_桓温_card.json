@@ -1,0 +1,26 @@
+{
+  "name": "actor_桓温",
+  "description": "演员 桓温，角色：反派/对立面 —— 权臣、军事将领",
+  "url": "http://localhost:9095/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_桓温",
+      "name": "扮演桓温",
+      "description": "以桓温的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

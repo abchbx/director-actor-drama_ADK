@@ -16,6 +16,7 @@ from google.adk.sessions import InMemorySessionService
 
 from app.actor_service import stop_all_actor_services
 from app.agent import root_agent
+from app.api.command_queue import CommandQueue
 from app.api.lock import acquire_lock, release_lock
 from app.api.routers import commands, queries
 from app.api.routers import auth as auth_router
@@ -129,6 +130,12 @@ async def lifespan(app: FastAPI):
     app.state.session_service = session_service
     app.state.runner_lock = asyncio.Lock()
 
+    # Phase 27: CommandQueue — decouple API endpoints from blocking runner_lock
+    command_queue = CommandQueue(runner=runner, lock=app.state.runner_lock)
+    await command_queue.start()
+    app.state.command_queue = command_queue
+    logger.info("CommandQueue started (Phase 27)")
+
     # STATE-02: flush-on-push hook for Phase 14 WebSocket
     app.state.flush_before_push = True
     app.state.flush_state_sync = flush_state_sync
@@ -151,6 +158,9 @@ async def lifespan(app: FastAPI):
         logger.info("Auth enabled: API_TOKEN configured (token auth mode)")
 
     yield
+
+    # Phase 27: Gracefully stop CommandQueue worker
+    await command_queue.stop()
 
     # Phase 14: Close all active WS connections
     for ws in list(manager.active_connections):

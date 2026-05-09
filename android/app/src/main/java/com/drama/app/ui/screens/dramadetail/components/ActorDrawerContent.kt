@@ -55,6 +55,7 @@ fun ActorDrawerContent(
     actors: List<ActorInfo>,
     isActorLoading: Boolean = false,
     onDismiss: () -> Unit,
+    onToggleCast: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
@@ -112,8 +113,8 @@ fun ActorDrawerContent(
                     }
                 }
                 else -> {
-                    // 演员列表 — 带交错入场动画
-                    ActorListWithStagger(actors = actors)
+                    // 演员列表 — 分在场/待机组
+                    ActorListGrouped(actors = actors, onToggleCast = onToggleCast)
                 }
             }
         }
@@ -121,18 +122,65 @@ fun ActorDrawerContent(
 }
 
 /**
- * 演员列表 — 交错入场动画 (Stagger Animation)
- *
- * 每张卡片延迟 index * 60ms 入场，配合 spring 弹性曲线
+ * 演员列表 — 分在场/待机组显示
  */
 @Composable
-private fun ActorListWithStagger(actors: List<ActorInfo>) {
+private fun ActorListGrouped(
+    actors: List<ActorInfo>,
+    onToggleCast: ((String) -> Unit)? = null,
+) {
+    val onStageActors = actors.filter { it.onStage }
+    val standbyActors = actors.filter { !it.onStage }
+
     LazyColumn(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        itemsIndexed(actors, key = { _, actor -> actor.name }) { index, actor ->
-            StaggerItem(index = index) {
-                ActorCard(actor = actor, onClick = {})
+        // 在场组
+        if (onStageActors.isNotEmpty()) {
+            item(key = "header_onstage") {
+                Text(
+                    text = "在场",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+                )
+            }
+            itemsIndexed(onStageActors, key = { _, actor -> "onstage_${actor.name}" }) { index, actor ->
+                StaggerItem(index = index) {
+                    ActorCard(
+                        actor = actor,
+                        onClick = {},
+                        onToggleCast = onToggleCast,
+                    )
+                }
+            }
+        }
+
+        // 待机组
+        if (standbyActors.isNotEmpty()) {
+            item(key = "header_standby") {
+                Column {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    androidx.compose.material3.HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 8.dp),
+                        color = MaterialTheme.colorScheme.outlineVariant,
+                    )
+                    Text(
+                        text = "待机",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        modifier = Modifier.padding(bottom = 4.dp),
+                    )
+                }
+            }
+            itemsIndexed(standbyActors, key = { _, actor -> "standby_${actor.name}" }) { index, actor ->
+                StaggerItem(index = index) {
+                    ActorCard(
+                        actor = actor,
+                        onClick = {},
+                        onToggleCast = onToggleCast,
+                    )
+                }
             }
         }
     }

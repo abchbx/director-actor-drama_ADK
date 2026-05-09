@@ -1,0 +1,222 @@
+[
+  {
+    "id": "45f8816b-9d59-469c-9b77-3bf58b59f874",
+    "content": "面对情境: 春日午后到潇湘馆探望黛玉，见她手执《西厢记》倚窗而坐，心中又喜又怜。",
+    "metadata": {
+      "stored_at": "2026-05-08T01:38:35.354781",
+      "importance": "normal",
+      "type": "working_memory",
+      "actor_name": "贾宝玉",
+      "scene": 1
+    }
+  },
+  {
+    "id": "798b8a89-7474-4bdc-9e6f-103ca02a5060",
+    "content": "我说：妹妹好雅兴，这般春光里临窗读书，倒比那些须眉浊物强上百倍。",
+    "metadata": {
+      "importance": "normal",
+      "actor_name": "贾宝玉",
+      "stored_at": "2026-05-08T01:38:44.110667",
+      "scene": 1,
+      "type": "working_memory"
+    }
+  },
+  {
+    "id": "6e90f0f7-9917-49bd-941c-0ced35159adf",
+    "content": "面对情境: 听到黛玉的嗔怪，非但不恼，反而笑嘻嘻地凑近，问她读的是什么书，又说要借来一观。",
+    "metadata": {
+      "scene": 1,
+      "type": "working_memory",
+      "stored_at": "2026-05-08T01:38:53.419115",
+      "actor_name": "贾宝玉",
+      "importance": "normal"
+    }
+  },
+  {
+    "id": "bb0838c6-ba73-4682-9338-711bc9552bb3",
+    "content": "我说：妹妹读的什么好书？让我也瞧瞧。",
+    "metadata": {
+      "actor_name": "贾宝玉",
+      "scene": 1,
+      "stored_at": "2026-05-08T01:39:02.413331",
+      "importance": "normal",
+      "type": "working_memory"
+    }
+  },
+  {
+    "id": "aa2fccec-18bc-4410-bb21-2e12e0daa30f",
+    "content": "面对情境: 眼尖发现黛玉藏的是《西厢记》，心中大喜，连声央求要与妹妹一同品读这千古奇文。",
+    "metadata": {
+      "scene": 1,
+      "importance": "normal",
+      "stored_at": "2026-05-08T01:39:09.218834",
+      "actor_name": "贾宝玉",
+      "type": "working_memory"
+    }
+  },
+  {
+    "id": "87b31ba9-da25-4b1e-9f7a-51ff65a55141",
+    "content": "我说：好妹妹！原来是《西厢记》！我早听闻这书是千古奇文，只是无缘得见。妹妹藏着这般好东西，竟不让我瞧瞧？\n\n（内心：我与妹妹心意相通，她读的必是世上最好的文字）",
+    "metadata": {
+      "actor_name": "贾宝玉",
+      "importance": "normal",
+      "scene": 1,
+      "stored_at": "2026-05-08T01:39:19.114802",
+      "type": "working_memory"
+    }
+  },
+  {
+    "id": "b61594ff-7173-4413-9fe4-fbe53fc24554",
+    "content": "面对情境: 与黛玉并肩而坐，同读《西厢记》。读到动情处，宝玉轻声赞叹：'真真绝世好文！崔莺莺与张生的情意，何其真挚动人。'",
+    "metadata": {
+      "stored_at": "2026-05-08T01:39:28.626225",
+      "importance": "normal",
+      "type": "working_memory",
+      "scene": 1,
+      "actor_name": "贾宝玉"
+    }
+  },
+  {
+    "id": "06b41eaa-c8e0-4556-863f-5b23328fb854",
+    "content": "我说：我方才读到这里，不禁心驰神往。若得一心人如崔莺莺般知情识趣，便是折寿十年也甘愿。妹妹你说，这世间可真有这般不以功名富贵为念、只求心意相通的痴人？",
+    "metadata": {
+      "stored_at": "2026-05-08T01:39:38.939423",
+      "scene": 1,
+      "importance": "normal",
+      "type": "working_memory",
+      "actor_name": "贾宝玉"
+    }
+  },
+  {
+    "id": "70341045-684b-4ca6-bc5e-e2a853a60af3",
+    "content": "面对情境: 见宝钗姐姐来了，浑不在意地招呼她坐下，说不过是些闲书杂书，妹妹不必好奇。",
+    "metadata": {
+      "type": "working_memory",
+      "stored_at": "2026-05-08T01:40:16.426234",
+      "importance": "normal",
+      "scene": 1,
+      "actor_name": "贾宝玉"
+    }
+  },
+  {
+    "id": "fbb1aba6-80de-493f-a8f1-0e2a665939c4",
+    "content": "我说：宝姐姐来了，快坐快坐。不过是些闲书杂书，妹妹不必好奇。",
+    "metadata": {
+      "stored_at": "2026-05-08T01:40:24.211161",
+      "importance": "normal",
+      "actor_name": "贾宝玉",
+      "scene": 1,
+      "type": "working_memory"
+    }
+  },
+  {
+    "id": "30fabec1-1ab9-4a17-abc9-33fc48816672",
+    "content": "面对情境: 一听老爷要考功课，宝玉顿时眉头紧锁，连连摇头说最怕那些八股文章，又央求宝钗姐姐在老爷面前替他美言几句。",
+    "metadata": {
+      "importance": "normal",
+      "stored_at": "2026-05-08T01:43:40.520936",
+      "actor_name": "贾宝玉",
+      "type": "working_memory",
+      "scene": 2
+    }
+  },
+  {
+    "id": "9ea95a4e-b741-499e-8131-9a6c81b7af94",
+    "content": "我说：宝姐姐，你可千万救救我！那些八股文章，枯涩乏味，哪里是人读的东西？老爷若是真考起来，我岂不是要当场出丑？姐姐素来聪慧，口才又好，在老爷跟前替我说几句好话，就说我近日身子不适，或是功课尚在温习，容我几日功夫……姐姐若不帮我，我只怕今日这顿训斥是逃不掉了。（内心：若被老爷考住，惹恼了他事小，只怕又要被逼着读那些令人厌烦的经济文章，那可如何是好！）",
+    "metadata": {
+      "stored_at": "2026-05-08T01:43:51.657662",
+      "scene": 2,
+      "type": "working_memory",
+      "importance": "normal",
+      "actor_name": "贾宝玉"
+    }
+  },
+  {
+    "id": "d2828fed-d00e-4db7-8e44-9a8f15a7e6af",
+    "content": "面对情境: 宝玉见黛玉神色有异，连忙起身走到她身边，轻声问她是否身子不爽，又自责说都是自己不好，惹妹妹生气了。",
+    "metadata": {
+      "stored_at": "2026-05-08T01:44:18.123481",
+      "actor_name": "贾宝玉",
+      "type": "working_memory",
+      "scene": 2,
+      "importance": "normal"
+    }
+  },
+  {
+    "id": "066c2f01-bea6-48e5-83b3-7fe9f95a76ee",
+    "content": "我说：妹妹可别恼我，都是我不好，惹得妹妹不痛快。你若是不舒服，我这就叫人去请大夫来瞧瞧；若是心里有什么不快活，也只管与我说，我替你分担就是了。（内心：妹妹若是愁闷，我哪里还能安得下心）",
+    "metadata": {
+      "importance": "normal",
+      "type": "working_memory",
+      "stored_at": "2026-05-08T01:44:27.452662",
+      "actor_name": "贾宝玉",
+      "scene": 2
+    }
+  },
+  {
+    "id": "3dca1b5a-4fae-4d59-aa13-6efef45c7143",
+    "content": "[插话触发] 黛玉口出酸言，宝玉急忙安抚，宝钗却不动声色地旁观这二人的亲密，心中自有计较。",
+    "metadata": {
+      "actor_name": "贾宝玉",
+      "importance": "normal",
+      "stored_at": "2026-05-08T01:44:33.824965",
+      "type": "working_memory",
+      "scene": 2
+    }
+  },
+  {
+    "id": "54fac51b-fc03-4f6c-9083-562143a52519",
+    "content": "[插话] 我说：妹妹消消气，我在这里陪着你呢。",
+    "metadata": {
+      "scene": 2,
+      "actor_name": "贾宝玉",
+      "type": "working_memory",
+      "stored_at": "2026-05-08T01:44:39.752762",
+      "importance": "normal"
+    }
+  },
+  {
+    "id": "8117c4ca-4601-4a03-8346-e72d52dc9d2d",
+    "content": "面对情境: 突然听见父亲声音，如遭雷击，顿时面如土色，慌忙站起身，神色惶恐。",
+    "metadata": {
+      "actor_name": "贾宝玉",
+      "stored_at": "2026-05-08T01:48:39.420211",
+      "scene": 2,
+      "importance": "normal",
+      "type": "working_memory"
+    }
+  },
+  {
+    "id": "589bd104-3553-4233-afb8-7f56944bd849",
+    "content": "我说：老爷……老爷来了？（声音微微发颤）",
+    "metadata": {
+      "type": "working_memory",
+      "stored_at": "2026-05-08T01:48:49.615342",
+      "scene": 2,
+      "actor_name": "贾宝玉",
+      "importance": "normal"
+    }
+  },
+  {
+    "id": "ad1458d8-8dbf-4c6a-b372-323596e8576d",
+    "content": "面对情境: 宝玉低头垂手，不敢有半句违拗，只在心中叫苦不迭。偷偷看了黛玉一眼，见她眼眶泛红，心中更是难过。",
+    "metadata": {
+      "scene": 2,
+      "importance": "normal",
+      "actor_name": "贾宝玉",
+      "stored_at": "2026-05-08T01:49:01.227244",
+      "type": "working_memory"
+    }
+  },
+  {
+    "id": "97e5cc10-724d-4265-a8ff-868d649e9750",
+    "content": "我说：妹妹莫恼，老爷来了，我去应付便是。你且放宽心，凡事有我呢。（内心：妹妹若是为我担忧，我这心里越发不安了）",
+    "metadata": {
+      "importance": "normal",
+      "scene": 2,
+      "actor_name": "贾宝玉",
+      "type": "working_memory",
+      "stored_at": "2026-05-08T01:49:11.096825"
+    }
+  }
+]

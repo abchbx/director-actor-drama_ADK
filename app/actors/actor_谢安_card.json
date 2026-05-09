@@ -1,0 +1,26 @@
+{
+  "name": "actor_谢安",
+  "description": "演员 谢安，角色：主角视角 —— 东晋士族领袖、宰相",
+  "url": "http://localhost:9097/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_谢安",
+      "name": "扮演谢安",
+      "description": "以谢安的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

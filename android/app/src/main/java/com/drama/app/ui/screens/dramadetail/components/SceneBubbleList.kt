@@ -13,6 +13,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,8 +46,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,6 +61,7 @@ import androidx.compose.ui.unit.dp
 import com.drama.app.domain.model.SceneBubble
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.mutableStateOf
 
 /** ★ 剧情引导反馈颜色 */
 private val PlotGuidanceColor = Color(0xFF6A5ACD)  // 紫色系，与导演头像同色系
@@ -80,6 +84,9 @@ fun SceneBubbleList(
     isTyping: Boolean,
     typingText: String = "AI 正在思考...",
     typingElapsedSeconds: Int = 0,
+    // ★ 修复 D-25-02：实时流式占位气泡参数
+    streamingActorName: String = "",
+    streamingText: String = "",
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
@@ -105,9 +112,10 @@ fun SceneBubbleList(
     }
 
     // ── 自动滚动：仅当接近底部且有新消息到达时 ──
+    // ★ 修复：使用 scrollToItem 而非 animateScrollToItem，避免滚动动画延迟
     LaunchedEffect(bubbles.size, isTyping) {
         if (bubbles.isNotEmpty() && isNearBottom) {
-            listState.animateScrollToItem(0)
+            listState.scrollToItem(0)
         }
     }
 
@@ -121,7 +129,7 @@ fun SceneBubbleList(
             verticalArrangement = Arrangement.spacedBy(4.dp),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 8.dp, bottom = 8.dp),
         ) {
-            // 思考指示器 — 在 reverseLayout 中作为第一个 item，显示在最底部
+            // ★ 修复 D-25-02：思考指示器 — 当后端 call 阶段已创建占位气泡时，显示实时气泡而非三点指示器
             item(key = "typing_indicator") {
                 Box(modifier = Modifier.height(TYPING_ROW_HEIGHT)) {
                     AnimatedVisibility(
@@ -131,7 +139,37 @@ fun SceneBubbleList(
                             animationSpec = tween(350, easing = LinearOutSlowInEasing),
                         ),
                     ) {
-                        TypingIndicator(typingText = typingText, elapsedSeconds = typingElapsedSeconds)
+                        // ★ 优先级：有占位气泡信息时显示实时气泡，否则显示传统三点指示器
+                        when {
+                            streamingActorName.isNotBlank() && streamingText.isNotBlank() -> {
+                                RealtimeDialogueBubble(actorName = streamingActorName, text = streamingText)
+                            }
+                            streamingText.isNotBlank() && streamingActorName.isBlank() -> {
+                                RealtimeNarrationBubble(text = streamingText)
+                            }
+                            else -> {
+                                TypingIndicator(typingText = typingText, elapsedSeconds = typingElapsedSeconds)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ★ 修复：当 bubbles 为空但正在处理中时，显示提示文本，避免用户看到完全空白的界面
+            if (reversedBubbles.isEmpty()) {
+                item(key = "empty_hint") {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 32.dp, vertical = 48.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = if (isTyping) "内容正在生成中，请稍候..." else "开始一段新的戏剧体验！",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            textAlign = TextAlign.Center,
+                        )
                     }
                 }
             }
@@ -143,28 +181,8 @@ fun SceneBubbleList(
             ) { bubble ->
                 // ★ 修复：LazyColumn 回收复用 item 时，AnimatedVisibility(visible=true) 会重新播放 enter 动画，
                 // 导致上下滑动时已有消息重复播放入场动画（看起来像流式输出）。
-                // 改用 remember 跟踪该 id 是否已播放过动画，只播放一次。
-                val hasAnimated = remember(bubble.id) { mutableSetOf<String>() }
-                val shouldAnimate = !hasAnimated.contains(bubble.id).also {
-                    hasAnimated.add(bubble.id)
-                }
-
-                if (shouldAnimate) {
-                    val enterAnimation = fadeIn(
-                        animationSpec = tween(350, easing = FastOutSlowInEasing),
-                    ) + slideInVertically(
-                        initialOffsetY = { it / 3 },
-                        animationSpec = tween(400, easing = FastOutSlowInEasing),
-                    )
-                    AnimatedVisibility(
-                        visible = true,
-                        enter = enterAnimation,
-                    ) {
-                        BubbleContent(bubble = bubble)
-                    }
-                } else {
-                    BubbleContent(bubble = bubble)
-                }
+                // 使用 rememberSaveable 跟踪已动画的 bubble id，确保只播放一次。
+                BubbleItem(bubble = bubble)
             }
         }
 
@@ -248,7 +266,7 @@ private fun SceneDivider(bubble: SceneBubble.SceneDivider) {
                 append("第 ")
                 append(bubble.sceneNumber)
                 append(" 场")
-                if (bubble.sceneTitle.isNotBlank()) {
+                if (bubble.sceneTitle.isNotBlank() && bubble.sceneTitle != "第${bubble.sceneNumber}场") {
                     append(" · ")
                     append(bubble.sceneTitle)
                 }
@@ -313,6 +331,99 @@ private fun BubbleContent(bubble: SceneBubble) {
         is SceneBubble.SceneDivider -> SceneDivider(bubble)
         is SceneBubble.SystemError -> SystemErrorBubble(bubble)
         is SceneBubble.PlotGuidance -> PlotGuidanceBubble(bubble)
+    }
+}
+
+/**
+ * ★ 打字机效果：AI 生成的 Narration / Dialogue 新消息逐字显示，
+ * 减少生成等待焦虑，给用户"内容正在实时流出"的反馈感。
+ *
+ * - 历史消息 / 用户消息 / 系统消息：直接完整显示
+ * - 新 AI 消息：逐字打出，带闪烁光标，完成后自动移除光标
+ * - 动画速度根据文本长度自适应：长文更快，短文更有节奏感
+ * - 使用 rememberSaveable(bubble.id) 确保配置变化或列表复用后状态不丢失
+ */
+@Composable
+private fun BubbleItem(bubble: SceneBubble) {
+    // ★ 区分实时消息（WS 推送、REST fallback）和历史/恢复消息
+    // 实时消息前缀：b_ 旁白/对话、chime_ 插话、resp_ REST fallback、free_ 自由聊天
+    // 历史/恢复前缀：conv_ 历史、hist_ 场景历史、sync_ 重连对齐、user_/cmd_/sys_ 用户/命令/系统
+    val isRealtime = bubble.id.startsWith("b_") || bubble.id.startsWith("chime_")
+            || bubble.id.startsWith("resp_") || bubble.id.startsWith("free_")
+            || bubble.id.startsWith("api_resp_") || bubble.id.startsWith("pg_")
+
+    if (isRealtime) {
+        // ★ 实时消息：带入场动画，一条一条滑入
+        val entryPlayed = rememberSaveable(bubble.id) { mutableStateOf(false) }
+        val entryVisible = remember(bubble.id) { mutableStateOf(entryPlayed.value) }
+
+        LaunchedEffect(bubble.id) {
+            if (!entryPlayed.value) {
+                entryVisible.value = true
+                entryPlayed.value = true
+            }
+        }
+
+        AnimatedVisibility(
+            visible = entryVisible.value,
+            enter = fadeIn(tween(200)) + slideInVertically(
+                initialOffsetY = { it / 3 },
+                animationSpec = tween(350, easing = LinearOutSlowInEasing),
+            ),
+        ) {
+            BubbleWithTypingEffect(bubble = bubble)
+        }
+    } else {
+        // ★ 历史/恢复/用户/系统消息：直接显示，无入场动画
+        // 避免页面切换时大量气泡同时触发动画导致的"空屏后重新显示"闪烁
+        BubbleWithTypingEffect(bubble = bubble)
+    }
+}
+
+@Composable
+private fun BubbleWithTypingEffect(bubble: SceneBubble) {
+    // 打字机效果（原有逻辑）
+    val shouldAnimate = bubble is SceneBubble.Narration || bubble is SceneBubble.Dialogue
+    val animationDone = rememberSaveable(bubble.id) { mutableStateOf(false) }
+    val displayText = rememberSaveable(bubble.id) { mutableStateOf("") }
+    val showCursor = remember(bubble.id) { mutableStateOf(false) }
+
+    if (shouldAnimate && !animationDone.value) {
+        val fullText = when (bubble) {
+            is SceneBubble.Narration -> bubble.text
+            is SceneBubble.Dialogue -> bubble.text
+            else -> ""
+        }
+
+        LaunchedEffect(bubble.id) {
+            if (animationDone.value) return@LaunchedEffect
+            val startIndex = displayText.value.length.coerceAtMost(fullText.length)
+            // 自适应速度：长文本加速，避免让用户等太久
+            val delayPerChar = when {
+                fullText.length > 800 -> 3L
+                fullText.length > 400 -> 6L
+                fullText.length > 150 -> 10L
+                else -> 16L
+            }
+            for (i in startIndex until fullText.length) {
+                displayText.value = fullText.take(i + 1)
+                showCursor.value = true
+                delay(delayPerChar)
+            }
+            showCursor.value = false
+            animationDone.value = true
+        }
+
+        // 打字过程中在末尾附加光标符号，提示"还在输出"
+        val textWithCursor = if (showCursor.value) displayText.value + "▍" else displayText.value
+        val animatedBubble = when (bubble) {
+            is SceneBubble.Narration -> bubble.copy(text = textWithCursor.ifEmpty { " " })
+            is SceneBubble.Dialogue -> bubble.copy(text = textWithCursor.ifEmpty { " " })
+            else -> bubble
+        }
+        BubbleContent(bubble = animatedBubble)
+    } else {
+        BubbleContent(bubble = bubble)
     }
 }
 

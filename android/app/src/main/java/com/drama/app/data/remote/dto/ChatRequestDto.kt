@@ -12,3 +12,12 @@ data class ChatRequestDto(
     /** 发送者名称 — 主角的自定义名称，默认"主角" */
     val senderName: String = "主角",
 )
+
+/** POST /drama/free_chat 请求体 — 自由模式，直接A2A发给演员（绕过导演） */
+@Serializable
+data class FreeChatRequestDto(
+    val message: String,
+    val mention: String? = null,
+    /** 发送者名称 — 自由聊天中的用户身份 */
+    val senderName: String = "用户",
+)

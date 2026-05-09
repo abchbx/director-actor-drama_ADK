@@ -1,0 +1,26 @@
+{
+  "name": "actor_孙悟空",
+  "description": "演员 孙悟空，角色：主角",
+  "url": "http://localhost:9006/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_孙悟空",
+      "name": "扮演孙悟空",
+      "description": "以孙悟空的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

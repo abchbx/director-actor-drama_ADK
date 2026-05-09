@@ -7,4 +7,5 @@ import kotlinx.serialization.json.JsonElement
 data class CastStatusResponseDto(
     val status: String = "success",
     val actors: Map<String, JsonElement> = emptyMap(),
+    val scene_cast: List<String>? = null,
 )

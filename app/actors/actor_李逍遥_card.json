@@ -1,0 +1,26 @@
+{
+  "name": "actor_李逍遥",
+  "description": "演员 李逍遥，角色：主角",
+  "url": "http://localhost:9085/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_李逍遥",
+      "name": "扮演李逍遥",
+      "description": "以李逍遥的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

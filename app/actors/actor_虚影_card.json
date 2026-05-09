@@ -1,0 +1,26 @@
+{
+  "name": "actor_虚影",
+  "description": "演员 虚影，角色：归墟中迷失的灵魂，历史的见证者",
+  "url": "http://localhost:9075/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_虚影",
+      "name": "扮演虚影",
+      "description": "以虚影的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

@@ -114,7 +114,7 @@ async def run_command_and_collect(
     message: str,
     user_id: str,
     session_id: str,
-    timeout: float = 120.0,
+    timeout: float | None = None,
     event_callback: Callable[[Event], Awaitable[None]] | None = None,
 ) -> dict[str, Any]:
     """Run a command through the ADK Runner and collect structured results.
@@ -133,12 +133,15 @@ async def run_command_and_collect(
     ★ 兜底解析：如果导演未调用 actor_speak/_batch，但 final_response 包含角色对话，
     自动解析并生成合成的 function_response 事件推送给前端，防止白屏。
 
+    ★ 超时修复：timeout 默认 None（无限制），避免 LLM 长思考时触发 504。
+      如需限制，可显式传入 timeout 值。
+
     Args:
         runner: The ADK Runner instance.
         message: The user message to send.
         user_id: User ID for the session.
         session_id: Session ID for the session.
-        timeout: Maximum seconds to wait before raising 504.
+        timeout: Maximum seconds to wait before raising 504. None = no limit.
         event_callback: Optional async callback invoked for each Runner event.
             When provided (WS scenario), receives every event for real-time push.
             When None (REST scenario), behavior unchanged.
@@ -147,7 +150,7 @@ async def run_command_and_collect(
         Dict with "final_response" (str) and "tool_results" (list[dict]).
 
     Raises:
-        HTTPException: 504 if the command execution times out.
+        HTTPException: 504 if the command execution times out (only when timeout is set).
     """
     content = types.Content(
         role="user",
@@ -170,6 +173,8 @@ async def run_command_and_collect(
         start_time = time.monotonic()
         # ★ 跟踪是否有真正的演员对话生成
         has_actor_dialogue = False
+        # ★ 跟踪 command_complete 是否已发送，确保异常时也能关闭前端 typing
+        command_complete_sent = False
 
         # DEBUG: Log command entry point
         cmd_label = message[:80] + ("..." if len(message) > 80 else "")
@@ -178,126 +183,128 @@ async def run_command_and_collect(
             invocation_id, cmd_label, timeout,
         )
 
-        async for event in runner.run_async(
-            user_id=user_id,
-            session_id=session_id,
-            new_message=content,
-        ):
-            event_count += 1
-            elapsed = time.monotonic() - start_time
+        try:
+            async for event in runner.run_async(
+                user_id=user_id,
+                session_id=session_id,
+                new_message=content,
+            ):
+                event_count += 1
+                elapsed = time.monotonic() - start_time
 
-            # DEBUG: Log each event type at INFO level (visible in server console)
-            event_type = _describe_event(event)
-            logger.info(
-                "[DIRECTOR-LOG] ⏱️ [%s] #%d t=%.1fs | %s",
-                invocation_id, event_count, elapsed, event_type,
-            )
-
-            # D-01: Event callback for WS real-time push
-            if event_callback:
-                try:
-                    await event_callback(event)
-                except Exception as exc:
-                    logger.warning(
-                        "[DIRECTOR-LOG] ⚠️ WS回调失败 [%s #%d]: %s",
-                        invocation_id, event_count, exc,
-                    )
-                    pass  # Callback failure must NOT block Runner execution
-
-            if event.is_final_response():
-                # ★ 核心修复：每次 is_final_response() 都覆盖 final_text
-                # 只保留最后一次的文本，确保 CommandResponse 只包含单次聚合响应
-                final_response_count += 1
-                if event.content and event.content.parts:
-                    text_parts = []
-                    for part in event.content.parts:
-                        if part.text:
-                            text_parts.append(part.text)
-                    if text_parts:
-                        # ★ 覆盖而非追加 — 只保留最新一次 final_response
-                        final_text = "".join(text_parts)
-                        logger.info(
-                            "[DIRECTOR-LOG] ✅ [%s] final_response#%d (%d字符): %.50s...",
-                            invocation_id, final_response_count, len(final_text),
-                            final_text.strip(),
-                        )
-                        if final_response_count > 1:
-                            logger.warning(
-                                "[DIRECTOR-LOG] ⚠️ [%s] 去重: 丢弃前%d次final_response，保留最新",
-                                invocation_id, final_response_count - 1,
-                            )
-            elif event.content and event.content.parts:
-                for part in event.content.parts:
-                    if part.function_response and part.function_response.response:
-                        tool_name = part.function_response.name or "?"
-                        resp = part.function_response.response
-
-                        # ★ 跟踪是否有真正的演员对话
-                        if tool_name in ("actor_speak", "actor_speak_batch"):
-                            has_actor_dialogue = True
-
-                        # ★ 核心修复：基于 (tool_name, id) 去重 tool_results
-                        # ADK 有时会对同一个工具调用产生重复的 function_response 事件
-                        # ★ 修复去重键冲突：actor_speak/director_narrate/create_actor 等工具
-                        # 没有 "id" 或 "scene_number" 字段，导致所有同类结果被错误去重。
-                        # 使用 ADK function_response 自带的 id（每次调用唯一）作为首选去重键。
-                        resp_id = resp.get("id", resp.get("scene_number", ""))
-                        # 如果返回值没有唯一标识，使用 ADK 分配的 function_response.id
-                        # 该 id 在每次工具调用时由 ADK 自动生成，保证全局唯一
-                        if not resp_id and part.function_response.id:
-                            resp_id = part.function_response.id
-                        # 最终兜底：用 actor_name + situation 哈希生成唯一键
-                        if not resp_id:
-                            actor = resp.get("actor_name", "")
-                            msg = str(resp.get("message", resp.get("situation", "")))[:50]
-                            resp_id = f"{actor}:{msg}"
-                        dedup_key = (tool_name, str(resp_id))
-
-                        if dedup_key in seen_tool_results:
-                            logger.warning(
-                                "[DIRECTOR-LOG] ⚠️ [%s] 去重: 跳过重复 tool_result %s",
-                                invocation_id, dedup_key,
-                            )
-                            continue
-                        seen_tool_results.add(dedup_key)
-
-                        status_val = resp.get("status", "ok")
-                        msg_preview = str(resp.get("message", ""))[:60]
-                        logger.info(
-                            "[DIRECTOR-LOG] 🔧 [%s] Tool完成 [%s] status=%s | %.60s",
-                            invocation_id, tool_name, status_val, msg_preview,
-                        )
-                        tool_results.append(dict(resp))
-
-        # ★ 兜底解析：如果导演没有调用 actor_speak/_batch，但 final_response 包含角色对话
-        if not has_actor_dialogue and final_text and event_callback:
-            synthetic_dialogues = _extract_dialogue_from_text(final_text)
-            if synthetic_dialogues:
-                logger.warning(
-                    "[DIRECTOR-LOG] ⚠️ [%s] 导演未调用 actor_speak，从 final_response 解析出 %d 条合成对话",
-                    invocation_id, len(synthetic_dialogues),
+                # DEBUG: Log each event type at INFO level (visible in server console)
+                event_type = _describe_event(event)
+                logger.info(
+                    "[DIRECTOR-LOG] ⏱️ [%s] #%d t=%.1fs | %s",
+                    invocation_id, event_count, elapsed, event_type,
                 )
-                for dialogue in synthetic_dialogues:
-                    synthetic_event = _build_synthetic_actor_speak_event(dialogue)
-                    try:
-                        await event_callback(synthetic_event)
-                    except Exception:
-                        pass
-                    # 同时加入 tool_results，让 REST 响应也包含这些对话
-                    tool_results.append({
-                        "actor_name": dialogue["actor_name"],
-                        "text": dialogue["text"],
-                        "dialogue": dialogue["text"],
-                        "status": "ok",
-                        "message": "synthetic from final_response",
-                    })
 
-        # ★ 发送 command_complete 事件，确保前端关闭 typing 状态
-        if event_callback:
-            try:
-                await event_callback(_build_command_complete_event())
-            except Exception:
-                pass
+                # D-01: Event callback for WS real-time push
+                if event_callback:
+                    try:
+                        await event_callback(event)
+                    except Exception as exc:
+                        logger.warning(
+                            "[DIRECTOR-LOG] ⚠️ WS回调失败 [%s #%d]: %s",
+                            invocation_id, event_count, exc,
+                        )
+                        pass  # Callback failure must NOT block Runner execution
+
+                if event.is_final_response():
+                    # ★ 核心修复：每次 is_final_response() 都覆盖 final_text
+                    # 只保留最后一次的文本，确保 CommandResponse 只包含单次聚合响应
+                    final_response_count += 1
+                    if event.content and event.content.parts:
+                        text_parts = []
+                        for part in event.content.parts:
+                            if part.text:
+                                text_parts.append(part.text)
+                        if text_parts:
+                            # ★ 覆盖而非追加 — 只保留最新一次 final_response
+                            final_text = "".join(text_parts)
+                            logger.info(
+                                "[DIRECTOR-LOG] ✅ [%s] final_response#%d (%d字符): %.50s...",
+                                invocation_id, final_response_count, len(final_text),
+                                final_text.strip(),
+                            )
+                            if final_response_count > 1:
+                                logger.warning(
+                                    "[DIRECTOR-LOG] ⚠️ [%s] 去重: 丢弃前%d次final_response，保留最新",
+                                    invocation_id, final_response_count - 1,
+                                )
+                elif event.content and event.content.parts:
+                    for part in event.content.parts:
+                        if part.function_response and part.function_response.response:
+                            tool_name = part.function_response.name or "?"
+                            resp = part.function_response.response
+
+                            # ★ 跟踪是否有真正的演员对话
+                            if tool_name in ("actor_speak", "actor_speak_batch"):
+                                has_actor_dialogue = True
+
+                            # ★ 核心修复：基于 (tool_name, id) 去重 tool_results
+                            # ADK 有时会对同一个工具调用产生重复的 function_response 事件
+                            # ★ 修复去重键冲突：actor_speak/director_narrate/create_actor 等工具
+                            # 没有 "id" 或 "scene_number" 字段，导致所有同类结果被错误去重。
+                            # 使用 ADK function_response 自带的 id（每次调用唯一）作为首选去重键。
+                            resp_id = resp.get("id", resp.get("scene_number", ""))
+                            # 如果返回值没有唯一标识，使用 ADK 分配的 function_response.id
+                            # 该 id 在每次工具调用时由 ADK 自动生成，保证全局唯一
+                            if not resp_id and part.function_response.id:
+                                resp_id = part.function_response.id
+                            # 最终兜底：用 actor_name + situation 哈希生成唯一键
+                            if not resp_id:
+                                actor = resp.get("actor_name", "")
+                                msg = str(resp.get("message", resp.get("situation", "")))[:50]
+                                resp_id = f"{actor}:{msg}"
+                            dedup_key = (tool_name, str(resp_id))
+
+                            if dedup_key in seen_tool_results:
+                                logger.warning(
+                                    "[DIRECTOR-LOG] ⚠️ [%s] 去重: 跳过重复 tool_result %s",
+                                    invocation_id, dedup_key,
+                                )
+                                continue
+                            seen_tool_results.add(dedup_key)
+
+                            status_val = resp.get("status", "ok")
+                            msg_preview = str(resp.get("message", ""))[:60]
+                            logger.info(
+                                "[DIRECTOR-LOG] 🔧 [%s] Tool完成 [%s] status=%s | %.60s",
+                                invocation_id, tool_name, status_val, msg_preview,
+                            )
+                            tool_results.append(dict(resp))
+
+            # ★ 兜底解析：如果导演没有调用 actor_speak/_batch，但 final_response 包含角色对话
+            if not has_actor_dialogue and final_text and event_callback:
+                synthetic_dialogues = _extract_dialogue_from_text(final_text)
+                if synthetic_dialogues:
+                    logger.warning(
+                        "[DIRECTOR-LOG] ⚠️ [%s] 导演未调用 actor_speak，从 final_response 解析出 %d 条合成对话",
+                        invocation_id, len(synthetic_dialogues),
+                    )
+                    for dialogue in synthetic_dialogues:
+                        synthetic_event = _build_synthetic_actor_speak_event(dialogue)
+                        try:
+                            await event_callback(synthetic_event)
+                        except Exception:
+                            pass
+                        # 同时加入 tool_results，让 REST 响应也包含这些对话
+                        tool_results.append({
+                            "actor_name": dialogue["actor_name"],
+                            "text": dialogue["text"],
+                            "dialogue": dialogue["text"],
+                            "status": "ok",
+                            "message": "synthetic from final_response",
+                        })
+        finally:
+            # ★ 关键修复：无论命令成功还是异常，都发送 command_complete 关闭前端 typing
+            if event_callback and not command_complete_sent:
+                try:
+                    await event_callback(_build_command_complete_event())
+                    command_complete_sent = True
+                except Exception:
+                    pass
 
         total_time = time.monotonic() - start_time
         logger.info(
@@ -307,14 +314,18 @@ async def run_command_and_collect(
         )
         return {"final_response": final_text, "tool_results": tool_results}
 
-    try:
-        return await asyncio.wait_for(_collect(), timeout=timeout)
-    except asyncio.TimeoutError:
-        logger.error(
-            "[DIRECTOR-LOG] 💥 [%s] 命令超时! '%s' 超过 %.1f 秒限制",
-            invocation_id, message, timeout,
-        )
-        raise HTTPException(status_code=504, detail="Command execution timed out")
+    if timeout is not None:
+        try:
+            return await asyncio.wait_for(_collect(), timeout=timeout)
+        except asyncio.TimeoutError:
+            logger.error(
+                "[DIRECTOR-LOG] 💥 [%s] 命令超时! '%s' 超过 %.1f 秒限制",
+                invocation_id, message, timeout,
+            )
+            raise HTTPException(status_code=504, detail="Command execution timed out")
+    else:
+        # ★ 无超时模式：LLM 长思考不中断
+        return await _collect()
 
 
 def _describe_event(event: Event) -> str:

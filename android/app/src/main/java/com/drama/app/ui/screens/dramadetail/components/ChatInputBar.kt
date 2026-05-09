@@ -1,4 +1,5 @@
 package com.drama.app.ui.screens.dramadetail.components
+import com.drama.app.ui.screens.dramadetail.ChatMode
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -27,6 +28,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import com.drama.app.domain.model.ActorInfo
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -69,13 +71,15 @@ private val QUICK_ACTIONS = listOf(
 
 @Composable
 fun ChatInputBar(
-    actors: List<String>,
+    actors: List<ActorInfo>,
     onSend: (String, String?) -> Unit,
     onCommand: (String) -> Unit,
+    onInterrupt: () -> Unit = {},
     isProcessing: Boolean,
     isTyping: Boolean = false,
     isWsConnected: Boolean = true,
     isReconnecting: Boolean = false,
+    chatMode: ChatMode = ChatMode.DIRECTOR,
     modifier: Modifier = Modifier,
 ) {
     var inputText by rememberSaveable { mutableStateOf("") }
@@ -87,11 +91,13 @@ fun ChatInputBar(
     // Slash command menu state — independent mutable state, not derived from focus
     var slashMenuExpanded by remember { mutableStateOf(false) }
 
+    val actorNames = remember(actors) { actors.map { it.name } }
+
     // Parse mention if text starts with @actor_name
-    val mention = remember(inputText, actors) {
-        if (inputText.startsWith("@") && actors.isNotEmpty()) {
+    val mention = remember(inputText, actorNames) {
+        if (inputText.startsWith("@") && actorNames.isNotEmpty()) {
             val namePart = inputText.substring(1).takeWhile { it != ' ' }
-            actors.find { it == namePart }
+            actorNames.find { it == namePart }
         } else null
     }
 
@@ -121,9 +127,11 @@ fun ChatInputBar(
             ) {
                 actors.forEach { actor ->
                     MentionChip(
-                        label = "@$actor",
+                        label = "@${actor.name}",
+                        enabled = inputEnabled,
+                        isOnStage = actor.onStage,
                         onClick = {
-                            inputText = "@$actor "
+                            inputText = "@${actor.name} "
                             focusRequester.requestFocus()
                         },
                     )
@@ -131,25 +139,29 @@ fun ChatInputBar(
             }
         }
 
-        // ★ D-22-02: Quick action chips — /next /end shortcuts
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.Start),
-        ) {
-            QUICK_ACTIONS.forEach { action ->
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.tertiaryContainer,
-                    onClick = { onCommand(action.command) },
-                ) {
-                    Text(
-                        text = "${action.icon} ${action.label}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onTertiaryContainer,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                    )
+        // ★ Phase 25: Quick action chips — 只在群聊模式显示 /next /end 快捷入口
+        if (chatMode == ChatMode.DIRECTOR) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.Start),
+            ) {
+                QUICK_ACTIONS.forEach { action ->
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                        onClick = { if (!isLocked) onCommand(action.command) },
+                    ) {
+                        Text(
+                            text = "${action.icon} ${action.label}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer.copy(
+                                alpha = if (isLocked) 0.4f else 1f
+                            ),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                        )
+                    }
                 }
             }
         }
@@ -181,9 +193,10 @@ fun ChatInputBar(
                     placeholder = {
                         Text(
                             when {
-                                isLocked -> "AI 正在思考，请稍候..."
+                                isLocked -> if (chatMode == ChatMode.FREE_CHAT) "角色们正在回应..." else "AI 正在思考，请稍候..."
                                 isReconnecting -> "正在重新连接..."
                                 !isWsConnected -> "离线模式 — 消息将通过 REST 发送"
+                                chatMode == ChatMode.FREE_CHAT -> "自由聊天，@提及某位演员..."
                                 else -> "发消息给角色们..."
                             },
                             style = MaterialTheme.typography.bodyMedium,
@@ -208,19 +221,24 @@ fun ChatInputBar(
                 )
                 // Send / Stop button — 推理中显示停止状态，空闲时显示发送
                 if (isLocked) {
-                    // ★ 停止/等待状态：禁用的按钮 + Close 图标，提示用户正在处理
-                    Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = MaterialTheme.colorScheme.errorContainer,
+                    // ★ 停止/等待状态：点击可主动打断当前任务
+                    IconButton(
+                        onClick = onInterrupt,
                         modifier = Modifier.size(40.dp),
                     ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(36.dp)) {
-                            Icon(
-                                Icons.Filled.Close,
-                                contentDescription = "等待中",
-                                modifier = Modifier.size(18.dp),
-                                tint = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f),
-                            )
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = MaterialTheme.colorScheme.errorContainer,
+                            modifier = Modifier.size(40.dp),
+                        ) {
+                            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(36.dp)) {
+                                Icon(
+                                    Icons.Filled.Close,
+                                    contentDescription = "打断",
+                                    modifier = Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f),
+                                )
+                            }
                         }
                     }
                 } else {
@@ -302,17 +320,31 @@ fun ChatInputBar(
 @Composable
 private fun MentionChip(
     label: String,
+    enabled: Boolean = true,
+    isOnStage: Boolean = true,
     onClick: () -> Unit,
 ) {
+    val containerColor = if (isOnStage) {
+        MaterialTheme.colorScheme.secondaryContainer
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant
+    }
+    val contentColor = if (isOnStage) {
+        MaterialTheme.colorScheme.onSecondaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+    }
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        onClick = onClick,
+        color = containerColor,
+        onClick = { if (enabled) onClick() },
     ) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSecondaryContainer,
+            color = contentColor.copy(
+                alpha = if (enabled) 1f else 0.4f
+            ),
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
         )
     }

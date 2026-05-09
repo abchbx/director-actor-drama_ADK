@@ -1,0 +1,26 @@
+{
+  "name": "actor_唐僧",
+  "description": "演员 唐僧，角色：主角",
+  "url": "http://localhost:9092/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_唐僧",
+      "name": "扮演唐僧",
+      "description": "以唐僧的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

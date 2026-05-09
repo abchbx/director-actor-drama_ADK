@@ -1,0 +1,145 @@
+[
+  {
+    "id": "984b1423-7709-4120-ab81-1eea7b2e9955",
+    "content": "与道衍商议起兵之事",
+    "metadata": {
+      "actor_name": "朱棣",
+      "importance": "normal",
+      "stored_at": "2026-04-25T01:53:46.746579",
+      "type": "working_memory",
+      "scene": 3
+    }
+  },
+  {
+    "id": "8035576a-13f5-402a-bd89-2080023df3a7",
+    "content": "第一次遇见道衍和尚",
+    "metadata": {
+      "scene": 3,
+      "importance": "critical",
+      "stored_at": "2026-04-25T01:53:47.894519",
+      "actor_name": "朱棣",
+      "type": "working_memory"
+    }
+  },
+  {
+    "id": "9fc38924-881b-4f94-9fa3-d5d742118a20",
+    "content": "与道衍商议起兵之事",
+    "metadata": {
+      "actor_name": "朱棣",
+      "stored_at": "2026-04-26T05:23:32.262906",
+      "importance": "normal",
+      "type": "working_memory",
+      "scene": 3
+    }
+  },
+  {
+    "id": "d9d14f44-83d5-4f65-ac52-2e38be411811",
+    "content": "第一次遇见道衍和尚",
+    "metadata": {
+      "importance": "critical",
+      "actor_name": "朱棣",
+      "stored_at": "2026-04-26T05:23:32.658295",
+      "scene": 3,
+      "type": "working_memory"
+    }
+  },
+  {
+    "id": "ef053202-8ab6-4c30-bb43-c63af3ce9c10",
+    "content": "与道衍商议起兵之事",
+    "metadata": {
+      "actor_name": "朱棣",
+      "importance": "normal",
+      "type": "working_memory",
+      "scene": 3,
+      "stored_at": "2026-04-29T02:36:25.458762"
+    }
+  },
+  {
+    "id": "0590bbc5-79fb-47a3-af82-9c6ed44e61e2",
+    "content": "第一次遇见道衍和尚",
+    "metadata": {
+      "type": "working_memory",
+      "actor_name": "朱棣",
+      "stored_at": "2026-04-29T02:36:25.953189",
+      "importance": "critical",
+      "scene": 3
+    }
+  },
+  {
+    "id": "6661e453-7ae0-47b7-88b3-3a28f6259a5d",
+    "content": "新增记忆",
+    "metadata": {
+      "type": "working_memory",
+      "stored_at": "2026-05-02T12:26:51.366848",
+      "scene": 3,
+      "actor_name": "朱棣",
+      "importance": "normal"
+    }
+  },
+  {
+    "id": "59a3c412-2b43-452f-b207-d969ed7b0067",
+    "content": "新增记忆",
+    "metadata": {
+      "actor_name": "朱棣",
+      "stored_at": "2026-05-02T12:26:58.900818",
+      "type": "working_memory",
+      "importance": "normal",
+      "scene": 3
+    }
+  },
+  {
+    "id": "0dfbc4a7-6eb5-493a-b7d5-832ade6f8c96",
+    "content": "新增记忆",
+    "metadata": {
+      "importance": "normal",
+      "type": "working_memory",
+      "scene": 3,
+      "stored_at": "2026-05-02T12:27:06.924980",
+      "actor_name": "朱棣"
+    }
+  },
+  {
+    "id": "3bcbe7d7-0891-4383-9dd7-b9f909c9d08f",
+    "content": "与道衍商议起兵之事",
+    "metadata": {
+      "actor_name": "朱棣",
+      "stored_at": "2026-05-02T12:27:23.613090",
+      "type": "working_memory",
+      "scene": 3,
+      "importance": "normal"
+    }
+  },
+  {
+    "id": "2ce4d895-a9c9-430d-b94f-e5fcfca0e03e",
+    "content": "第一次遇见道衍和尚",
+    "metadata": {
+      "scene": 3,
+      "importance": "critical",
+      "actor_name": "朱棣",
+      "type": "working_memory",
+      "stored_at": "2026-05-02T12:27:24.495873"
+    }
+  },
+  {
+    "id": "b3fa223d-34cc-412b-ada5-2349f6806e1c",
+    "content": "与道衍商议起兵之事",
+    "metadata": {
+      "type": "working_memory",
+      "scene": 3,
+      "stored_at": "2026-05-02T12:27:32.128655",
+      "actor_name": "朱棣",
+      "importance": "normal"
+    }
+  },
+  {
+    "id": "7ff3d7b5-0c2b-47b9-99b1-70a4a846397b",
+    "content": "第一次遇见道衍和尚",
+    "metadata": {
+      "scene": 3,
+      "type": "working_memory",
+      "stored_at": "2026-05-02T12:27:33.136827",
+      "importance": "critical",
+      "actor_name": "朱棣"
+    }
+  }
+]

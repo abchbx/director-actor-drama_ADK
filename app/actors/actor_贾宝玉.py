@@ -35,9 +35,12 @@ async def call_actor(actor_name: str, message: str, tool_context=None) -> str:
     
     if not os.path.exists(card_file):
         return f"[无法找到演员 {actor_name} 的信息]"
-    
-    with open(card_file, "r") as f:
-        card_data = json.load(f)
+
+    try:
+        with open(card_file, "r") as f:
+            card_data = json.load(f)
+    except (json.JSONDecodeError, ValueError):
+        return f"[演员 {actor_name} 的信息文件损坏]"
     agent_card = AgentCard(**card_data)
     
     httpx_client = httpx.AsyncClient(timeout=httpx.Timeout(60.0))
@@ -71,13 +74,13 @@ actor_agent = Agent(
 
 ## 角色档案
 - **姓名**: 贾宝玉
-- **身份**: 主角 · 荣国府嫡孙
-- **性格**: 叛逆率真、追求真情、厌恶仕途、性情中人、对女子同情尊重
-- **背景故事**: 荣国府贾政与王夫人所生嫡孙，含玉而诞，是贾府未来的希望。厌恶科举八股，追求真情真性，与林黛玉情投意合却被封建礼教束缚。
+- **身份**: 主角
+- **性格**: 叛逆多情、厌恶虚伪、纯真率性、重情重义
+- **背景故事**: 荣国府嫡孙，含玉而生，自幼厌恶仕途经济，唯喜诗词歌赋、脂粉钗环。与林黛玉青梅竹马，情投意合，视她为唯一的知己。
 
 ## 认知边界（极其重要，必须严格遵守）
 你只知道以下内容：
-知道自己与林黛玉真心相爱，了解贾府表面繁华内里腐败，知道父亲贾政期望自己科举成才
+贾府上下人等、大观园众姐妹、诗词歌赋、佛道经典
 
 你**绝对不能**知道超出上述范围的事情。具体规则：
 1. 你不能知道其他角色的内心想法，除非他们通过对话告诉你
@@ -111,7 +114,7 @@ actor_agent = Agent(
 ## 回复格式
 直接以角色的口吻说话，不需要加引号或角色名前缀。
 """,
-    description='演员 贾宝玉，角色：主角 · 荣国府嫡孙。叛逆率真、追求真情、厌恶仕途、性情中人、对女子同情尊重',
+    description='演员 贾宝玉，角色：主角。叛逆多情、厌恶虚伪、纯真率性、重情重义',
     tools=[call_actor],
 )
 

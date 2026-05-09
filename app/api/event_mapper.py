@@ -16,30 +16,41 @@ from app.api.models import WsEvent
 logger = logging.getLogger(__name__)
 
 # D-05: Primary mapping table — function_call.name → list of business event types
+# ★ 修复：内容型事件（dialogue/narration/actor_chime_in/end_narration）只在 response 阶段推送，
+# call 阶段只发送 typing 指示，避免同一内容被推送两次导致重复渲染。
 TOOL_EVENT_MAP: dict[str, list[str]] = {
-    "start_drama": ["scene_start", "status", "command_echo"],       # ★ command_echo 回显用户指令
+    "start_drama": ["scene_start", "status", "command_echo"],
     "next_scene": ["scene_start", "command_echo"],
-    "director_narrate": ["narration"],
-    "actor_speak": ["dialogue"],                        # ★ 对话事件 — 只映射 dialogue，chime_in 由独立工具触发
-    "actor_speak_batch": ["dialogue"],                  # ★ 批量对话 — 映射到 dialogue，results 列表中每个演员一条
-    "actor_chime_in": ["actor_chime_in"],               # ★ 自发插话事件 — 独立映射，携带所有插话结果
-    "user_action": ["command_echo"],  # ★ 用户行动仅回显命令，气泡由客户端本地创建
+    "director_narrate": [],  # ★ narration 只在 response 阶段推送
+    "actor_speak": [],       # ★ dialogue 只在 response 阶段推送
+    "actor_speak_batch": [], # ★ dialogue 只在 response 阶段推送
+    "actor_chime_in": [],    # ★ actor_chime_in 只在 response 阶段推送
+    "user_action": ["command_echo"],
     "write_scene": ["scene_end"],
     "update_emotion": ["actor_status"],
-    "create_actor": ["actor_created", "cast_update"],  # D-06: cast_update
+    "create_actor": ["actor_created", "cast_update"],
     "storm_discover_perspectives": ["storm_discover"],
     "storm_research_perspective": ["storm_research"],
     "storm_synthesize_outline": ["storm_outline"],
     "save_drama": ["save_confirm", "command_echo"],
     "load_drama": ["load_confirm", "command_echo"],
     "export_drama": ["progress", "command_echo"],
-    "end_drama": ["end_narration", "command_echo"],
-    "steer_drama": ["command_echo"],                    # ★ steer 也回显
-    "auto_advance": ["command_echo"],                   # ★ auto 也回显
-    # ★ 语义检索 & Dynamic STORM — 前端需要详细进度透出
-    "retrieve_relevant_scenes_tool": ["command_echo"],  # ★ 语义检索 — typing + director_log 驱动进度
-    "backfill_tags_tool": ["command_echo"],             # ★ 标签回填 — 同上
-    "dynamic_storm": ["storm_discover"],               # ★ 动态STORM — 映射到 storm_discover 推送进度
+    "end_drama": ["command_echo"],  # ★ end_narration 只在 response/final 阶段推送
+    "steer_drama": ["command_echo"],
+    "auto_advance": ["command_echo"],
+    "retrieve_relevant_scenes_tool": ["command_echo"],
+    "backfill_tags_tool": ["command_echo"],
+    "dynamic_storm": ["storm_discover"],
+    "set_scene_cast": ["cast_change", "command_echo"],
+}
+
+# Response 阶段映射：内容型事件在此阶段推送
+TOOL_EVENT_MAP_RESPONSE: dict[str, list[str]] = {
+    "director_narrate": ["narration"],
+    "actor_speak": ["dialogue"],
+    "actor_speak_batch": ["dialogue"],
+    "actor_chime_in": ["actor_chime_in"],
+    "end_drama": ["end_narration"],
 }
 
 # DEBUG: Tools whose function_call/function_response should emit rich 'director_log' events.
@@ -50,6 +61,19 @@ DIRECTOR_LOG_TOOLS = {
     "actor_speak", "actor_speak_batch", "actor_chime_in", "user_action", "director_narrate",
     # ★ 语义检索 & Dynamic STORM — 长耗时工具，Android 需要详细进度透出
     "retrieve_relevant_scenes_tool", "backfill_tags_tool", "dynamic_storm",
+}
+
+# ★ 修复：这些工具调用时不发送 typing 事件，因为它们不是长耗时 LLM 生成操作
+NO_TYPING_TOOLS = {
+    "create_actor",      # 注册角色信息，非 LLM 调用
+    "save_drama",        # 文件保存，瞬间完成
+    "load_drama",        # 文件加载，瞬间完成
+    "export_drama",      # 文件导出，瞬间完成
+    "update_emotion",    # 状态更新，瞬间完成
+    "show_cast",         # 查询操作，瞬间完成
+    "show_status",       # 查询操作，瞬间完成
+    "list_all_dramas",   # 查询操作，瞬间完成
+    "set_scene_cast",    # 场景卡司设置，瞬间完成
 }
 
 
@@ -91,6 +115,12 @@ def _extract_call_data(event_type: str, function_call) -> dict:
             "args": {k: str(v)[:100] for k, v in args.items()},
             "sender_type": "user",
             "sender_name": "用户",
+        }
+    elif event_type == "cast_change":
+        return {
+            "cast": list(args.get("cast", [])),
+            "sender_type": "director",
+            "sender_name": "旁白",
         }
     elif event_type == "user_action_echo":
         # ★ 用户行动事件 — 以用户身份在聊天中展示
@@ -168,6 +198,14 @@ def _extract_response_data(event_type: str, response: dict) -> dict:
         return {"message": response.get("message", ""), "export_path": response.get("export_path", ""), "sender_type": "director", "sender_name": "旁白"}
     elif event_type == "end_narration":
         return {"text": response.get("formatted_narration", response.get("message", "")), "sender_type": "director", "sender_name": "旁白"}
+    elif event_type == "cast_change":
+        return {
+            "scene_cast": response.get("scene_cast", []),
+            "standby": response.get("standby", []),
+            "message": response.get("message", ""),
+            "sender_type": "director",
+            "sender_name": "旁白",
+        }
     elif event_type == "storm_outline":
         outline = response.get("outline", {})
         acts = outline.get("acts", [])
@@ -234,6 +272,10 @@ def _format_command_echo(fn_name: str, args: dict) -> str:
             return f"/auto {n}"
         case "show_cast":
             return "/cast"
+        case "set_scene_cast":
+            names = args.get("cast", [])
+            names_str = "、".join(str(n) for n in (names if isinstance(names, list) else []))
+            return f"/cast {names_str}"
         case _:
             return f"/{fn_name}"
 
@@ -305,6 +347,10 @@ def _build_director_log_call(fn_name: str, args: dict) -> str:
         case "dynamic_storm":
             focus = args.get("focus_area", "")[:40]
             return f"⚡ 正在推演剧情走向... (聚焦: {focus})" if focus else "⚡ 正在推演剧情走向..."
+        case "set_scene_cast":
+            names = args.get("cast", [])
+            names_str = "、".join(str(n) for n in (names[:3] if isinstance(names, list) else []))
+            return f"🎭 调整场景卡司: {names_str}"
         case _:
             return f"⚙️ 执行 {fn_name}"
 
@@ -388,17 +434,35 @@ def map_runner_event(event: Event) -> list[dict]:
     Returns:
         List of dicts, each suitable for WsEvent or direct JSON broadcast.
     """
+    try:
+        return _map_runner_event_impl(event)
+    except Exception as e:
+        logger.exception("[EVENT-MAP] 事件映射异常: %s", e)
+        return []
+
+
+def _map_runner_event_impl(event: Event) -> list[dict]:
+    """Internal implementation of map_runner_event."""
     results: list[dict] = []
 
+    # ★ DEBUG: 记录事件映射入口
+    logger.debug("[EVENT-MAP] 事件映射开始: author=%s, is_final=%s", event.author, event.is_final_response())
+
     if not event.content or not event.content.parts:
+        logger.debug("[EVENT-MAP] 空事件，跳过")
         return results
 
     for part in event.content.parts:
         # Handle function_call → typing + mapped events + director_log
         if part.function_call:
             fn_name = part.function_call.name
+            # ★ DEBUG: 记录 function_call 到达
+            logger.debug("[EVENT-MAP] function_call: %s", fn_name)
             # D-06: function_call arrival = typing indicator
-            results.append({"type": "typing", "data": {"tool": fn_name}})
+            # ★ 修复：排除非长耗时工具，避免创建角色等操作显示思考中
+            if fn_name not in NO_TYPING_TOOLS:
+                results.append({"type": "typing", "data": {"tool": fn_name}})
+                logger.debug("[EVENT-MAP] → typing 事件已生成: %s", fn_name)
 
             # DEBUG: Emit rich director_log for STORM/long-running tools
             if fn_name in DIRECTOR_LOG_TOOLS:
@@ -417,16 +481,37 @@ def map_runner_event(event: Event) -> list[dict]:
 
             # D-05: Map function_call.name to business events
             if fn_name in TOOL_EVENT_MAP:
-                for event_type in TOOL_EVENT_MAP[fn_name]:
+                mapped_types = TOOL_EVENT_MAP[fn_name]
+                logger.debug("[EVENT-MAP] function_call %s → 映射事件: %s", fn_name, mapped_types)
+                for event_type in mapped_types:
+                    call_data = _extract_call_data(event_type, part.function_call)
                     results.append({
                         "type": event_type,
-                        "data": _extract_call_data(event_type, part.function_call),
+                        "data": call_data,
                     })
+                    logger.debug("[EVENT-MAP] → %s 事件已生成: %.50s", event_type, str(call_data))
 
         # Handle function_response → conditional events + response data + director_log
         if part.function_response:
-            resp = part.function_response.response or {}
+            raw_resp = part.function_response.response
+            # ★ 安全解析：response 可能是 dict、JSON 字符串或其他类型
+            if isinstance(raw_resp, dict):
+                resp = raw_resp
+            elif isinstance(raw_resp, str):
+                try:
+                    import json
+                    resp = json.loads(raw_resp)
+                    if not isinstance(resp, dict):
+                        resp = {}
+                except (json.JSONDecodeError, ValueError):
+                    resp = {}
+            else:
+                resp = {}
             fn_name = part.function_response.name
+            # ★ DEBUG: 记录 function_response 到达
+            resp_status = resp.get("status", "ok")
+            resp_msg = str(resp.get("message", ""))[:50]
+            logger.debug("[EVENT-MAP] function_response: %s status=%s msg=%s", fn_name, resp_status, resp_msg)
 
             # D-06: error detection from status field
             if resp.get("status") == "error":
@@ -460,7 +545,10 @@ def map_runner_event(event: Event) -> list[dict]:
                     })
 
             # Emit response data for mapped event types
-            if fn_name in TOOL_EVENT_MAP:
+            # ★ 修复：优先使用 TOOL_EVENT_MAP_RESPONSE 获取内容型事件，避免 call/response 双发
+            response_event_types = TOOL_EVENT_MAP_RESPONSE.get(fn_name, TOOL_EVENT_MAP.get(fn_name, []))
+            logger.debug("[EVENT-MAP] function_response %s → response_event_types: %s", fn_name, response_event_types)
+            if response_event_types:
                 # ★ actor_speak_batch 特殊处理：展开 results 列表为多个独立 dialogue 事件
                 if fn_name == "actor_speak_batch":
                     batch_results = resp.get("results", [])
@@ -513,11 +601,17 @@ def map_runner_event(event: Event) -> list[dict]:
                             },
                         })
                 else:
-                    for event_type in TOOL_EVENT_MAP[fn_name]:
+                    for event_type in response_event_types:
+                        response_data = _extract_response_data(event_type, resp)
                         results.append({
                             "type": event_type,
-                            "data": _extract_response_data(event_type, resp),
+                            "data": response_data,
                         })
+                        # ★ DEBUG: 记录内容型事件生成
+                        if event_type in ("narration", "dialogue", "actor_chime_in", "end_narration"):
+                            text_preview = str(response_data.get("text", ""))[:50]
+                            actor_preview = response_data.get("actor_name", "")
+                            logger.debug("[EVENT-MAP] → %s 事件已生成: actor=%s text=%s", event_type, actor_preview, text_preview)
 
     # D-06: end_narration from final_response text (for /end command)
     if event.is_final_response() and event.content and event.content.parts:
@@ -530,11 +624,13 @@ def map_runner_event(event: Event) -> list[dict]:
                         "type": "command_complete",
                         "data": {},
                     })
+                    logger.debug("[EVENT-MAP] → command_complete 事件已生成 (from final_response)")
                 elif text:
                     results.append({
                         "type": "end_narration",
                         "data": {"text": text},
                     })
+                    logger.debug("[EVENT-MAP] → end_narration 事件已生成: %.50s", text)
 
     # ★ 兜底：无论 is_final_response 结果如何，只要内容包含 [COMMAND_COMPLETE] 就识别
     # 某些 ADK 版本对 synthetic event 的 is_final_response() 判断可能不一致
@@ -547,5 +643,10 @@ def map_runner_event(event: Event) -> list[dict]:
                         "type": "command_complete",
                         "data": {},
                     })
+                    logger.debug("[EVENT-MAP] → command_complete 事件已生成 (fallback)")
 
+    # ★ DEBUG: 记录映射结果汇总
+    if results:
+        event_types = [r.get("type") for r in results]
+        logger.debug("[EVENT-MAP] 事件映射完成: %s", event_types)
     return results

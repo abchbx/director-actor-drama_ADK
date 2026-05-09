@@ -9,6 +9,8 @@ import com.drama.app.data.remote.ws.WebSocketManager
 import com.drama.app.domain.repository.DramaRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,6 +38,7 @@ data class DirectorLogEntry(
 
 data class DramaCreateUiState(
     val theme: String = "",
+    val directorStyle: String = "default",
     val isCreating: Boolean = false,
     val stormPhase: String? = null,
     val error: String? = null,
@@ -44,10 +47,6 @@ data class DramaCreateUiState(
     /** 导演日志列表（最新在前，最多保留 50 条） */
     val directorLog: List<DirectorLogEntry> = emptyList(),
 )
-
-sealed class DramaCreateEvent {
-    data class NavigateToDetail(val dramaId: String) : DramaCreateEvent()
-}
 
 @HiltViewModel
 class DramaCreateViewModel @Inject constructor(
@@ -68,7 +67,8 @@ class DramaCreateViewModel @Inject constructor(
         private const val STATUS_ACTING = "acting"
         private const val STATUS_ENDED = "ended"
         // ★ 新增：绝对超时（秒）— 超时后强制导航，避免永久卡在创建页
-        private const val FORCE_NAVIGATE_TIMEOUT_SECONDS = 120  // 2分钟（与后端超时一致）
+        // ★ 修复：延长至 600 秒，与后端无超时模式对齐。后端 LLM 生成大纲可能超过 2 分钟。
+        private const val FORCE_NAVIGATE_TIMEOUT_SECONDS = 600
 
         /** 格式化已用时间为 [Xm Xs] 或 [Xs] */
         fun formatElapsed(seconds: Int): String {
@@ -82,11 +82,14 @@ class DramaCreateViewModel @Inject constructor(
         }
     }
 
-    private val _uiState = MutableStateFlow(DramaCreateUiState())
-    val uiState: StateFlow<DramaCreateUiState> = _uiState.asStateFlow()
+    private val _state = MutableStateFlow(DramaCreateUiState())
+    val state: StateFlow<DramaCreateUiState> = _state.asStateFlow()
 
-    private val _events = MutableSharedFlow<DramaCreateEvent>()
-    val events: SharedFlow<DramaCreateEvent> = _events.asSharedFlow()
+    private val _effect = MutableSharedFlow<DramaCreateEffect>(extraBufferCapacity = 64)
+    val effect: SharedFlow<DramaCreateEffect> = _effect.asSharedFlow()
+
+    /** Intent 顺序队列 — D-26-01: UNLIMITED 防止 WS 消息突发阻塞 */
+    private val intentQueue = Channel<DramaCreateIntent>(Channel.UNLIMITED)
 
     private var wsJob: Job? = null
     private var createJob: Job? = null
@@ -101,13 +104,89 @@ class DramaCreateViewModel @Inject constructor(
     /** WS 是否已连接且收到至少一个事件 — 收到后停止轮询以避免风暴 */
     @Volatile private var wsActive = false
 
-    fun createDrama(theme: String) {
+    init {
+        viewModelScope.launch {
+            intentQueue.consumeEach { intent ->
+                val currentState = _state.value
+                val newState = reduce(currentState, intent)
+                _state.compareAndSet(currentState, newState)
+            }
+        }
+    }
+
+    /** 唯一公共入口 — 所有操作必须经此入队 */
+    fun processIntent(intent: DramaCreateIntent) {
+        intentQueue.trySend(intent)
+    }
+
+    private fun emitEffect(effect: DramaCreateEffect) {
+        _effect.tryEmit(effect)
+    }
+
+    private fun reduce(state: DramaCreateUiState, intent: DramaCreateIntent): DramaCreateUiState {
+        return when (intent) {
+            is DramaCreateIntent.UpdateTheme -> state.copy(theme = intent.text)
+            is DramaCreateIntent.SelectDirectorStyle -> state.copy(directorStyle = intent.style)
+            is DramaCreateIntent.CreateDrama -> {
+                createDramaAsync(intent.theme)
+                state.copy(
+                    isCreating = true,
+                    error = null,
+                    stormPhase = "正在连接服务器...",
+                    elapsedSeconds = 0,
+                    directorLog = listOf(DirectorLogEntry(0, "导演开始创作「${intent.theme}」")),
+                )
+            }
+            is DramaCreateIntent.CancelCreation -> {
+                cancelCreation()
+                state.copy(isCreating = false, stormPhase = null)
+            }
+            is DramaCreateIntent.WsEventReceived -> {
+                handleStormEvent(intent.event)
+                state
+            }
+            is DramaCreateIntent.Internal.DirectorLogReceived -> {
+                state.copy(
+                    directorLog = listOf(intent.entry) + state.directorLog.take(MAX_LOG_ENTRIES - 1),
+                    stormPhase = intent.entry.message,
+                )
+            }
+            is DramaCreateIntent.Internal.CreateComplete -> {
+                navigated = true
+                emitEffect(DramaCreateEffect.NavigateToDetail(intent.dramaId))
+                state.copy(isCreating = false)
+            }
+            is DramaCreateIntent.Internal.CreateError -> {
+                state.copy(isCreating = false, error = intent.message, stormPhase = null)
+            }
+            is DramaCreateIntent.Internal.PollingPhaseUpdated -> {
+                val newLog = if (intent.log != null) {
+                    listOf(DirectorLogEntry(state.elapsedSeconds, intent.log)) + state.directorLog.take(MAX_LOG_ENTRIES - 1)
+                } else state.directorLog
+                state.copy(stormPhase = intent.phase, directorLog = newLog)
+            }
+            is DramaCreateIntent.Internal.PollingError -> {
+                state.copy(error = intent.message)
+            }
+            is DramaCreateIntent.Internal.ElapsedUpdated -> {
+                state.copy(elapsedSeconds = intent.seconds)
+            }
+            is DramaCreateIntent.Internal.ForceNavigateTimeout -> {
+                navigated = true
+                emitEffect(DramaCreateEffect.NavigateToDetail(intent.dramaId))
+                state.copy(isCreating = false)
+            }
+        }
+    }
+
+    private fun createDramaAsync(theme: String) {
         if (theme.isBlank()) return
         startTimeMs = System.currentTimeMillis()
         navigated = false
         hasConfirmedThemeMatch = false
         creatingTheme = theme.trim()  // ★ 记录用户输入的主题，用于后续验证
-        _uiState.update {
+        val directorStyle = _state.value.directorStyle
+        _state.update {
             it.copy(
                 isCreating = true,
                 error = null,
@@ -122,7 +201,7 @@ class DramaCreateViewModel @Inject constructor(
         wsJob = viewModelScope.launch {
             val config = serverPreferences.serverConfig.first() ?: run {
                 addLog("未配置服务器地址")
-                _uiState.update { it.copy(error = "未配置服务器地址", isCreating = false) }
+                _state.update { it.copy(error = "未配置服务器地址", isCreating = false) }
                 return@launch
             }
             webSocketManager.connect(config.ip, config.port, config.token, config.baseUrl)
@@ -145,10 +224,10 @@ class DramaCreateViewModel @Inject constructor(
 
         createJob?.cancel()
         createJob = viewModelScope.launch {
-            dramaRepository.startDrama(theme)
+            dramaRepository.startDrama(theme, directorStyle)
                 .onSuccess {
                     addLog("后端已接收创建请求")
-                    _uiState.update { it.copy(stormPhase = "导演正在构思世界观...") }
+                    _state.update { it.copy(stormPhase = "导演正在构思世界观...") }
                     // 轮询已在上面启动，此处无需重复调用
                 }
                 .onFailure { e ->
@@ -156,7 +235,7 @@ class DramaCreateViewModel @Inject constructor(
                     // ★ 关键：请求失败后必须停止所有后台任务，防止轮询/超时泄漏
                     navigated = true
                     cancelJobsOnly()
-                    _uiState.update {
+                    _state.update {
                         it.copy(
                             isCreating = false,
                             error = "创建请求失败: ${e.message}",
@@ -186,7 +265,7 @@ class DramaCreateViewModel @Inject constructor(
                 // ★ 防护：如果从未确认主题匹配，说明后端可能仍未创建新会话，不允许强制导航
                 if (!hasConfirmedThemeMatch) {
                     addLog("⏰ 已等待 ${formatElapsed(elapsed)}，但后端尚未确认新剧本主题")
-                    _uiState.update {
+                    _state.update {
                         it.copy(
                             isCreating = false,
                             error = "创建超时：后端未能在 ${FORCE_NAVIGATE_TIMEOUT_SECONDS} 秒内初始化新剧本，请检查后端日志后重试",
@@ -197,7 +276,7 @@ class DramaCreateViewModel @Inject constructor(
                     return@launch
                 }
                 addLog("⏰ 已等待 ${formatElapsed(elapsed)}，强制进入详情页...")
-                _uiState.update { it.copy(stormPhase = "正在进入剧本...") }
+                _state.update { it.copy(stormPhase = "正在进入剧本...") }
                 // 使用 creatingTheme 作为导航 ID，与 navigateToDetail 一致
                 val navTarget = creatingTheme.ifBlank { "current" }
                 navigateToDetail(navTarget)
@@ -254,7 +333,7 @@ class DramaCreateViewModel @Inject constructor(
                         when {
                             consecutiveErrors >= MAX_CONSECUTIVE_ERRORS && isConnectionError -> {
                                 addLog("连接中断（已重试 $MAX_CONSECUTIVE_ERRORS 次），请检查网络")
-                                _uiState.update {
+                                _state.update {
                                     it.copy(
                                         error = "无法连接服务器（已重试 $MAX_CONSECUTIVE_ERRORS 次）",
                                         stormPhase = "网络异常，尝试重新连接...",
@@ -264,7 +343,7 @@ class DramaCreateViewModel @Inject constructor(
                             }
                             consecutiveErrors >= MAX_CONSECUTIVE_ERRORS && !isConnectionError -> {
                                 addLog("服务响应异常：${e.message}")
-                                _uiState.update {
+                                _state.update {
                                     it.copy(
                                         error = "服务器响应异常（已重试 $MAX_CONSECUTIVE_ERRORS 次）：${e.message}",
                                         stormPhase = "等待服务器恢复...",
@@ -272,7 +351,7 @@ class DramaCreateViewModel @Inject constructor(
                                 }
                             }
                             consecutiveErrors <= 2 -> { /* 静默 */ }
-                            else -> _uiState.update {
+                            else -> _state.update {
                                 it.copy(stormPhase = "等待服务器响应... (${consecutiveErrors}/$MAX_CONSECUTIVE_ERRORS)")
                             }
                         }
@@ -333,10 +412,10 @@ class DramaCreateViewModel @Inject constructor(
             else -> "创作中..." to "创作进行中..."
         }
 
-        _uiState.update { it.copy(stormPhase = phaseInfo.first) }
+        _state.update { it.copy(stormPhase = phaseInfo.first) }
 
         // 仅在阶段变化时记录日志（避免刷屏）
-        val lastLog = _uiState.value.directorLog.firstOrNull()?.message
+        val lastLog = _state.value.directorLog.firstOrNull()?.message
         if (lastLog != phaseInfo.second) {
             addLog(phaseInfo.second)
         }
@@ -398,14 +477,14 @@ class DramaCreateViewModel @Inject constructor(
     private fun startTimer() {
         timerJob?.cancel()
         timerJob = viewModelScope.launch {
-            while (isActive && _uiState.value.isCreating && !navigated) {
+            while (isActive && _state.value.isCreating && !navigated) {
                 delay(1_000L)
-                _uiState.update { it.copy(elapsedSeconds = getElapsedSeconds()) }
+                _state.update { it.copy(elapsedSeconds = getElapsedSeconds()) }
             }
         }
     }
 
-    fun cancelCreation() {
+    private fun cancelCreation() {
         wsJob?.cancel()
         createJob?.cancel()
         pollingJob?.cancel()
@@ -414,13 +493,13 @@ class DramaCreateViewModel @Inject constructor(
         webSocketManager.disconnect()
         navigated = true
         addLog("用户取消创作")
-        _uiState.update { it.copy(isCreating = false, stormPhase = null) }
+        _state.update { it.copy(isCreating = false, stormPhase = null) }
     }
 
     private fun navigateToDetail(dramaId: String) {
         if (navigated) return
         navigated = true
-        _uiState.update { it.copy(isCreating = false) }
+        _state.update { it.copy(isCreating = false) }
 
         // ★★★ 核心修复：只取消本 VM 的事件收集 job，不断开 WS 物理连接 ★★★
         // 原因：WebSocketManager 是全局单例，disconnect() 会关闭底层 TCP 连接。
@@ -443,7 +522,7 @@ class DramaCreateViewModel @Inject constructor(
         // ★ 不再调用 webSocketManager.disconnect()！
 
         viewModelScope.launch {
-            _events.emit(DramaCreateEvent.NavigateToDetail(dramaId))
+            emitEffect(DramaCreateEffect.NavigateToDetail(dramaId))
         }
     }
 
@@ -468,7 +547,7 @@ class DramaCreateViewModel @Inject constructor(
 
             addLog(logMsg)
             // 更新状态文字为最新的 director_log 消息
-            _uiState.update { it.copy(stormPhase = (msg ?: logMsg)) }
+            _state.update { it.copy(stormPhase = (msg ?: logMsg)) }
             return  // director_log 不走下面的通用逻辑
         }
 
@@ -487,7 +566,7 @@ class DramaCreateViewModel @Inject constructor(
         if (logMsg != null) {
             addLog(logMsg)
             // 同时更新当前状态文字
-            _uiState.update { it.copy(stormPhase = logMsg) }
+            _state.update { it.copy(stormPhase = logMsg) }
         }
         // ★ 新增：storm_outline 事件表示大纲已生成，仅记录日志，不自动导航
         // 导航由轮询的 isComplete 条件决定（需要演员已创建后才导航）
@@ -512,7 +591,7 @@ class DramaCreateViewModel @Inject constructor(
 
     /** 追加一条导演日志（最新在前） */
     private fun addLog(message: String) {
-        _uiState.update { state ->
+        _state.update { state ->
             val entry = DirectorLogEntry(getElapsedSeconds(), message)
             val updated = listOf(entry) + state.directorLog.take(MAX_LOG_ENTRIES - 1)
             state.copy(directorLog = updated)

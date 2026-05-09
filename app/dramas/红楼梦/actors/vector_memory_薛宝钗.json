@@ -1,0 +1,134 @@
+[
+  {
+    "id": "3aac4653-8ebe-4e29-aaf7-8fb68b767ba4",
+    "content": "[插话触发] 林黛玉听闻宝玉愿为心上人折寿十年，心中五味杂陈——感动、不安、还有隐隐的忧虑。她眼眶微红，低下头去。",
+    "metadata": {
+      "actor_name": "薛宝钗",
+      "type": "working_memory",
+      "importance": "normal",
+      "scene": 1,
+      "stored_at": "2026-05-08T01:39:47.243274"
+    }
+  },
+  {
+    "id": "9d69a0f9-e599-49ea-92a5-9d3585ba4cc7",
+    "content": "[插话] 我说：黛玉妹妹，这是怎么了？可是身子不舒坦？",
+    "metadata": {
+      "importance": "normal",
+      "stored_at": "2026-05-08T01:39:53.972627",
+      "actor_name": "薛宝钗",
+      "type": "working_memory",
+      "scene": 1
+    }
+  },
+  {
+    "id": "2421be37-4379-4ffd-8e69-0ad68dc34cab",
+    "content": "面对情境: 宝钗来访，见二人神态亲密，便笑着打趣，又好奇询问二人读的是什么书。",
+    "metadata": {
+      "scene": 1,
+      "actor_name": "薛宝钗",
+      "stored_at": "2026-05-08T01:40:15.324732",
+      "type": "working_memory",
+      "importance": "normal"
+    }
+  },
+  {
+    "id": "2a7e76e0-1830-430e-8b60-f6762b8e17fd",
+    "content": "我说：妹妹若是心中有什么不畅快，不妨与我说道说道。闷在心里反倒伤身。",
+    "metadata": {
+      "type": "working_memory",
+      "actor_name": "薛宝钗",
+      "importance": "normal",
+      "stored_at": "2026-05-08T01:40:25.984131",
+      "scene": 1
+    }
+  },
+  {
+    "id": "ac2ed10b-05b2-48b6-836c-3300ae5a917c",
+    "content": "面对情境: 宝钗见黛玉神色有异，便不再追问，转而与宝玉闲话家常，问他可曾读过什么新书，又提醒他老爷正打算考他功课。",
+    "metadata": {
+      "scene": 2,
+      "stored_at": "2026-05-08T01:43:39.319454",
+      "type": "working_memory",
+      "importance": "normal",
+      "actor_name": "薛宝钗"
+    }
+  },
+  {
+    "id": "130d07ac-5ba8-48a3-9453-7d220b7d2f67",
+    "content": "我说：宝兄弟，近来可曾又得了什么新书？前儿听说你寻了本《西厢记》，可曾细细读了？我想着老爷不日便要考你功课，你还是收收心，莫要整日看那些杂书，仔细老爷教训你。",
+    "metadata": {
+      "scene": 2,
+      "actor_name": "薛宝钗",
+      "importance": "normal",
+      "stored_at": "2026-05-08T01:43:47.009118",
+      "type": "working_memory"
+    }
+  },
+  {
+    "id": "8212cca9-3502-4580-9484-cddef696da9a",
+    "content": "面对情境: 宝钗见此情形，心中了然，却只淡淡一笑，说黛玉妹妹素来身子弱，让宝玉多加照看便是。",
+    "metadata": {
+      "stored_at": "2026-05-08T01:44:19.323757",
+      "type": "working_memory",
+      "actor_name": "薛宝钗",
+      "scene": 2,
+      "importance": "normal"
+    }
+  },
+  {
+    "id": "96c8a112-474e-47d4-9818-6fad4ac8288f",
+    "content": "我说：黛玉妹妹素来身子弱，宝兄弟平日里还该多加照看才是。",
+    "metadata": {
+      "scene": 2,
+      "stored_at": "2026-05-08T01:44:27.134222",
+      "type": "working_memory",
+      "actor_name": "薛宝钗",
+      "importance": "normal"
+    }
+  },
+  {
+    "id": "8a7a14c3-1094-431a-b4f8-0dd9525df250",
+    "content": "面对情境: 宝钗从容起身，向贾政行礼问安，言语间替宝玉遮掩，说自己不过是来探望黛玉，顺便提醒宝兄弟该温习功课了。",
+    "metadata": {
+      "importance": "normal",
+      "actor_name": "薛宝钗",
+      "stored_at": "2026-05-08T01:48:41.620045",
+      "scene": 2,
+      "type": "working_memory"
+    }
+  },
+  {
+    "id": "a5b8b421-e4db-4c77-a3c4-9ab468aef013",
+    "content": "我说：老爷且请息怒，宝兄弟不过是惦记着黛玉妹妹的身子，兄妹情深，也是常理。\n\n（内心：老爷素来严厉，宝玉若是被训斥，姐妹们面上也不好看。且先缓和他们兄妹间的气氛要紧。）",
+    "metadata": {
+      "stored_at": "2026-05-08T01:48:52.433817",
+      "actor_name": "薛宝钗",
+      "importance": "normal",
+      "scene": 2,
+      "type": "working_memory"
+    }
+  },
+  {
+    "id": "902d7811-bb4a-4c47-a9a5-526d397d8f5a",
+    "content": "[插话触发] 贾政严厉训斥宝玉后，黛玉心疼落泪，宝钗在旁观察。",
+    "metadata": {
+      "stored_at": "2026-05-08T01:49:16.219443",
+      "type": "working_memory",
+      "scene": 2,
+      "importance": "normal",
+      "actor_name": "薛宝钗"
+    }
+  },
+  {
+    "id": "e81b54b1-b8f6-4485-a6dd-c8badccdc4bc",
+    "content": "[插话] 我说：黛玉妹妹快别伤心了，仔细哭坏了身子。",
+    "metadata": {
+      "actor_name": "薛宝钗",
+      "stored_at": "2026-05-08T01:49:20.575910",
+      "type": "working_memory",
+      "importance": "normal",
+      "scene": 2
+    }
+  }
+]

@@ -3,7 +3,10 @@ package com.drama.app.data.remote.dto
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class StartDramaRequestDto(val theme: String)
+data class StartDramaRequestDto(
+    val theme: String,
+    val director_style: String = "default"
+)
 
 @Serializable
 data class ActionRequestDto(val description: String)

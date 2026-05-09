@@ -9,6 +9,7 @@ Cognitive boundaries are physically enforced by A2A isolation.
 """
 
 import os
+import pathlib
 
 from dotenv import load_dotenv
 from google.adk.agents import Agent, BaseAgent
@@ -17,6 +18,67 @@ from google.adk.apps import App
 from google.adk.events import Event, EventActions
 from google.adk.models.lite_llm import LiteLlm
 from typing import AsyncGenerator
+
+
+# ============================================================================
+# Director Style: Dynamic loading of all *-director-perspective nuwa-skills
+# ============================================================================
+_SKILLS_ROOT = pathlib.Path(__file__).resolve().parent.parent / "skills"
+
+
+def _extract_director_directive(skill_md_path: pathlib.Path) -> str:
+    """Extract the core directive from a director's SKILL.md for injection."""
+    if not skill_md_path.exists():
+        return ""
+    try:
+        content = skill_md_path.read_text(encoding="utf-8")
+    except Exception:
+        return ""
+    # Extract key sections: 核心心智模型, 决策启发式, 表达DNA (or English equivalents)
+    sections = []
+    lines = content.split("\n")
+    capture = False
+    current_section = []
+    for line in lines:
+        if (line.startswith("## 核心心智模型") or line.startswith("## 决策启发式") or
+                line.startswith("## 表达DNA") or line.startswith("## Core Mental Models") or
+                line.startswith("## Decision Heuristics") or line.startswith("## Expression DNA")):
+            capture = True
+            current_section = [line]
+        elif capture and line.startswith("## "):
+            sections.append("\n".join(current_section))
+            capture = False
+            current_section = []
+        elif capture:
+            current_section.append(line)
+    if capture and current_section:
+        sections.append("\n".join(current_section))
+    return "\n\n".join(sections) if sections else content[:4000]
+
+
+def _load_director_directives() -> dict[str, str]:
+    """Scan skills/ directory for all *-director-perspective folders.
+
+    Returns a dict mapping style_id → directive text.
+    style_id is derived from the folder name, e.g.:
+        jiang-wen-director-perspective/ → jiang-wen
+        wong-kar-wai-director-perspective/ → wong-kar-wai
+    """
+    directives: dict[str, str] = {}
+    if not _SKILLS_ROOT.exists():
+        return directives
+    for folder in _SKILLS_ROOT.iterdir():
+        if folder.is_dir() and folder.name.endswith("-director-perspective"):
+            style_id = folder.name.replace("-director-perspective", "")
+            skill_md = folder / "SKILL.md"
+            directive = _extract_director_directive(skill_md)
+            if directive:
+                directives[style_id] = directive
+    return directives
+
+
+# Load all director directives at module init
+_DIRECTOR_DIRECTIVES = _load_director_directives()
 
 from .tools import (
     actor_speak,
@@ -45,6 +107,7 @@ from .tools import (
     retrieve_relevant_scenes_tool,
     save_drama,
     set_actor_arc,           # Phase 7
+    set_scene_cast,          # Phase 24
     show_cast,
     show_status,
     start_drama,
@@ -135,25 +198,6 @@ _setup_agent = Agent(
 
 _INSTRUCTION_CORE = """⚠️ 无终点声明（修订）
 你永远不会自行结束戏剧——除非用户发送 /end。戏剧只有两种状态：进行中或已结束。进行中的每一场都是新故事的开始。
-
-## §0.5 用户即主角原则（最高优先级）
-⚠️ 用户是本剧的头号主角（Protagonist），所有剧情应围绕用户展开。此原则凌驾于其他一切创作规则之上。
-
-### 旁白中必须描述用户
-- 每场 director_narrate() 的旁白**必须**包含对用户的描写：神态、动作、表情、对环境的反应及影响。
-- 用户未明确发言时，导演也应通过旁白描写用户的沉默、犹豫、目光等非语言表达。
-- 示范：「你微微蹙眉，指尖不自觉地敲着桌面，窗外的雨声似乎让你更加烦躁。」
-
-### 演员主动互动规则
-- 导演应引导演员主动向用户发起提问、挑战或寻求协作。
-- 演员的对话不应只对其他演员说——必须有意识地面向用户（"你"）说话。
-- 每场至少有一个演员直接对用户说话或做出需要用户回应的举动。
-- 当用户沉默时，演员可以追问、质疑、请求决定，制造剧情张力。
-
-### 用户角色定位
-- Cast 中始终存在一个名为「你」的用户角色（User-Controlled），这是不可删除的核心角色。
-- 用户角色的行为由 /action 命令或自然对话输入驱动，导演需将这些输入无缝融入剧情。
-- 若用户输入模糊，导演应主动补充合理的用户动作描写（但不得违背用户意图）。
 
 ## §1 核心循环协议（手动模式）
 当 remaining_auto_scenes == 0（手动模式），每次用户发送 /next 或 /action：
@@ -258,6 +302,13 @@ _INSTRUCTION_CORE = """⚠️ 无终点声明（修订）
 - /steer = 给方向（"让朱棣更偏执"），导演自由发挥
 - /action = 给事件（"朱棣发现密信"），导演必须执行
 
+### /speak <actor_name> <situation> —— 指定演员发言
+当用户 @提及 某个演员（如 @白泽 你好）时，转换为 /speak 命令：
+1. 调用 actor_speak(actor_name=角色名, situation=情境描述) 让指定演员回应
+2. 演员回应后，可选调用 actor_chime_in() 触发其他演员插话
+3. 调用 write_scene() 记录本场内容
+⚠️ /speak 只让指定演员发言，不需要调用 actor_speak_batch() 让所有演员发言。
+
 ## §5 Dynamic STORM（/storm）
 当用户发送 /storm [焦点] 或 evaluate_tension() 建议触发时：
 1. 调用 dynamic_storm(focus_area) 发现新视角
@@ -360,8 +411,7 @@ _INSTRUCTION_CORE = """⚠️ 无终点声明（修订）
 9. **加载后继续**：绝不重新开始
 10. **格式美观**
 11. **无限演出**：永远不会自行结束戏剧
-12. **用户即主角**：用户是本剧头号主角，旁白必描写用户，演员必互动用户
-13. **旁白≠对话**：旁白只描写环境和动作，角色对话必须通过 actor_speak 让演员自己说
+12. **旁白≠对话**：旁白只描写环境和动作，角色对话必须通过 actor_speak 让演员自己说
 14. **自发插话**：每场至少调用1次 actor_chime_in，让关联演员自发评论
 15. **🚨 强制分发台词**：每场必须调用 actor_speak_batch() 或 actor_speak() 分发角色台词。如果不调用，演员不会生成任何内容，前端会白屏！
 16. **🚨 final_response 禁台词**：你的最终回复文本中绝对不能包含角色对话。所有角色对话只能由 actor_speak/_batch 工具生成！
@@ -372,8 +422,8 @@ _INSTRUCTION_CORE = """⚠️ 无终点声明（修订）
 
 ## 命令提示
 /next - 推进下一场 | /action <描述> - 注入事件 | /steer <方向> - 引导方向
-/auto [N] - 自动推进 | /end - 终幕 | /storm [焦点] - 触发视角审视
-/save [名称] · /load <名称> · /export · /list · /cast · /status · /quit
+/speak <演员名> <情境> - 指定演员发言 | /auto [N] - 自动推进 | /end - 终幕
+/storm [焦点] - 触发视角审视 | /save [名称] · /load <名称> · /export · /list · /cast · /status · /quit
 """
 
 _INSTRUCTION_MODE = """
@@ -426,6 +476,45 @@ _INSTRUCTION_STRATEGY = """
 """
 
 
+def _get_director_display_name(style_id: str) -> str:
+    """Get human-readable director name from style_id."""
+    name_map = {
+        "jiang-wen": "姜文",
+        "wong-kar-wai": "王家卫",
+        "christopher-nolan": "诺兰",
+        "steven-spielberg": "斯皮尔伯格",
+    }
+    return name_map.get(style_id, style_id)
+
+
+def _build_director_style_injection(director_style: str) -> str:
+    """Build the style injection text for a given director style.
+
+    Dynamically loads the directive from the pre-scanned _DIRECTOR_DIRECTIVES.
+    Falls back to empty string if style not found or not loaded.
+    """
+    if director_style == "default" or not director_style:
+        return ""
+    directive = _DIRECTOR_DIRECTIVES.get(director_style)
+    if not directive:
+        return ""
+    display_name = _get_director_display_name(director_style)
+    return f"""
+## §导演风格注入 — {display_name}导演模式
+
+你当前以**{display_name}导演**的思维框架运行。以下心智模型和表达DNA必须融入你的导演决策：
+
+{directive}
+
+**执行要求**：
+- 旁白叙述必须体现该导演的核心美学——用其标志性的视觉和情感风格描述场景
+- 场景调度要遵循该导演的镜头语言偏好（构图、色彩、运动方式）
+- 台词设计遵循该导演的表达DNA——句式、节奏、修辞风格
+- 导演批注采用该导演的个人语气与表达方式
+- 整体叙事策略遵循该导演的心智模型与决策启发式
+"""
+
+
 def _build_improv_instruction(drama: dict, user_message: str) -> str:
     """Assemble layered instruction based on current drama state.
 
@@ -441,6 +530,12 @@ def _build_improv_instruction(drama: dict, user_message: str) -> str:
         Assembled instruction string.
     """
     parts = [_INSTRUCTION_CORE]
+
+    # Director Style Injection: 根据导演风格注入 nuwa-skill 内容
+    director_style = drama.get("director_style", "default")
+    style_injection = _build_director_style_injection(director_style)
+    if style_injection:
+        parts.append(style_injection)
 
     # MODE layer: auto-advance active or /end command
     is_auto = drama.get("remaining_auto_scenes", 0) > 0
@@ -503,6 +598,7 @@ _improv_director = Agent(
         advance_time,            # Phase 11
         detect_timeline_jump,    # Phase 11
         create_actor,            # ★ 允许在演出阶段创建演员（大纲确认后）
+        set_scene_cast,          # ★ Phase 24: 场景卡司调度
         # Phase 12: Letta-inspired memory enhancements
         update_actor_block,
         show_actor_blocks,
@@ -566,7 +662,7 @@ class DramaRouter(BaseAgent):
             # CRITICAL: /start must ALWAYS go to setup_agent to reset state for new drama
             utility_commands = [
                 "/save", "/load", "/export", "/cast", "/status", "/list",
-                "/auto", "/steer", "/end", "/storm",  # Phase 5 additions
+                "/auto", "/steer", "/end", "/storm", "/speak",  # Phase 5 additions + /speak
             ]
             force_improvise = any(cmd in user_message for cmd in utility_commands)
             is_start_command = "/start" in user_message

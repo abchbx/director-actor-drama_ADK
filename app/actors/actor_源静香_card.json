@@ -1,0 +1,26 @@
+{
+  "name": "actor_源静香",
+  "description": "演员 源静香，角色：配角",
+  "url": "http://localhost:9078/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_源静香",
+      "name": "扮演源静香",
+      "description": "以源静香的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

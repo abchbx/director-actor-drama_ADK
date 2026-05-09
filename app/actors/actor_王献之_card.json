@@ -1,0 +1,26 @@
+{
+  "name": "actor_王献之",
+  "description": "演员 王献之，角色：伦理/哲学视角 —— 书法家、名士",
+  "url": "http://localhost:9056/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_王献之",
+      "name": "扮演王献之",
+      "description": "以王献之的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

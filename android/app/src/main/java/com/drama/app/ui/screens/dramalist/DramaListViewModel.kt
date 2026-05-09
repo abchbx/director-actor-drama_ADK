@@ -4,14 +4,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.drama.app.domain.model.Drama
 import com.drama.app.domain.repository.DramaRepository
+import com.drama.app.ui.mvi.MviState
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -27,155 +29,180 @@ data class DramaListUiState(
     // Batch Selection Mode
     val isSelectionMode: Boolean = false,
     val selectedFolders: Set<String> = emptySet(),
-)
-
-sealed class DramaListEvent {
-    data class ShowSnackbar(val message: String) : DramaListEvent()
-}
+) : MviState
 
 @HiltViewModel
 class DramaListViewModel @Inject constructor(
     private val dramaRepository: DramaRepository,
 ) : ViewModel() {
-    private val _uiState = MutableStateFlow(DramaListUiState())
-    val uiState: StateFlow<DramaListUiState> = _uiState.asStateFlow()
 
-    private val _events = MutableSharedFlow<DramaListEvent>()
-    val events: SharedFlow<DramaListEvent> = _events.asSharedFlow()
+    private val _state = MutableStateFlow(DramaListUiState())
+    val state: StateFlow<DramaListUiState> = _state.asStateFlow()
 
-    init { loadDramas() }
+    private val _effect = MutableSharedFlow<DramaListEffect>(extraBufferCapacity = 64)
+    val effect: SharedFlow<DramaListEffect> = _effect.asSharedFlow()
 
-    // === Data Operations ===
+    /** Intent 顺序队列 — D-26-01: UNLIMITED 防止 WS 消息突发阻塞 */
+    private val intentQueue = Channel<DramaListIntent>(Channel.UNLIMITED)
 
-    fun loadDramas() {
+    init {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
-            dramaRepository.listDramas()
-                .onSuccess { dramas -> _uiState.update { it.copy(dramas = dramas, isLoading = false) } }
-                .onFailure { e -> _uiState.update { it.copy(error = e.message, isLoading = false) } }
+            intentQueue.consumeEach { intent ->
+                val currentState = _state.value
+                val newState = reduce(currentState, intent)
+                _state.compareAndSet(currentState, newState)
+            }
+        }
+        processIntent(DramaListIntent.LoadDramas)
+    }
+
+    /** 唯一公共入口 — 所有操作必须经此入队 */
+    fun processIntent(intent: DramaListIntent) {
+        intentQueue.trySend(intent)
+    }
+
+    /** Reducer 纯函数 — (State, Intent) -> State */
+    private fun reduce(state: DramaListUiState, intent: DramaListIntent): DramaListUiState {
+        return when (intent) {
+            // === 数据操作 ===
+            is DramaListIntent.LoadDramas -> {
+                loadDramasAsync()
+                state.copy(isLoading = true, error = null)
+            }
+            is DramaListIntent.DeleteDrama -> {
+                deleteDramaAsync(intent.folder)
+                state
+            }
+            is DramaListIntent.BatchDelete -> {
+                batchDeleteAsync(intent.folders)
+                state.copy(isSelectionMode = false, selectedFolders = emptySet())
+            }
+            is DramaListIntent.BatchUpdateStatus -> {
+                val updatedDramas = state.dramas.map { d ->
+                    if (d.folder in intent.folders) d.copy(status = intent.newStatus) else d
+                }
+                emitEffect(DramaListEffect.ShowSnackbar("已更新 ${intent.folders.size} 个剧本状态"))
+                state.copy(
+                    dramas = updatedDramas,
+                    isSelectionMode = false,
+                    selectedFolders = emptySet(),
+                )
+            }
+            is DramaListIntent.LoadDrama -> {
+                loadDramaAsync(intent.folder)
+                state
+            }
+
+            // === 搜索过滤 ===
+            is DramaListIntent.OnSearchQueryChanged -> state.copy(searchQuery = intent.query)
+            is DramaListIntent.OnStatusFilterChanged -> state.copy(selectedStatusFilter = intent.filter)
+
+            // === 选择模式 ===
+            is DramaListIntent.EnterSelectionMode ->
+                state.copy(isSelectionMode = true, selectedFolders = emptySet())
+            is DramaListIntent.ExitSelectionMode ->
+                state.copy(isSelectionMode = false, selectedFolders = emptySet())
+            is DramaListIntent.ToggleSelection -> {
+                val newSet = if (state.selectedFolders.contains(intent.folder))
+                    state.selectedFolders - intent.folder
+                else
+                    state.selectedFolders + intent.folder
+                state.copy(selectedFolders = newSet)
+            }
+            is DramaListIntent.SelectAll ->
+                state.copy(selectedFolders = intent.folders.toSet())
+            is DramaListIntent.ClearSelection ->
+                state.copy(selectedFolders = emptySet())
+
+            // === 内部异步结果 ===
+            is DramaListIntent.Internal.DramasLoaded ->
+                state.copy(dramas = intent.dramas, isLoading = false)
+            is DramaListIntent.Internal.LoadError ->
+                state.copy(error = intent.message, isLoading = false)
+            is DramaListIntent.Internal.DeleteComplete -> {
+                if (intent.success) {
+                    emitEffect(DramaListEffect.ShowSnackbar("已删除：${intent.folder}"))
+                    processIntent(DramaListIntent.LoadDramas)
+                } else {
+                    emitEffect(DramaListEffect.ShowSnackbar("删除失败：${intent.error}"))
+                }
+                state
+            }
+            is DramaListIntent.Internal.BatchDeleteComplete -> {
+                if (intent.successCount > 0) {
+                    emitEffect(DramaListEffect.ShowSnackbar("已删除 ${intent.successCount} 个剧本"))
+                    processIntent(DramaListIntent.LoadDramas)
+                }
+                state
+            }
+            is DramaListIntent.Internal.BatchUpdateComplete -> {
+                emitEffect(DramaListEffect.ShowSnackbar("已更新 ${intent.updatedCount} 个剧本状态"))
+                state
+            }
+            is DramaListIntent.Internal.LoadDramaComplete -> {
+                if (intent.success) {
+                    emitEffect(DramaListEffect.ShowSnackbar("已加载：${intent.folder}"))
+                } else {
+                    emitEffect(DramaListEffect.ShowSnackbar("加载失败：${intent.error}"))
+                }
+                state
+            }
         }
     }
 
-    fun deleteDrama(folder: String) {
+    private fun emitEffect(effect: DramaListEffect) {
+        _effect.tryEmit(effect)
+    }
+
+    private fun loadDramasAsync() {
+        viewModelScope.launch {
+            dramaRepository.listDramas()
+                .onSuccess { dramas ->
+                    processIntent(DramaListIntent.Internal.DramasLoaded(dramas))
+                }
+                .onFailure { e ->
+                    processIntent(DramaListIntent.Internal.LoadError(e.message))
+                }
+        }
+    }
+
+    private fun deleteDramaAsync(folder: String) {
         viewModelScope.launch {
             dramaRepository.deleteDrama(folder)
                 .onSuccess {
-                    // ★ 修复：从服务器重新刷新列表，确保前后端一致
-                    loadDramas()
-                    _events.emit(DramaListEvent.ShowSnackbar("已删除：$folder"))
+                    processIntent(DramaListIntent.Internal.DeleteComplete(folder, success = true))
                 }
                 .onFailure { e ->
-                    _events.emit(DramaListEvent.ShowSnackbar("删除失败：${e.message}"))
+                    processIntent(DramaListIntent.Internal.DeleteComplete(folder, success = false, error = e.message))
                 }
         }
     }
 
-    /** 批量删除选中的剧本 */
-    fun batchDelete(folders: Set<String>) {
+    private fun batchDeleteAsync(folders: Set<String>) {
         viewModelScope.launch {
             var successCount = 0
             folders.forEach { folder ->
                 dramaRepository.deleteDrama(folder)
                     .onSuccess { successCount++ }
             }
-            exitSelectionMode()
-            if (successCount > 0) {
-                loadDramas()
-                _events.emit(DramaListEvent.ShowSnackbar("已删除 $successCount 个剧本"))
-            }
+            processIntent(DramaListIntent.Internal.BatchDeleteComplete(successCount))
         }
     }
 
-    /** 修改选中剧本的状态 */
-    fun batchUpdateStatus(folders: Set<String>, newStatus: String) {
-        viewModelScope.launch {
-            var updated = 0
-            // 后端暂无批量状态修改 API，此处仅更新本地 UI 状态以展示效果
-            // 实际项目中需对接后端 PATCH 接口
-            folders.forEach { folder ->
-                _uiState.update { state ->
-                    state.copy(
-                        dramas = state.dramas.map { d ->
-                            if (d.folder == folder) d.copy(status = newStatus) else d
-                        },
-                    )
-                }
-                updated++
-            }
-            exitSelectionMode()
-            _events.emit(DramaListEvent.ShowSnackbar("已更新 $updated 个剧本状态"))
-        }
-    }
-
-    fun loadDrama(folder: String) {
+    private fun loadDramaAsync(folder: String) {
         viewModelScope.launch {
             dramaRepository.loadDrama(folder)
-                .onSuccess { _events.emit(DramaListEvent.ShowSnackbar("已加载：$folder")) }
-                .onFailure { e -> _events.emit(DramaListEvent.ShowSnackbar("加载失败：${e.message}")) }
+                .onSuccess {
+                    processIntent(DramaListIntent.Internal.LoadDramaComplete(folder, success = true))
+                }
+                .onFailure { e ->
+                    processIntent(DramaListIntent.Internal.LoadDramaComplete(folder, success = false, error = e.message))
+                }
         }
     }
 
-    // === Search & Filter ===
-
-    fun onSearchQueryChanged(query: String) {
-        _uiState.update { it.copy(searchQuery = query) }
-    }
-
-    fun onStatusFilterChanged(filter: String?) {
-        _uiState.update { it.copy(selectedStatusFilter = filter) }
-    }
-
-    /** 根据搜索词和状态筛选过滤后的列表 */
-    fun getFilteredDramas(state: DramaListUiState): List<Drama> {
-        return state.dramas.filter { drama ->
-            val matchesSearch =
-                state.searchQuery.isBlank() ||
-                drama.theme.contains(state.searchQuery, ignoreCase = true)
-            val matchesStatus =
-                state.selectedStatusFilter == null ||
-                drama.status == state.selectedStatusFilter
-            matchesSearch && matchesStatus
-        }
-    }
-
-    // === Selection Mode ===
-
-    fun enterSelectionMode() {
-        _uiState.update { it.copy(isSelectionMode = true, selectedFolders = emptySet()) }
-    }
-
-    fun exitSelectionMode() {
-        _uiState.update { it.copy(isSelectionMode = false, selectedFolders = emptySet()) }
-    }
-
-    fun toggleSelection(folder: String) {
-        _uiState.update { state ->
-            val newSet = if (state.selectedFolders.contains(folder))
-                state.selectedFolders - folder
-            else
-                state.selectedFolders + folder
-            state.copy(selectedFolders = newSet)
-        }
-    }
-
-    fun selectAll(availableFolders: List<String>) {
-        _uiState.update { it.copy(selectedFolders = availableFolders.toSet()) }
-    }
-
-    fun clearSelection() {
-        _uiState.update { it.copy(selectedFolders = emptySet()) }
-    }
-
-    val statusFilters = listOf(
-        "全部" to null,
-        "筹备中" to "setup",
-        "演出中" to "acting",
-        "已落幕" to "ended",
-    )
-
-    companion object {
-        const val STATUS_SETUP = "setup"
-        const val STATUS_ACTING = "acting"
-        const val STATUS_ENDED = "ended"
+    override fun onCleared() {
+        super.onCleared()
+        intentQueue.close()
     }
 }

@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -56,12 +57,13 @@ fun DramaCreateScreen(
     onNavigateToDetail: (String) -> Unit = {},
     viewModel: DramaCreateViewModel = hiltViewModel(),
 ) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val uiState by viewModel.state.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
-        viewModel.events.collect { event ->
+        viewModel.effect.collect { event ->
             when (event) {
-                is DramaCreateEvent.NavigateToDetail -> onNavigateToDetail(event.dramaId)
+                is DramaCreateEffect.NavigateToDetail -> onNavigateToDetail(event.dramaId)
+                is DramaCreateEffect.ShowSnackbar -> { /* 当前页面无 Scaffold，忽略 */ }
             }
         }
     }
@@ -150,7 +152,7 @@ fun DramaCreateScreen(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                IconButton(onClick = { viewModel.cancelCreation() }) {
+                IconButton(onClick = { viewModel.processIntent(DramaCreateIntent.CancelCreation) }) {
                     Surface(
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.surfaceVariant,
@@ -163,7 +165,7 @@ fun DramaCreateScreen(
                         )
                     }
                 }
-                TextButton(onClick = { viewModel.cancelCreation() }) {
+                TextButton(onClick = { viewModel.processIntent(DramaCreateIntent.CancelCreation) }) {
                     Text("取消", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
@@ -211,10 +213,58 @@ fun DramaCreateScreen(
                     ),
                 )
 
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // ── 导演风格选择 ──
+                Text(
+                    text = "选择导演风格",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    val styles = listOf(
+                        "default" to "默认导演",
+                        "jiang-wen" to "姜文导演",
+                        "wong-kar-wai" to "王家卫导演",
+                        "christopher-nolan" to "诺兰导演",
+                        "steven-spielberg" to "斯皮尔伯格导演",
+                    )
+                    styles.forEach { (key, label) ->
+                        val selected = uiState.directorStyle == key
+                        Surface(
+                            onClick = { viewModel.processIntent(DramaCreateIntent.SelectDirectorStyle(key)) },
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (selected) {
+                                MaterialTheme.colorScheme.primaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.surfaceVariant
+                            },
+                        ) {
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                color = if (selected) {
+                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(24.dp))
 
                 Button(
-                    onClick = { viewModel.createDrama(themeInput) },
+                    onClick = { viewModel.processIntent(DramaCreateIntent.CreateDrama(themeInput)) },
                     enabled = themeInput.isNotBlank(),
                     modifier = Modifier
                         .fillMaxWidth()

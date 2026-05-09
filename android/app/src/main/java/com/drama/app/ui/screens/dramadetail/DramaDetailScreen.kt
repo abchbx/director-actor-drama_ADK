@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -96,6 +97,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import com.drama.app.data.remote.ws.ConnectionState
 import com.drama.app.ui.screens.dramadetail.components.ActorDrawerContent
 import com.drama.app.ui.screens.dramadetail.components.ChatInputBar
+import com.drama.app.ui.screens.dramadetail.ChatMode
 import com.drama.app.ui.screens.dramadetail.components.SceneBubbleList
 import com.drama.app.ui.screens.dramadetail.components.SceneHistorySheet
 import com.drama.app.ui.screens.dramadetail.components.TensionIndicator
@@ -108,16 +110,16 @@ fun DramaDetailScreen(
     skipLoad: Boolean = false,
     viewModel: DramaDetailViewModel = hiltViewModel(),
 ) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val uiState by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
 
     // === WebSocket 生命周期：进入时连接，离开时断开 ===
     DisposableEffect(Unit) {
-        viewModel.connectWebSocket()
+        viewModel.processIntent(DramaDetailIntent.ConnectWebSocket)
         onDispose {
-            viewModel.disconnectWebSocket()
+            viewModel.processIntent(DramaDetailIntent.DisconnectWebSocket)
         }
     }
 
@@ -127,9 +129,9 @@ fun DramaDetailScreen(
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             when (event) {
                 androidx.lifecycle.Lifecycle.Event.ON_RESUME ->
-                    viewModel.setWebSocketForeground(true)
+                    viewModel.processIntent(DramaDetailIntent.SetWebSocketForeground(true))
                 androidx.lifecycle.Lifecycle.Event.ON_PAUSE ->
-                    viewModel.setWebSocketForeground(false)
+                    viewModel.processIntent(DramaDetailIntent.SetWebSocketForeground(false))
                 else -> { /* ignore */ }
             }
         }
@@ -161,7 +163,7 @@ fun DramaDetailScreen(
                 duration = androidx.compose.material3.SnackbarDuration.Indefinite,
             )
             if (result == SnackbarResult.ActionPerformed) {
-                viewModel.retryConnection()
+                viewModel.processIntent(DramaDetailIntent.RetryConnection)
             }
         }
     }
@@ -170,21 +172,22 @@ fun DramaDetailScreen(
     val view = LocalView.current
     val context = LocalContext.current
     LaunchedEffect(Unit) {
-        viewModel.events.collect { event ->
-            when (event) {
-                is DramaDetailEvent.ShowSnackbar ->
-                    snackbarHostState.showSnackbar(event.message)
+        viewModel.effect.collect { effect ->
+            when (effect) {
+                is DramaDetailEffect.ShowSnackbar ->
+                    snackbarHostState.showSnackbar(effect.message)
                 // ★ AI 回合开始时触发触觉反馈
-                is DramaDetailEvent.HapticFeedback ->
+                is DramaDetailEffect.HapticFeedback ->
                     view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
-                is DramaDetailEvent.ShareExport -> {
+                is DramaDetailEffect.ShareExport -> {
                     val shareIntent = Intent(Intent.ACTION_SEND).apply {
                         type = "text/markdown"
-                        putExtra(Intent.EXTRA_SUBJECT, event.title)
-                        putExtra(Intent.EXTRA_TEXT, event.content)
+                        putExtra(Intent.EXTRA_SUBJECT, effect.title)
+                        putExtra(Intent.EXTRA_TEXT, effect.content)
                     }
                     context.startActivity(Intent.createChooser(shareIntent, "分享剧本"))
                 }
+                is DramaDetailEffect.NavigateToHistory -> { /* 已由 SceneHistorySheet 内部处理 */ }
             }
         }
     }
@@ -211,9 +214,10 @@ fun DramaDetailScreen(
                             actors = uiState.actors,
                             isActorLoading = uiState.isActorLoading,
                             onDismiss = {
-                                viewModel.hideActorDrawer()
+                                viewModel.processIntent(DramaDetailIntent.ToggleActorDrawer)
                                 scope.launch { drawerState.close() }
                             },
+                            onToggleCast = { viewModel.processIntent(DramaDetailIntent.ToggleActorOnStage(it)) },
                         )
                     }
                 }
@@ -258,7 +262,7 @@ fun DramaDetailScreen(
                             modifier = Modifier.padding(horizontal = 32.dp),
                         )
                         Spacer(modifier = Modifier.height(24.dp))
-                        Button(onClick = viewModel::retryInit) {
+                        Button(onClick = { viewModel.processIntent(DramaDetailIntent.RetryInit) }) {
                             Icon(
                                 Icons.Filled.Refresh,
                                 contentDescription = null,
@@ -273,10 +277,11 @@ fun DramaDetailScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    // 仅消费状态栏 insets，防止 TopAppBar 被遮挡
-                    // 导航栏 insets 不在这里消费，避免 imePadding() 计算时被扣除
+                    // 消费状态栏 insets（TopAppBar 自行处理），避免子组件重复 padding
                     .consumeWindowInsets(WindowInsets.statusBars)
-                    // ★ imePadding：整个内容区避让键盘，消息列表自动收缩
+                    // 为导航栏添加底部 padding，确保内容不被手势导航条遮挡
+                    .windowInsetsPadding(WindowInsets.navigationBars)
+                    // 键盘弹出时整体内容向上收缩
                     .imePadding()
             ) {
                 TopAppBar(
@@ -298,7 +303,7 @@ fun DramaDetailScreen(
                     },
                     navigationIcon = {
                         if (uiState.viewingHistoryScene != null) {
-                            IconButton(onClick = viewModel::returnToCurrentScene) {
+                            IconButton(onClick = { viewModel.processIntent(DramaDetailIntent.ReturnToCurrentScene) }) {
                                 Icon(Icons.Filled.ArrowBack, contentDescription = "返回当前场景")
                             }
                         }
@@ -306,12 +311,12 @@ fun DramaDetailScreen(
                     actions = {
                         TensionIndicator(score = uiState.tensionScore)
                         IconButton(onClick = {
-                            viewModel.showActorDrawer()
+                            viewModel.processIntent(DramaDetailIntent.ToggleActorDrawer)
                             scope.launch { drawerState.open() }
                         }) {
                             Icon(Icons.Filled.People, contentDescription = "演员面板")
                         }
-                        IconButton(onClick = viewModel::showHistorySheet) {
+                        IconButton(onClick = { viewModel.processIntent(DramaDetailIntent.LoadSceneHistory) }) {
                             Icon(Icons.Filled.History, contentDescription = "场景历史")
                         }
                         Box {
@@ -325,14 +330,14 @@ fun DramaDetailScreen(
                                 DropdownMenuItem(
                                     text = { Text("保存") },
                                     onClick = {
-                                        viewModel.showSaveDialog()
+                                        viewModel.processIntent(DramaDetailIntent.ShowSaveDialog)
                                         showOverflowMenu = false
                                     },
                                 )
                                 DropdownMenuItem(
                                     text = { Text("导出") },
                                     onClick = {
-                                        viewModel.exportDrama()
+                                        viewModel.processIntent(DramaDetailIntent.ExportDrama)
                                         showOverflowMenu = false
                                     },
                                     enabled = !uiState.isExporting,
@@ -340,6 +345,12 @@ fun DramaDetailScreen(
                             }
                         }
                     },
+                )
+
+                // ★ Phase 25: 模式切换 Chip 行
+                ChatModeSwitcher(
+                    currentMode = uiState.chatMode,
+                    onModeChange = { viewModel.processIntent(DramaDetailIntent.ToggleChatMode) },
                 )
 
                 // 连接状态指示器：Connecting/Reconnecting → 进度条，Disconnected → 横幅
@@ -354,7 +365,7 @@ fun DramaDetailScreen(
                         uiState.outlineSummary.isNotBlank() && uiState.currentScene == 0 && uiState.bubbles.isEmpty() -> {
                             OutlineConfirmPanel(
                                 outline = uiState.outlineSummary,
-                                onConfirm = { viewModel.sendCommand("/action 开始") },
+                                onConfirm = { viewModel.processIntent(DramaDetailIntent.SendCommand("/action 开始")) },
                             )
                         }
                         uiState.bubbles.isEmpty() && !uiState.isTyping -> {
@@ -367,6 +378,9 @@ fun DramaDetailScreen(
                                 isTyping = uiState.isTyping,
                                 typingText = uiState.typingText,
                                 typingElapsedSeconds = uiState.typingElapsedSeconds,
+                                // ★ 修复 D-25-02：传递实时占位气泡信息，call 阶段即显示气泡框
+                                streamingActorName = uiState.streamingActorName,
+                                streamingText = uiState.streamingText,
                             )
                         }
                     }
@@ -396,13 +410,21 @@ fun DramaDetailScreen(
                     ) + fadeOut(tween(200)),
                 ) {
                     ChatInputBar(
-                        actors = uiState.actors.map { it.name },
-                        onSend = viewModel::sendChatMessage,
-                        onCommand = viewModel::sendCommand,
+                        actors = uiState.actors,
+                        onSend = { text, mention ->
+                            if (uiState.chatMode == ChatMode.FREE_CHAT) {
+                                viewModel.processIntent(DramaDetailIntent.SendFreeChatMessage(text, mention))
+                            } else {
+                                viewModel.processIntent(DramaDetailIntent.SendChatMessage(text, mention))
+                            }
+                        },
+                        onCommand = { viewModel.processIntent(DramaDetailIntent.SendCommand(it)) },
+                        onInterrupt = { viewModel.processIntent(DramaDetailIntent.InterruptProcessing) },
                         isProcessing = uiState.isProcessing,
                         isTyping = uiState.isTyping,
                         isWsConnected = uiState.isWsConnected,
                         isReconnecting = uiState.isReconnecting,
+                        chatMode = uiState.chatMode,
                     )
                 }
             }
@@ -421,8 +443,8 @@ fun DramaDetailScreen(
     if (uiState.showHistorySheet) {
         SceneHistorySheet(
             scenes = uiState.historyScenes,
-            onSceneClick = viewModel::viewHistoryScene,
-            onDismiss = viewModel::hideHistorySheet,
+            onSceneClick = { viewModel.processIntent(DramaDetailIntent.ViewSceneHistory(it)) },
+            onDismiss = { viewModel.processIntent(DramaDetailIntent.DismissSceneHistory) },
         )
     }
 
@@ -430,7 +452,7 @@ fun DramaDetailScreen(
     if (uiState.showSaveDialog) {
         var saveName by rememberSaveable { mutableStateOf("") }
         AlertDialog(
-            onDismissRequest = viewModel::hideSaveDialog,
+            onDismissRequest = { viewModel.processIntent(DramaDetailIntent.DismissSaveDialog) },
             title = { Text("保存戏剧") },
             text = {
                 OutlinedTextField(
@@ -441,10 +463,10 @@ fun DramaDetailScreen(
                 )
             },
             confirmButton = {
-                TextButton(onClick = { viewModel.saveDrama(saveName) }) { Text("保存") }
+                TextButton(onClick = { viewModel.processIntent(DramaDetailIntent.SaveDrama(saveName)) }) { Text("保存") }
             },
             dismissButton = {
-                TextButton(onClick = viewModel::hideSaveDialog) { Text("取消") }
+                TextButton(onClick = { viewModel.processIntent(DramaDetailIntent.DismissSaveDialog) }) { Text("取消") }
             },
         )
     }
@@ -563,6 +585,77 @@ private fun DramaEmptyState() {
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                 textAlign = TextAlign.Center,
             )
+        }
+    }
+}
+
+// ============================================================
+// ChatModeSwitcher — 聊天模式切换控件（Phase 25）
+// ============================================================
+
+@Composable
+private fun ChatModeSwitcher(
+    currentMode: ChatMode,
+    onModeChange: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+            modifier = Modifier.height(36.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                // 群聊模式（导演模式）
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = if (currentMode == ChatMode.DIRECTOR)
+                        MaterialTheme.colorScheme.primaryContainer
+                    else
+                        MaterialTheme.colorScheme.surfaceContainerHighest,
+                    onClick = { if (currentMode != ChatMode.DIRECTOR) onModeChange() },
+                    modifier = Modifier.padding(2.dp),
+                ) {
+                    Text(
+                        text = "剧情推进",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (currentMode == ChatMode.DIRECTOR)
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                    )
+                }
+
+                // 自由模式
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = if (currentMode == ChatMode.FREE_CHAT)
+                        MaterialTheme.colorScheme.tertiaryContainer
+                    else
+                        MaterialTheme.colorScheme.surfaceContainerHighest,
+                    onClick = { if (currentMode != ChatMode.FREE_CHAT) onModeChange() },
+                    modifier = Modifier.padding(2.dp),
+                ) {
+                    Text(
+                        text = "自由聊天",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (currentMode == ChatMode.FREE_CHAT)
+                            MaterialTheme.colorScheme.onTertiaryContainer
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                    )
+                }
+            }
         }
     }
 }

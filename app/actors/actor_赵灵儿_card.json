@@ -1,0 +1,26 @@
+{
+  "name": "actor_赵灵儿",
+  "description": "演员 赵灵儿，角色：女主角",
+  "url": "http://localhost:9013/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_赵灵儿",
+      "name": "扮演赵灵儿",
+      "description": "以赵灵儿的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

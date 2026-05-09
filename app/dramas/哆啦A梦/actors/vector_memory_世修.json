@@ -1,0 +1,46 @@
+[
+  {
+    "id": "d7736d06-8717-4139-a02e-ff204ed9282e",
+    "content": "[插话触发] 哆啦A梦刚刚向大雄介绍了自己是从22世纪来的机器猫，要帮助他改变命运。大雄可能会对这个神奇的事情感到好奇或害怕",
+    "metadata": {
+      "type": "working_memory",
+      "scene": 1,
+      "actor_name": "世修",
+      "importance": "normal",
+      "stored_at": "2026-05-01T08:25:45.352787"
+    }
+  },
+  {
+    "id": "2f4807b8-a140-44fc-b608-57887bae60e7",
+    "content": "[插话] 我说：哆啦A梦成功了...希望这次一切顺利，祖先大人会慢慢接受的。",
+    "metadata": {
+      "stored_at": "2026-05-01T08:25:54.817054",
+      "type": "working_memory",
+      "importance": "normal",
+      "actor_name": "世修",
+      "scene": 1
+    }
+  },
+  {
+    "id": "d8aed6a6-82ef-4b08-ba6b-c095129ad347",
+    "content": "[插话触发] 大雄正在犹豫要不要许愿，担心改变后的世界会让自己失去朋友。哆啦A梦在鼓励他勇敢一点。",
+    "metadata": {
+      "actor_name": "世修",
+      "stored_at": "2026-05-01T08:28:21.047732",
+      "scene": 2,
+      "importance": "normal",
+      "type": "working_memory"
+    }
+  },
+  {
+    "id": "510b4f83-e9bc-4fe6-b9f1-74ce7c75e4c3",
+    "content": "[插话] 我说：祖先大人请放心，真正的朋友不会因为世界的改变而消失的。",
+    "metadata": {
+      "importance": "normal",
+      "scene": 2,
+      "actor_name": "世修",
+      "type": "working_memory",
+      "stored_at": "2026-05-01T08:28:27.530441"
+    }
+  }
+]

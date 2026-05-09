@@ -1,0 +1,26 @@
+{
+  "name": "actor_星璇",
+  "description": "演员 星璇，角色：天象司星官，掌握时间命运的知识",
+  "url": "http://localhost:9042/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_星璇",
+      "name": "扮演星璇",
+      "description": "以星璇的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

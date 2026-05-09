@@ -15,6 +15,7 @@ data class DramaStatusResponseDto(
     val time_period: String = "",
     val has_outline: Boolean = false,
     val outline_summary: String = "",
+    val director_style: String = "default",
 )
 
 @Serializable

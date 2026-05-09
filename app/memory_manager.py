@@ -150,8 +150,9 @@ def extract_and_register_entities(text: str, speaker_name: str = "",
 # Constants (from D-01, D-02, D-06)
 # ============================================================================
 
-WORKING_MEMORY_LIMIT = 5
+WORKING_MEMORY_LIMIT = 3  # D-01: tightened from 5 → 3 for sharper working memory focus
 SCENE_SUMMARY_LIMIT = 10
+SHORT_TERM_MEMORY_LIMIT = 8  # L2 capacity
 
 CRITICAL_REASONS = [
     "首次登场",   # Character first appearance / relationship established
@@ -933,6 +934,7 @@ def add_working_memory(
     actor_data.setdefault("working_memory", [])
     actor_data.setdefault("critical_memories", [])
     actor_data.setdefault("scene_summaries", [])
+    actor_data.setdefault("short_term_memory", [])  # Phase 28: L2
     actor_data.setdefault("arc_summary", {
         "structured": {"theme": "", "key_characters": [], "unresolved": [], "resolved": []},
         "narrative": "",
@@ -1253,7 +1255,7 @@ def ensure_actor_memory_fields(actor_data: dict, actor_name: str = "") -> dict:
 
     Utility function to add missing fields to actor dicts that were
     created before the memory architecture was implemented.
-    Also initializes memory_blocks if not present.
+    Also initializes memory_blocks and short_term_memory if not present.
 
     Args:
         actor_data: The actor data dict to check/update.
@@ -1269,6 +1271,8 @@ def ensure_actor_memory_fields(actor_data: dict, actor_name: str = "") -> dict:
         "narrative": "",
     })
     actor_data.setdefault("critical_memories", [])
+    # Phase 28: Short-term memory (L2)
+    actor_data.setdefault("short_term_memory", [])
     # Memory Blocks (Phase 12+)
     actor_data.setdefault("memory_blocks", {})
     if actor_name and not actor_data["memory_blocks"]:
@@ -1290,11 +1294,13 @@ def pre_reasoning_hook(
 ) -> dict:
     """Unified memory preparation hook called before each actor reasoning step.
 
-    借鉴 ReMe 的 pre_reasoning_hook 模式，在每次演员推理前自动执行：
+    Phase 28 重构：明确三层记忆召回架构（L1 工作记忆 → L2 短期记忆 → L3 长期记忆）。
+    在每次演员推理前自动执行：
     1. 合并待处理的压缩结果（_merge_pending_compression）
     2. 检查记忆容量并触发压缩（check_and_compress）
-    3. 可选：语义召回相关记忆片段（retrieve_relevant_scenes）
-    4. 应用记忆衰减权重（_apply_decay_weights）
+    3. 应用记忆衰减权重（_apply_decay_weights）
+    4. L2 短期记忆召回（search_short_term_memory）
+    5. L3 长期记忆召回（向量语义 + RIR 综合评分）
 
     这确保演员在每次回应前，记忆状态是最新的且经过优化的，
     而非依赖零散的、分散在不同调用点的记忆管理。
@@ -1310,7 +1316,8 @@ def pre_reasoning_hook(
         - status: "success" or "error"
         - merged: bool — whether pending compression was merged
         - compression: result from check_and_compress (if enabled)
-        - recall: list of recalled memory fragments (if enabled)
+        - l2_recall: list of short-term memory fragments
+        - l3_recall: list of long-term vector memory fragments (RIR scored)
         - recall_tags: auto-generated tags used for recall
         - decay_applied: bool — whether decay was applied
     """
@@ -1321,15 +1328,21 @@ def pre_reasoning_hook(
         return {"status": "error", "message": f"演员「{actor_name}」不存在。"}
 
     actor_data = actors[actor_name]
-    result = {"status": "success", "merged": False, "compression": None, "recall": [], "recall_tags": [], "decay_applied": False}
+    result = {
+        "status": "success",
+        "merged": False,
+        "compression": None,
+        "l2_recall": [],
+        "l3_recall": [],
+        "recall_tags": [],
+        "decay_applied": False,
+    }
 
     # Step 1: Merge any completed pending compression results
-    # This ensures the latest compressed data is available before building context
     merged = _merge_pending_compression(actor_name, actor_data, tool_context)
     result["merged"] = merged
 
     # Step 2: Check memory tier sizes and trigger compression if needed
-    # This keeps memory within limits before the actor sees it
     if enable_compression:
         compression_result = check_and_compress(actor_name, tool_context)
         result["compression"] = compression_result
@@ -1338,62 +1351,63 @@ def pre_reasoning_hook(
     decay_result = _apply_decay_weights(actor_name, tool_context)
     result["decay_applied"] = decay_result.get("applied", False)
 
-    # Step 3: Semantic recall — find relevant past memories based on auto-tags
-    # Inspired by ReMe's memory_search but adapted to our tag-weighted system
-    if enable_recall:
-        from .semantic_retriever import _extract_auto_tags, retrieve_relevant_scenes
-        from .context_builder import estimate_tokens
+    if not enable_recall:
+        return result
 
-        # Refresh state after compression
-        state = _get_state(tool_context)
-        actor_data = state.get("actors", {}).get(actor_name, {})
+    # Refresh state after compression
+    state = _get_state(tool_context)
+    actor_data = state.get("actors", {}).get(actor_name, {})
+    current_scene = state.get("current_scene", 0)
 
-        auto_tags = _extract_auto_tags(actor_data, tool_context)
-        result["recall_tags"] = auto_tags
+    # Step 3: Auto-tag extraction (shared across L2/L3 recall)
+    from .semantic_retriever import _extract_auto_tags
+    auto_tags = _extract_auto_tags(actor_data, tool_context)
+    result["recall_tags"] = auto_tags
 
+    # Step 4: L2 Short-term memory recall (Phase 28)
+    try:
+        from .short_term_memory import search_short_term_memory
         if auto_tags:
-            current_scene = state.get("current_scene", 0)
-            # Actor-side recall: top-3, limited to own memories (D-07)
-            recall_results = retrieve_relevant_scenes(
-                tags=auto_tags,
-                current_scene=current_scene,
-                tool_context=tool_context,
+            l2_results = search_short_term_memory(
                 actor_name=actor_name,
+                query_tags=auto_tags,
+                tool_context=tool_context,
                 top_k=3,
             )
-            result["recall"] = [
+            result["l2_recall"] = [
                 {
-                    "scenes_covered": r.get("scenes_covered", ""),
-                    "text": r.get("text", "")[:150],
-                    "matched_tags": r.get("matched_tags", []),
+                    "scene_range": r.get("scene_range", ""),
+                    "summary": r.get("summary", "")[:150],
                     "score": r.get("score", 0),
                 }
-                for r in recall_results
+                for r in l2_results
             ]
+    except Exception as e:
+        logger.debug(f"L2 short-term recall skipped for {actor_name}: {e}")
 
-    # Step 4: Vector memory recall (Tier 4) — semantic search in long-term memory
-    if enable_recall:
-        current_scene = state.get("current_scene", 0) if 'state' in dir() else 0
-        # Refresh state
-        state = _get_state(tool_context)
-        try:
-            vector_results = search_vector_memory(
-                actor_name=actor_name,
-                query=f"第{current_scene}场 最近的经历",
-                n_results=3,
-                tool_context=tool_context,
-            )
-            if vector_results:
-                result["vector_recall"] = [
-                    {
-                        "content": r.get("content", "")[:150],
-                        "relevance": r.get("relevance", 0),
-                        "scene": r.get("metadata", {}).get("scene", ""),
-                    }
-                    for r in vector_results
-                ]
-        except Exception as e:
-            logger.debug(f"Vector recall skipped for {actor_name}: {e}")
+    # Step 5: L3 Long-term vector memory recall with RIR scoring (Phase 28)
+    try:
+        from .short_term_memory import rank_vector_results_by_rir
+        vector_results = search_vector_memory(
+            actor_name=actor_name,
+            query=f"第{current_scene}场 最近的经历",
+            n_results=8,  # Over-fetch for RIR re-ranking
+            tool_context=tool_context,
+        )
+        if vector_results:
+            # RIR re-ranking
+            ranked = rank_vector_results_by_rir(vector_results, current_scene)
+            result["l3_recall"] = [
+                {
+                    "content": r.get("content", "")[:150],
+                    "relevance": r.get("relevance", 0),
+                    "rir_score": r.get("rir_score", 0),
+                    "scene": r.get("metadata", {}).get("scene", ""),
+                }
+                for r in ranked[:3]  # Top-3 after RIR ranking
+            ]
+    except Exception as e:
+        logger.debug(f"L3 vector recall skipped for {actor_name}: {e}")
 
     return result
 

@@ -34,7 +34,6 @@ import com.drama.app.ui.components.MarkdownConfig
 import com.drama.app.ui.components.MarkdownText
 import com.drama.app.ui.components.ParagraphSpacing
 import com.drama.app.ui.components.QuoteStyle
-import com.drama.app.ui.components.TypewriterMarkdownText
 import com.drama.app.ui.theme.MarkdownColors
 
 /** 导演头像颜色 - 专属配色 */
@@ -131,10 +130,11 @@ fun NarrationBubble(bubble: SceneBubble.Narration) {
         }
 
         // ★ 叙述气泡 — 群聊样式：居中，自适应宽度，小圆角，更紧凑
+        // ★ 修复：背景色不透明度从 0.45f 提升到 0.78f，增加 1dp 阴影，确保气泡视觉层次分明
         Surface(
             shape = RoundedCornerShape(12.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-            shadowElevation = 0.dp,
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.78f),
+            shadowElevation = 1.dp,
             modifier = Modifier.padding(horizontal = 32.dp),
         ) {
             // ★ Markdown 渲染：支持 **加粗**、*斜体*、`代码`、[链接](url) 等
@@ -169,8 +169,7 @@ fun NarrationBubble(bubble: SceneBubble.Narration) {
                 ),
             )
 
-            TypewriterMarkdownText(
-                id = bubble.id,
+            MarkdownText(
                 markdown = bubble.text,
                 style = MaterialTheme.typography.bodyMedium.copy(
                     fontStyle = FontStyle.Italic,
@@ -179,7 +178,6 @@ fun NarrationBubble(bubble: SceneBubble.Narration) {
                 ),
                 config = narrationConfig,
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                typingSpeedMs = 22L,
             )
         }
     }
@@ -248,8 +246,8 @@ fun RealtimeNarrationBubble(text: String) {
 
         Surface(
             shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f),
-            shadowElevation = 0.dp,
+            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f),
+            shadowElevation = 1.dp,
             modifier = Modifier.fillMaxWidth(),
         ) {
             // 旁白配置

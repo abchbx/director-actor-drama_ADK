@@ -1,0 +1,90 @@
+[
+  {
+    "id": "d9244458-c90b-4354-bfd5-889ad7065e17",
+    "content": "面对情境: 大雄正对着成绩单发呆，看到抽屉里冒出一个蓝色的圆滚滚的东西，惊讶地问这是什么",
+    "metadata": {
+      "importance": "normal",
+      "scene": 1,
+      "type": "working_memory",
+      "actor_name": "野比大雄",
+      "stored_at": "2026-05-01T08:25:31.684238"
+    }
+  },
+  {
+    "id": "bc89c474-cbea-4266-a78e-e1f1c304fccc",
+    "content": "我说：哇啊啊啊！什、什么东西啊？！抽屉里怎么会冒出一个蓝色的……圆滚滚的……你是谁啊？！",
+    "metadata": {
+      "importance": "normal",
+      "stored_at": "2026-05-01T08:25:41.957515",
+      "scene": 1,
+      "type": "working_memory",
+      "actor_name": "野比大雄"
+    }
+  },
+  {
+    "id": "4544d86a-4576-4d49-9313-e166d818a0ea",
+    "content": "[插话触发] 哆啦A梦刚刚向大雄介绍了自己是从22世纪来的机器猫，要帮助他改变命运。大雄可能会对这个神奇的事情感到好奇或害怕",
+    "metadata": {
+      "importance": "normal",
+      "stored_at": "2026-05-01T08:25:46.253070",
+      "actor_name": "野比大雄",
+      "scene": 1,
+      "type": "working_memory"
+    }
+  },
+  {
+    "id": "ca6de065-2908-4876-8aee-6293730a1d9b",
+    "content": "[插话] 我说：22、22世纪？！你在说什么啊，这、这也太奇怪了吧……你真的是从未来来的吗？",
+    "metadata": {
+      "actor_name": "野比大雄",
+      "type": "working_memory",
+      "scene": 1,
+      "importance": "normal",
+      "stored_at": "2026-05-01T08:25:52.885248"
+    }
+  },
+  {
+    "id": "378f5728-a6bf-41c3-8341-4b867d655a52",
+    "content": "面对情境: 看到哆啦A梦真的拿出了神奇道具，大雄感到惊讶又好奇",
+    "metadata": {
+      "importance": "normal",
+      "type": "working_memory",
+      "actor_name": "野比大雄",
+      "scene": 1,
+      "stored_at": "2026-05-01T08:25:59.957644"
+    }
+  },
+  {
+    "id": "15654bfb-2fab-4870-8239-764189bd1942",
+    "content": "我说：等一下等一下……你是说你要帮我改变命运？那、那我现在要怎么办？你说的那些道具，真的能从那个口袋里拿出来吗？（内心：虽然有点害怕，但听起来好像很厉害的样子……）",
+    "metadata": {
+      "stored_at": "2026-05-01T08:26:07.253585",
+      "scene": 1,
+      "importance": "normal",
+      "actor_name": "野比大雄",
+      "type": "working_memory"
+    }
+  },
+  {
+    "id": "f9d45bb6-58b8-4056-a99e-8c7275245b2d",
+    "content": "面对情境: 大雄面对如果电话亭，内心挣扎着不知道该许什么愿望，既想要改变现状又害怕改变",
+    "metadata": {
+      "actor_name": "野比大雄",
+      "type": "working_memory",
+      "scene": 2,
+      "importance": "normal",
+      "stored_at": "2026-05-01T08:28:05.754265"
+    }
+  },
+  {
+    "id": "bb48e861-5efb-4aa0-9d2c-9256787d2eaa",
+    "content": "我说：这、这个就是如果电话亭吗……？真的只要许愿就能改变现实？\n\n可是……我要许什么愿望啊？变成成绩第一名？还是让胖虎和小夫不再欺负我？\n\n不对不对，如果我真的变厉害了，那、那我现在认识的人还会是现在这样吗？胖虎还是胖虎吗？静香还会和我做朋友吗？\n\n哆啦A梦，我、我有点害怕……万一我许了愿，结果变得不认识任何人了怎么办？我虽然对现在的生活有很多不满意的地方，但、但我不想连朋友都失去啊……",
+    "metadata": {
+      "actor_name": "野比大雄",
+      "importance": "normal",
+      "stored_at": "2026-05-01T08:28:14.340463",
+      "type": "working_memory",
+      "scene": 2
+    }
+  }
+]

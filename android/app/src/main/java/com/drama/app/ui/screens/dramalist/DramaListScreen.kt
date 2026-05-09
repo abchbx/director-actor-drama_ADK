@@ -99,7 +99,7 @@ fun DramaListScreen(
     onDramaClick: (String) -> Unit = {},
     viewModel: DramaListViewModel = hiltViewModel(),
 ) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val uiState by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
     // ★ 关键修复：从详情页返回时自动刷新列表，避免新创建的剧本不显示
@@ -107,7 +107,7 @@ fun DramaListScreen(
     DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
-                viewModel.loadDramas()
+                viewModel.processIntent(DramaListIntent.LoadDramas)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -117,9 +117,10 @@ fun DramaListScreen(
     }
 
     LaunchedEffect(Unit) {
-        viewModel.events.collect { event ->
-            when (event) {
-                is DramaListEvent.ShowSnackbar -> snackbarHostState.showSnackbar(event.message)
+        viewModel.effect.collect { effect ->
+            when (effect) {
+                is DramaListEffect.ShowSnackbar -> snackbarHostState.showSnackbar(effect.message)
+                is DramaListEffect.NavigateToDetail -> { /* 由外部导航处理 */ }
             }
         }
     }
@@ -142,33 +143,46 @@ fun DramaListScreen(
 
     // 过滤后的数据
     val filteredDramas by remember(uiState.dramas, uiState.searchQuery, uiState.selectedStatusFilter) {
-        derivedStateOf { viewModel.getFilteredDramas(uiState) }
+        derivedStateOf {
+            uiState.dramas.filter { drama ->
+                val matchesSearch = uiState.searchQuery.isBlank() ||
+                    drama.theme.contains(uiState.searchQuery, ignoreCase = true)
+                val matchesStatus = uiState.selectedStatusFilter == null ||
+                    drama.status == uiState.selectedStatusFilter
+                matchesSearch && matchesStatus
+            }
+        }
     }
+
+    val statusFilters = listOf(
+        "全部" to null,
+        "筹备中" to "setup",
+        "演出中" to "acting",
+        "已落幕" to "ended",
+    )
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
+            modifier = Modifier.fillMaxSize(),
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 // === 1. 吸顶搜索栏区域 ===
                 SearchHeader(
                     searchQuery = uiState.searchQuery,
-                    onValueChange = viewModel::onSearchQueryChanged,
+                    onValueChange = { viewModel.processIntent(DramaListIntent.OnSearchQueryChanged(it)) },
                     isScrolled = isScrolled,
                     modifier = Modifier.fillMaxWidth(),
                 )
 
                 // === 2. 状态筛选 Chips（含管理按钮） ===
                 StatusFilterChips(
-                    filters = viewModel.statusFilters,
+                    filters = statusFilters,
                     selectedFilter = uiState.selectedStatusFilter,
-                    onFilterChanged = viewModel::onStatusFilterChanged,
+                    onFilterChanged = { viewModel.processIntent(DramaListIntent.OnStatusFilterChanged(it)) },
                     showManageButton = !uiState.isSelectionMode,
-                    onManageClick = { viewModel.enterSelectionMode() },
+                    onManageClick = { viewModel.processIntent(DramaListIntent.EnterSelectionMode) },
                     modifier = Modifier.fillMaxWidth(),
                 )
 
@@ -202,7 +216,12 @@ fun DramaListScreen(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .weight(1f),
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                            contentPadding = PaddingValues(
+                                start = 16.dp,
+                                end = 16.dp,
+                                top = 8.dp + innerPadding.calculateTopPadding(),
+                                bottom = 8.dp + innerPadding.calculateBottomPadding(),
+                            ),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             itemsIndexed(
@@ -213,10 +232,10 @@ fun DramaListScreen(
                                     drama = drama,
                                     isSelectionMode = uiState.isSelectionMode,
                                     isSelected = uiState.selectedFolders.contains(drama.folder),
-                                    onToggleSelect = { viewModel.toggleSelection(drama.folder) },
+                                    onToggleSelect = { viewModel.processIntent(DramaListIntent.ToggleSelection(drama.folder)) },
                                     onDramaClick = onDramaClick,
-                                    onLoadDrama = { viewModel.loadDrama(drama.theme) },
-                                    onDeleteDrama = { viewModel.deleteDrama(drama.folder) },
+                                    onLoadDrama = { viewModel.processIntent(DramaListIntent.LoadDrama(drama.theme)) },
+                                    onDeleteDrama = { viewModel.processIntent(DramaListIntent.DeleteDrama(drama.folder)) },
                                 )
                             }
                         }
@@ -244,16 +263,16 @@ fun DramaListScreen(
                     if (uiState.selectedFolders.size == filteredDramas.size &&
                         uiState.selectedFolders.containsAll(filteredDramas.map { it.folder })
                     ) {
-                        viewModel.clearSelection()
+                        viewModel.processIntent(DramaListIntent.ClearSelection)
                     } else {
-                        viewModel.selectAll(filteredDramas.map { it.folder })
+                        viewModel.processIntent(DramaListIntent.SelectAll(filteredDramas.map { it.folder }))
                     }
                 },
                 onDelete = { showBatchDeleteDialog = true },
                 onUpdateStatus = { status ->
-                    viewModel.batchUpdateStatus(uiState.selectedFolders, status)
+                    viewModel.processIntent(DramaListIntent.BatchUpdateStatus(uiState.selectedFolders, status))
                 },
-                onCancel = { viewModel.exitSelectionMode() },
+                onCancel = { viewModel.processIntent(DramaListIntent.ExitSelectionMode) },
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
 
@@ -265,7 +284,7 @@ fun DramaListScreen(
                     text = { Text("确定要删除选中的 ${uiState.selectedFolders.size} 个剧本？此操作无法撤销。") },
                     confirmButton = {
                         TextButton(onClick = {
-                            viewModel.batchDelete(uiState.selectedFolders)
+                            viewModel.processIntent(DramaListIntent.BatchDelete(uiState.selectedFolders))
                             showBatchDeleteDialog = false
                         }) { Text("删除") }
                     },

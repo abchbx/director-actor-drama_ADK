@@ -1,0 +1,26 @@
+{
+  "name": "actor_诸葛云",
+  "description": "演员 诸葛云，角色：镜像——诸葛亮的另一面，智慧与旁观",
+  "url": "http://localhost:9001/",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "act_诸葛云",
+      "name": "扮演诸葛云",
+      "description": "以诸葛云的身份进行角色扮演",
+      "tags": [
+        "acting",
+        "roleplay"
+      ]
+    }
+  ]
+}

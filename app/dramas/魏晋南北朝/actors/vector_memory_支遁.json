@@ -1,0 +1,46 @@
+[
+  {
+    "id": "2e125ea7-7e52-4788-9ba6-b631ab3307e8",
+    "content": "面对情境: 你正在竹亭里喂白鹤，感受到空气中微妙的紧绷。谢安的沉默、王献之的等待，你都看在眼里。你不会直接问那封信的事，而是用一个佛家的隐喻或故事，点化当下的情境。你是旁观者，却比任何人都看得清楚。",
+    "metadata": {
+      "actor_name": "支遁",
+      "importance": "normal",
+      "type": "working_memory",
+      "scene": 1,
+      "stored_at": "2026-05-01T08:04:01.741045"
+    }
+  },
+  {
+    "id": "45ba139a-44a4-463d-a8bb-1a0ff683e13a",
+    "content": "我说：诸位可知，鹤有六翮，本可高飞九天，然驯养日久，竟忘却云霄之乐。世人皆叹鹤之温顺，却不知——那笼中之鹤，夜夜梦的仍是万里长风。\n\n谢公，你说这鹤，是放它归山好，还是留它在庭中好？",
+    "metadata": {
+      "scene": 1,
+      "importance": "normal",
+      "stored_at": "2026-05-01T08:04:12.171147",
+      "actor_name": "支遁",
+      "type": "working_memory"
+    }
+  },
+  {
+    "id": "ea4eb404-e1c7-47ff-a11f-8948bc63cb38",
+    "content": "面对情境: 你看到谢安终于拿起了那封信。你一直在用隐喻点化他，但现在，面对这个即将做出抉择的时刻，你会说什么？是继续用佛理来开导，还是说出更直接的话？你知道，这一刻对谢安来说至关重要。",
+    "metadata": {
+      "actor_name": "支遁",
+      "stored_at": "2026-05-01T08:08:49.453464",
+      "type": "working_memory",
+      "importance": "normal",
+      "scene": 2
+    }
+  },
+  {
+    "id": "1a9f9304-6095-4c8c-b153-4b3d874356f0",
+    "content": "我说：litellm.APIError: APIError: OpenAIException - Insufficient account balance",
+    "metadata": {
+      "importance": "normal",
+      "actor_name": "支遁",
+      "scene": 2,
+      "type": "working_memory",
+      "stored_at": "2026-05-01T08:08:50.449847"
+    }
+  }
+]

@@ -3,6 +3,7 @@ package com.drama.app.data.repository
 import com.drama.app.data.remote.api.DramaApiService
 import com.drama.app.data.remote.dto.ActionRequestDto
 import com.drama.app.data.remote.dto.ChatRequestDto
+import com.drama.app.data.remote.dto.FreeChatRequestDto
 import com.drama.app.data.remote.dto.CommandResponseDto
 import com.drama.app.data.remote.dto.LoadRequestDto
 import com.drama.app.data.remote.dto.SaveRequestDto
@@ -32,9 +33,9 @@ class DramaRepositoryImpl @Inject constructor(
 
     // ===== 原有 DTO 级方法 =====
 
-    override suspend fun startDrama(theme: String): Result<CommandResponseDto> =
+    override suspend fun startDrama(theme: String, directorStyle: String): Result<CommandResponseDto> =
         runCatching {
-            dramaApiService.startDrama(StartDramaRequestDto(theme))
+            dramaApiService.startDrama(StartDramaRequestDto(theme, directorStyle))
         }
 
     override suspend fun listDramas(): Result<List<Drama>> = runCatching {
@@ -132,9 +133,20 @@ class DramaRepositoryImpl @Inject constructor(
             dramaApiService.getCast()
         }
 
+    override suspend fun setSceneCast(cast: List<String>): Result<CommandResponseDto> =
+        runCatching {
+            val message = "/cast ${cast.joinToString(",")}"
+            dramaApiService.chatMessage(ChatRequestDto(message, null))
+        }
+
     override suspend fun sendChatMessage(message: String, mention: String?): Result<CommandResponseDto> =
         runCatching {
             dramaApiService.chatMessage(ChatRequestDto(message, mention))
+        }
+
+    override suspend fun sendFreeChatMessage(message: String, mention: String?, senderName: String): Result<CommandResponseDto> =
+        runCatching {
+            dramaApiService.freeChatMessage(FreeChatRequestDto(message, mention, senderName))
         }
 
     // ===== 业务逻辑下沉：领域模型级方法 =====
@@ -142,6 +154,12 @@ class DramaRepositoryImpl @Inject constructor(
     override suspend fun sendChatMessageAsBubbles(message: String, mention: String?, senderName: String): Result<List<SceneBubble>> =
         runCatching {
             val resp = dramaApiService.chatMessage(ChatRequestDto(message, mention, senderType = "user", senderName = senderName))
+            extractBubblesFromCommandResponse(resp)
+        }
+
+    override suspend fun sendFreeChatMessageAsBubbles(message: String, mention: String?, senderName: String): Result<List<SceneBubble>> =
+        runCatching {
+            val resp = dramaApiService.freeChatMessage(FreeChatRequestDto(message, mention, senderName))
             extractBubblesFromCommandResponse(resp)
         }
 
@@ -164,7 +182,7 @@ class DramaRepositoryImpl @Inject constructor(
         } catch (e: Exception) {
             com.drama.app.data.remote.dto.CastStatusResponseDto()
         }
-        mergeCastWithStatus(cast, status)
+        mergeCastWithStatus(cast, status, status.scene_cast)
     }
 
     override suspend fun getConversationLogBubbles(): Result<List<SceneBubble>> = runCatching {
@@ -184,7 +202,7 @@ class DramaRepositoryImpl @Inject constructor(
                 bubbles.add(SceneBubble.SceneDivider(
                     id = "conv_div_${scene}",
                     sceneNumber = scene,
-                    sceneTitle = "第${scene}场",
+                    sceneTitle = "",  // 不重复设置"第N场"，渲染层已自动添加
                 ))
                 lastScene = scene
             }
@@ -358,8 +376,10 @@ class DramaRepositoryImpl @Inject constructor(
     private fun mergeCastWithStatus(
         cast: com.drama.app.data.remote.dto.CastResponseDto,
         status: com.drama.app.data.remote.dto.CastStatusResponseDto,
+        sceneCast: List<String>? = null,
     ): List<ActorInfo> {
         val statusMap = status.actors
+        val onStageSet = sceneCast?.toSet()
         val mergedActors = mutableListOf<ActorInfo>()
 
         for ((name, actorElement) in cast.actors) {
@@ -379,6 +399,8 @@ class DramaRepositoryImpl @Inject constructor(
                 ?: a2aObj?.get("progress")?.jsonPrimitive?.intOrNull
                 ?: 0
 
+            val isOnStage = onStageSet?.contains(name) ?: true
+
             mergedActors.add(ActorInfo(
                 name = name,
                 role = role,
@@ -389,6 +411,7 @@ class DramaRepositoryImpl @Inject constructor(
                 isA2ARunning = isRunning,
                 a2aPort = port,
                 thinkingProgress = thinkingSteps,
+                onStage = isOnStage,
             ))
         }
 

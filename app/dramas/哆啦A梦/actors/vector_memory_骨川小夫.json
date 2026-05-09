@@ -1,0 +1,24 @@
+[
+  {
+    "id": "7dcc04e0-8232-4279-a171-81d298a48240",
+    "content": "[插话触发] 哆啦A梦刚刚向大雄介绍了自己是从22世纪来的机器猫，要帮助他改变命运。大雄可能会对这个神奇的事情感到好奇或害怕",
+    "metadata": {
+      "actor_name": "骨川小夫",
+      "stored_at": "2026-05-01T08:25:46.716415",
+      "type": "working_memory",
+      "importance": "normal",
+      "scene": 1
+    }
+  },
+  {
+    "id": "30e5e0e0-5320-4338-927e-32389e1fcc41",
+    "content": "[插话] 我说：哈哈，22世纪来的机器猫？大雄你是不是漫画看太多了，Oh my god，这种话你也信啊？",
+    "metadata": {
+      "type": "working_memory",
+      "scene": 1,
+      "stored_at": "2026-05-01T08:25:53.639323",
+      "importance": "normal",
+      "actor_name": "骨川小夫"
+    }
+  }
+]
